@@ -1218,12 +1218,36 @@ function buildTableRows(table, allItems, hoursData) {
     settingsBtn.onTap = async () => {
       const alert = new Alert();
       alert.title = "Settings";
-      alert.message = `Logged in as: ${CONFIG.fullName}\nTeam: ${CONFIG.teams?.[0]?.name || "N/A"}\nRole: ${CONFIG.isManager ? "Manager" : "Contributor"}\nRate: $${CONFIG.hourlyRate}/hr\nEnv: ${CONFIG.useQA ? "QA" : "Production"}`;
+      alert.message = `Logged in as: ${CONFIG.fullName}\nTeam: ${CONFIG.teams?.[0]?.name || "N/A"}\nRole: ${CONFIG.isManager ? "Manager" : "Contributor"}\nRate: $${CONFIG.hourlyRate}/hr\nEnv: ${CONFIG.useQA ? "QA" : "Production"}\nVersion: v${SCRIPT_VERSION}`;
+      alert.addAction("Check for Updates");
       alert.addAction("Change Hourly Rate");
       alert.addDestructiveAction("Re-login / Reconfigure");
       alert.addCancelAction("Close");
       const choice = await alert.presentAlert();
       if (choice === 0) {
+        const update = await checkForUpdate();
+        if (update) {
+          const ua = new Alert();
+          ua.title = "Update Available";
+          ua.message = `v${update.version} is available (you have v${SCRIPT_VERSION}).${update.changelog ? "\n\n" + update.changelog : ""}`;
+          ua.addAction("Update Now");
+          ua.addCancelAction("Later");
+          if (await ua.presentAlert() === 0) {
+            const ok = await performUpdate();
+            const ra = new Alert();
+            ra.title = ok ? "Updated!" : "Update Failed";
+            ra.message = ok ? "Restart the script to use the new version." : "Could not download the update. Try again later.";
+            ra.addAction("OK");
+            await ra.presentAlert();
+          }
+        } else {
+          const na = new Alert();
+          na.title = "Up to Date";
+          na.message = `You're running the latest version (v${SCRIPT_VERSION}).`;
+          na.addAction("OK");
+          await na.presentAlert();
+        }
+      } else if (choice === 1) {
         const rateAlert = new Alert();
         rateAlert.title = "Hourly Rate";
         rateAlert.message = `Current rate: $${CONFIG.hourlyRate}/hr`;
@@ -1235,7 +1259,7 @@ function buildTableRows(table, allItems, hoursData) {
           const newRate = parseFloat(rateAlert.textFieldValue(0));
           if (newRate > 0) updateConfigField("hourlyRate", newRate);
         }
-      } else if (choice === 1) {
+      } else if (choice === 2) {
         clearConfig();
         await runOnboarding();
       }
@@ -1247,7 +1271,7 @@ function buildTableRows(table, allItems, hoursData) {
     footerRow.backgroundColor = new Color("#1a1a1a");
     footerRow.height = 30;
     const footerText = footerRow.addText(
-      `Updated: ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} • Week of ${getWeekStartDate()}`
+      `v${SCRIPT_VERSION} • Updated: ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} • Week of ${getWeekStartDate()}`
     );
     footerText.titleFont = Font.systemFont(11);
     footerText.titleColor = new Color("#666666");
@@ -1369,12 +1393,36 @@ function buildTableRows(table, allItems, hoursData) {
   settingsBtn.onTap = async () => {
     const alert = new Alert();
     alert.title = "Settings";
-    alert.message = `Logged in as: ${CONFIG.fullName}\nTeam: ${CONFIG.teams?.[0]?.name || "N/A"}\nRole: ${CONFIG.isManager ? "Manager" : "Contributor"}\nRate: $${CONFIG.hourlyRate}/hr\nEnv: ${CONFIG.useQA ? "QA" : "Production"}`;
+    alert.message = `Logged in as: ${CONFIG.fullName}\nTeam: ${CONFIG.teams?.[0]?.name || "N/A"}\nRole: ${CONFIG.isManager ? "Manager" : "Contributor"}\nRate: $${CONFIG.hourlyRate}/hr\nEnv: ${CONFIG.useQA ? "QA" : "Production"}\nVersion: v${SCRIPT_VERSION}`;
+    alert.addAction("Check for Updates");
     alert.addAction("Change Hourly Rate");
     alert.addDestructiveAction("Re-login / Reconfigure");
     alert.addCancelAction("Close");
     const choice = await alert.presentAlert();
     if (choice === 0) {
+      const update = await checkForUpdate();
+      if (update) {
+        const ua = new Alert();
+        ua.title = "Update Available";
+        ua.message = `v${update.version} is available (you have v${SCRIPT_VERSION}).${update.changelog ? "\n\n" + update.changelog : ""}`;
+        ua.addAction("Update Now");
+        ua.addCancelAction("Later");
+        if (await ua.presentAlert() === 0) {
+          const ok = await performUpdate();
+          const ra = new Alert();
+          ra.title = ok ? "Updated!" : "Update Failed";
+          ra.message = ok ? "Restart the script to use the new version." : "Could not download the update. Try again later.";
+          ra.addAction("OK");
+          await ra.presentAlert();
+        }
+      } else {
+        const na = new Alert();
+        na.title = "Up to Date";
+        na.message = `You're running the latest version (v${SCRIPT_VERSION}).`;
+        na.addAction("OK");
+        await na.presentAlert();
+      }
+    } else if (choice === 1) {
       const rateAlert = new Alert();
       rateAlert.title = "Hourly Rate";
       rateAlert.message = `Current rate: $${CONFIG.hourlyRate}/hr`;
@@ -1386,7 +1434,7 @@ function buildTableRows(table, allItems, hoursData) {
         const newRate = parseFloat(rateAlert.textFieldValue(0));
         if (newRate > 0) updateConfigField("hourlyRate", newRate);
       }
-    } else if (choice === 1) {
+    } else if (choice === 2) {
       clearConfig();
       await runOnboarding();
     }
@@ -1398,7 +1446,7 @@ function buildTableRows(table, allItems, hoursData) {
   footerRow.backgroundColor = new Color("#1a1a1a");
   footerRow.height = 30;
   const footerText = footerRow.addText(
-    `Updated: ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} • Week of ${getWeekStartDate()}`
+    `v${SCRIPT_VERSION} • Updated: ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} • Week of ${getWeekStartDate()}`
   );
   footerText.titleFont = Font.systemFont(11);
   footerText.titleColor = new Color("#666666");
