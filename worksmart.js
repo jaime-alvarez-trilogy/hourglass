@@ -6,7 +6,7 @@
 // Failover cache: shows last known data when API fails
 
 // ─── Version & Auto-Update ───────────────────────────────────
-const SCRIPT_VERSION = "1.2.0";
+const SCRIPT_VERSION = "1.3.0";
 const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/jaime-alvarez-trilogy/worksmart/main";
 
 async function checkForUpdate() {
@@ -257,19 +257,23 @@ async function runOnboarding() {
     } catch (e) {}
   }
 
-  // If still no team, ask the user for their team ID
+  // If still no team, ask the user for their IDs manually
+  // The token userId (profile ID) may differ from the assignment userId
+  // needed for timesheet queries. We need: teamId, managerId, userId (assignment)
   if (!primaryTeam) {
-    const teamAlert = new Alert();
-    teamAlert.title = "Team ID Needed";
-    teamAlert.message = "Could not detect your team automatically.\n\nTo find your Team ID:\n1. Open app.crossover.com\n2. Go to your dashboard\n3. Look at the URL — it contains your team ID number\n\nOr ask your manager for the team ID.";
-    teamAlert.addTextField("Team ID", "");
-    teamAlert.addTextField("Manager User ID (optional)", "");
-    teamAlert.addAction("Save");
-    teamAlert.addCancelAction("Skip");
-    const teamChoice = await teamAlert.presentAlert();
-    if (teamChoice === 0) {
-      const enteredTeamId = parseInt(teamAlert.textFieldValue(0)) || 0;
-      const enteredManagerId = parseInt(teamAlert.textFieldValue(1)) || userId;
+    const idAlert = new Alert();
+    idAlert.title = "Setup IDs";
+    idAlert.message = "Could not auto-detect your team.\n\nTo find these values:\n1. Go to app.crossover.com → Time Tracking\n2. Open browser DevTools → Network tab\n3. Look for a 'timesheets' request — the URL has teamId, managerId, and userId\n\nOr check with your manager.";
+    idAlert.addTextField("Team ID", "");
+    idAlert.addTextField("Manager ID", "");
+    idAlert.addTextField("Your User ID (assignment)", String(userId));
+    idAlert.addAction("Save");
+    idAlert.addCancelAction("Skip");
+    const idChoice = await idAlert.presentAlert();
+    if (idChoice === 0) {
+      const enteredTeamId = parseInt(idAlert.textFieldValue(0)) || 0;
+      const enteredManagerId = parseInt(idAlert.textFieldValue(1)) || userId;
+      const enteredUserId = parseInt(idAlert.textFieldValue(2)) || userId;
       if (enteredTeamId > 0) {
         primaryTeam = {
           id: enteredTeamId,
@@ -279,6 +283,9 @@ async function runOnboarding() {
         };
         managerId = enteredManagerId;
         teams = [primaryTeam];
+      }
+      if (enteredUserId !== userId) {
+        userId = enteredUserId;
       }
     }
   }
