@@ -6,7 +6,7 @@
 // Failover cache: shows last known data when API fails
 
 // ─── Version & Auto-Update ───────────────────────────────────
-const SCRIPT_VERSION = "1.1.0";
+const SCRIPT_VERSION = "1.2.0";
 const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/jaime-alvarez-trilogy/worksmart/main";
 
 async function checkForUpdate() {
@@ -255,6 +255,32 @@ async function runOnboarding() {
         }
       }
     } catch (e) {}
+  }
+
+  // If still no team, ask the user for their team ID
+  if (!primaryTeam) {
+    const teamAlert = new Alert();
+    teamAlert.title = "Team ID Needed";
+    teamAlert.message = "Could not detect your team automatically.\n\nTo find your Team ID:\n1. Open app.crossover.com\n2. Go to your dashboard\n3. Look at the URL — it contains your team ID number\n\nOr ask your manager for the team ID.";
+    teamAlert.addTextField("Team ID", "");
+    teamAlert.addTextField("Manager User ID (optional)", "");
+    teamAlert.addAction("Save");
+    teamAlert.addCancelAction("Skip");
+    const teamChoice = await teamAlert.presentAlert();
+    if (teamChoice === 0) {
+      const enteredTeamId = parseInt(teamAlert.textFieldValue(0)) || 0;
+      const enteredManagerId = parseInt(teamAlert.textFieldValue(1)) || userId;
+      if (enteredTeamId > 0) {
+        primaryTeam = {
+          id: enteredTeamId,
+          name: "My Team",
+          companyName: "",
+          managerId: enteredManagerId
+        };
+        managerId = enteredManagerId;
+        teams = [primaryTeam];
+      }
+    }
   }
 
   // Auto-detect manager role: user is a manager if they own any team

@@ -1,4 +1,4 @@
 {
-  "version": "1.1.0",
-  "changelog": "Bug fixes: overtime approvals now show, timesheet works without team data, re-login fixed, update button in Settings."
+  "version": "1.2.0",
+  "changelog": "Fix: manual team ID entry when auto-detection fails. Asks for team ID during setup if API can't find it."
 }
