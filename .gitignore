@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+package.json
+package-lock.json
+
+# Tools & test scripts (may contain credentials)
+tools/
+
+# Assets (logo files — embedded in script via base64)
+assets/
+
+# Local config & cache (device-specific)
+crossover-config.json
+crossover-cache.json
+
+# OS files
+.DS_Store
+*.swp
+*.swo
+
+# Claude Code project files
+.claude/
