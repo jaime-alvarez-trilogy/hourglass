@@ -52,6 +52,8 @@
       font-weight: 600;
       width: 100%;
       transition: background 0.2s;
+      cursor: pointer;
+      border: none;
     }
     .install-btn:hover { background: #43A047; }
     .prereq {
@@ -112,16 +114,23 @@
       line-height: 1.4;
     }
     .feature strong { color: #ccc; }
-    .desktop-note {
+    .info-note {
       display: none;
       margin-top: 24px;
       padding: 16px;
-      background: #1a1a0a;
-      border: 1px solid #444400;
       border-radius: 12px;
       font-size: 14px;
-      color: #cccc66;
       line-height: 1.5;
+    }
+    .info-note.desktop {
+      background: #1a1a0a;
+      border: 1px solid #444400;
+      color: #cccc66;
+    }
+    .info-note.success {
+      background: #0a1a0a;
+      border: 1px solid #004400;
+      color: #66cc66;
     }
     .manual-link {
       margin-top: 16px;
@@ -142,7 +151,6 @@
         .then(function(res) { return res.text(); })
         .then(function(code) {
           if (!code || code.length < 500) throw new Error("Download failed");
-          // Build .scriptable file (JSON format iOS opens with Scriptable)
           var scriptable = {
             always_run_in_app: false,
             icon: { color: "green", glyph: "clock" },
@@ -159,15 +167,15 @@
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
-          btn.textContent = "Downloaded! Open the file to install.";
+          btn.textContent = "Downloaded!";
           btn.style.background = "#2196F3";
-          document.getElementById("open-note").style.display = "block";
+          document.getElementById("success-note").style.display = "block";
         })
         .catch(function(err) {
-          btn.textContent = "Download failed — try again";
+          btn.textContent = "Download failed — tap to retry";
           btn.style.background = "#f44336";
           setTimeout(function() {
-            btn.textContent = "Install in Scriptable";
+            btn.textContent = "Download WorkSmart";
             btn.style.background = "#4CAF50";
           }, 3000);
         });
@@ -185,33 +193,33 @@
   <div class="card">
     <div class="logo">⏱️</div>
     <h1>WorkSmart</h1>
-    <p class="subtitle">Crossover hours tracking & approval management — right on your Home Screen.</p>
+    <p class="subtitle">Crossover hours tracking & approval management — right on your iOS Home Screen.</p>
 
-    <a id="install-btn" href="#" class="install-btn" onclick="installScript(event)">Install in Scriptable</a>
+    <a id="install-btn" href="#" class="install-btn" onclick="installScript(event)">Download WorkSmart</a>
 
     <p class="prereq">Requires <a href="https://apps.apple.com/app/scriptable/id1405459188">Scriptable</a> (free) on your iPhone.</p>
 
-    <div id="desktop-note" class="desktop-note">
-      Open this page on your iPhone to install. The install button uses a Scriptable URL scheme that only works on iOS.
+    <div id="desktop-note" class="info-note desktop">
+      Open this page on your iPhone to install.
     </div>
 
-    <div id="open-note" class="desktop-note" style="background:#0a1a0a;border-color:#004400;color:#66cc66;">
-      File downloaded! Open it from your Downloads or Files app — iOS will offer to import it into Scriptable automatically.
+    <div id="success-note" class="info-note success">
+      Open the downloaded file and iOS will ask you to open it with <strong>Scriptable</strong>. Once imported, run the script to set up your account.
     </div>
 
     <div class="steps">
       <h2>Setup (2 minutes)</h2>
       <div class="step">
         <div class="step-num">1</div>
-        <div class="step-text">Tap <strong>Install in Scriptable</strong> above, then open the downloaded file — Scriptable imports it automatically</div>
+        <div class="step-text">Tap <strong>Download WorkSmart</strong> above — then open the downloaded file and choose <strong>Open in Scriptable</strong></div>
       </div>
       <div class="step">
         <div class="step-num">2</div>
-        <div class="step-text">Open Scriptable and run <strong>WorkSmart</strong> — the setup wizard walks you through login</div>
+        <div class="step-text">Run <strong>WorkSmart</strong> in Scriptable — the setup wizard walks you through login and team detection</div>
       </div>
       <div class="step">
         <div class="step-num">3</div>
-        <div class="step-text">Long-press your Home Screen → add a <strong>Scriptable widget</strong> → choose WorkSmart</div>
+        <div class="step-text">Long-press your Home Screen → add a <strong>Scriptable</strong> widget → tap it to select <strong>WorkSmart</strong></div>
       </div>
     </div>
 
@@ -219,7 +227,7 @@
       <div class="feature"><strong>Hours</strong><br>Weekly total, daily breakdown, earnings</div>
       <div class="feature"><strong>Approvals</strong><br>One-tap approve/reject for managers</div>
       <div class="feature"><strong>Secure</strong><br>Credentials stay in iOS Keychain</div>
-      <div class="feature"><strong>Auto-updates</strong><br>Notifies when new version is out</div>
+      <div class="feature"><strong>Auto-updates</strong><br>Check for updates in Settings</div>
     </div>
 
     <div class="manual-link">
