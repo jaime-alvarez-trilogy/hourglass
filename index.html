@@ -130,29 +130,47 @@
     .manual-link a { color: #6BA4FF; text-decoration: none; }
   </style>
   <script>
-    const SCRIPTABLE_URL = "scriptable:///run/inline?script=" +
-      "const%20r%3Dnew%20Request%28%22https%3A%2F%2Fraw.githubusercontent.com%2Fjaime-alvarez-trilogy%2Fworksmart%2Fmain%2Fworksmart.js%22%29%3Bconst%20c%3Dawait%20r.loadString%28%29%3Bif%28%21c%7C%7Cc.length%3C500%29throw%20new%20Error%28%22Download%20failed%22%29%3Bconst%20f%3DFileManager.iCloud%28%29%3Bf.writeString%28f.joinPath%28f.documentsDirectory%28%29%2C%22WorkSmart.js%22%29%2Cc%29%3Bconst%20a%3Dnew%20Alert%28%29%3Ba.title%3D%22WorkSmart%20Installed%21%22%3Ba.message%3D%22Script%20added%20to%20Scriptable.%20Run%20it%20to%20set%20up%2C%20then%20add%20as%20a%20widget%20to%20your%20Home%20Screen.%22%3Ba.addAction%28%22OK%22%29%3Bawait%20a.presentAlert%28%29%3B";
+    var SCRIPT_URL = "https://raw.githubusercontent.com/jaime-alvarez-trilogy/worksmart/main/worksmart.js";
 
-    function launchScriptable(e) {
+    function installScript(e) {
       e.preventDefault();
-      var isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
-      if (!isIOS) {
-        document.getElementById("desktop-note").style.display = "block";
-        return;
-      }
-      // Use hidden iframe to trigger custom URL scheme without navigation
-      var iframe = document.createElement("iframe");
-      iframe.style.display = "none";
-      iframe.src = SCRIPTABLE_URL;
-      document.body.appendChild(iframe);
-      // Fallback: if iframe doesn't trigger, try window.location after brief delay
-      setTimeout(function() {
-        window.location.href = SCRIPTABLE_URL;
-      }, 100);
-      // If Scriptable isn't installed, show message after timeout
-      setTimeout(function() {
-        document.getElementById("no-app-note").style.display = "block";
-      }, 2000);
+      var btn = document.getElementById("install-btn");
+      btn.textContent = "Downloading...";
+      btn.style.background = "#666";
+
+      fetch(SCRIPT_URL)
+        .then(function(res) { return res.text(); })
+        .then(function(code) {
+          if (!code || code.length < 500) throw new Error("Download failed");
+          // Build .scriptable file (JSON format iOS opens with Scriptable)
+          var scriptable = {
+            always_run_in_app: false,
+            icon: { color: "green", glyph: "clock" },
+            name: "WorkSmart",
+            script: code,
+            share_sheet_inputs: []
+          };
+          var blob = new Blob([JSON.stringify(scriptable)], { type: "application/octet-stream" });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement("a");
+          a.href = url;
+          a.download = "WorkSmart.scriptable";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          btn.textContent = "Downloaded! Open the file to install.";
+          btn.style.background = "#2196F3";
+          document.getElementById("open-note").style.display = "block";
+        })
+        .catch(function(err) {
+          btn.textContent = "Download failed — try again";
+          btn.style.background = "#f44336";
+          setTimeout(function() {
+            btn.textContent = "Install in Scriptable";
+            btn.style.background = "#4CAF50";
+          }, 3000);
+        });
     }
 
     document.addEventListener("DOMContentLoaded", function() {
@@ -169,7 +187,7 @@
     <h1>WorkSmart</h1>
     <p class="subtitle">Crossover hours tracking & approval management — right on your Home Screen.</p>
 
-    <a id="install-btn" href="#" class="install-btn" onclick="launchScriptable(event)">Install in Scriptable</a>
+    <a id="install-btn" href="#" class="install-btn" onclick="installScript(event)">Install in Scriptable</a>
 
     <p class="prereq">Requires <a href="https://apps.apple.com/app/scriptable/id1405459188">Scriptable</a> (free) on your iPhone.</p>
 
@@ -177,15 +195,15 @@
       Open this page on your iPhone to install. The install button uses a Scriptable URL scheme that only works on iOS.
     </div>
 
-    <div id="no-app-note" class="desktop-note" style="background:#1a0a0a;border-color:#440000;color:#cc6666;">
-      Scriptable doesn't seem to be installed. <a href="https://apps.apple.com/app/scriptable/id1405459188" style="color:#6BA4FF;">Download it free from the App Store</a>, then come back and tap Install again.
+    <div id="open-note" class="desktop-note" style="background:#0a1a0a;border-color:#004400;color:#66cc66;">
+      File downloaded! Open it from your Downloads or Files app — iOS will offer to import it into Scriptable automatically.
     </div>
 
     <div class="steps">
       <h2>Setup (2 minutes)</h2>
       <div class="step">
         <div class="step-num">1</div>
-        <div class="step-text">Tap <strong>Install in Scriptable</strong> above — the script is added automatically</div>
+        <div class="step-text">Tap <strong>Install in Scriptable</strong> above, then open the downloaded file — Scriptable imports it automatically</div>
       </div>
       <div class="step">
         <div class="step-num">2</div>
