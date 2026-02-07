@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WorkSmart — Install</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Helvetica Neue", sans-serif;
+      background: #0a0a0a;
+      color: #f5f5f5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #1a1a1a;
+      border-radius: 20px;
+      padding: 40px 32px;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+      border: 1px solid #333;
+    }
+    .logo {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: #999;
+      font-size: 15px;
+      margin-bottom: 32px;
+      line-height: 1.5;
+    }
+    .install-btn {
+      display: inline-block;
+      background: #4CAF50;
+      color: white;
+      text-decoration: none;
+      padding: 16px 32px;
+      border-radius: 14px;
+      font-size: 17px;
+      font-weight: 600;
+      width: 100%;
+      transition: background 0.2s;
+      cursor: pointer;
+      border: none;
+    }
+    .install-btn:hover { background: #43A047; }
+    .prereq {
+      margin-top: 16px;
+      font-size: 13px;
+      color: #666;
+    }
+    .prereq a { color: #6BA4FF; text-decoration: none; }
+    .steps {
+      margin-top: 32px;
+      text-align: left;
+      border-top: 1px solid #333;
+      padding-top: 24px;
+    }
+    .steps h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #ccc;
+    }
+    .step {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+      align-items: flex-start;
+    }
+    .step-num {
+      background: #333;
+      color: #4CAF50;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .step-text {
+      font-size: 14px;
+      color: #bbb;
+      line-height: 1.5;
+      padding-top: 3px;
+    }
+    .features {
+      margin-top: 24px;
+      border-top: 1px solid #333;
+      padding-top: 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      text-align: left;
+    }
+    .feature {
+      font-size: 13px;
+      color: #999;
+      line-height: 1.4;
+    }
+    .feature strong { color: #ccc; }
+    .info-note {
+      display: none;
+      margin-top: 24px;
+      padding: 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .info-note.desktop {
+      background: #1a1a0a;
+      border: 1px solid #444400;
+      color: #cccc66;
+    }
+    .info-note.success {
+      background: #0a1a0a;
+      border: 1px solid #004400;
+      color: #66cc66;
+    }
+    .manual-link {
+      margin-top: 16px;
+      font-size: 13px;
+    }
+    .manual-link a { color: #6BA4FF; text-decoration: none; }
+  </style>
+  <script>
+    var SCRIPT_URL = "https://raw.githubusercontent.com/jaime-alvarez-trilogy/worksmart/main/worksmart.js";
+
+    function installScript(e) {
+      e.preventDefault();
+      var btn = document.getElementById("install-btn");
+      btn.textContent = "Downloading...";
+      btn.style.background = "#666";
+
+      fetch(SCRIPT_URL)
+        .then(function(res) { return res.text(); })
+        .then(function(code) {
+          if (!code || code.length < 500) throw new Error("Download failed");
+          var scriptable = {
+            always_run_in_app: false,
+            icon: { color: "green", glyph: "clock" },
+            name: "WorkSmart",
+            script: code,
+            share_sheet_inputs: []
+          };
+          var blob = new Blob([JSON.stringify(scriptable)], { type: "application/octet-stream" });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement("a");
+          a.href = url;
+          a.download = "WorkSmart.scriptable";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          btn.textContent = "Downloaded!";
+          btn.style.background = "#2196F3";
+          document.getElementById("success-note").style.display = "block";
+        })
+        .catch(function(err) {
+          btn.textContent = "Download failed — tap to retry";
+          btn.style.background = "#f44336";
+          setTimeout(function() {
+            btn.textContent = "Download WorkSmart";
+            btn.style.background = "#4CAF50";
+          }, 3000);
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+      var isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+      if (!isIOS) {
+        document.getElementById("desktop-note").style.display = "block";
+      }
+    });
+  </script>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">⏱️</div>
+    <h1>WorkSmart</h1>
+    <p class="subtitle">Crossover hours tracking & approval management — right on your iOS Home Screen.</p>
+
+    <a id="install-btn" href="#" class="install-btn" onclick="installScript(event)">Download WorkSmart</a>
+
+    <p class="prereq">Requires <a href="https://apps.apple.com/app/scriptable/id1405459188">Scriptable</a> (free) on your iPhone.</p>
+
+    <div id="desktop-note" class="info-note desktop">
+      Open this page on your iPhone to install.
+    </div>
+
+    <div id="success-note" class="info-note success">
+      Open the downloaded file and iOS will ask you to open it with <strong>Scriptable</strong>. Once imported, run the script to set up your account.
+    </div>
+
+    <div class="steps">
+      <h2>Setup (2 minutes)</h2>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">Tap <strong>Download WorkSmart</strong> above — then open the downloaded file and choose <strong>Open in Scriptable</strong></div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">Run <strong>WorkSmart</strong> in Scriptable — the setup wizard walks you through login and team detection</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">Long-press your Home Screen → tap <strong>+</strong> → search for <strong>Scriptable</strong> → add a widget in the size you prefer</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text">Long-press the widget → <strong>Edit Widget</strong> → set Script to <strong>WorkSmart</strong> and When Interacting to <strong>Open App</strong></div>
+      </div>
+    </div>
+
+    <div class="features">
+      <div class="feature"><strong>Hours</strong><br>Weekly total, daily breakdown, earnings</div>
+      <div class="feature"><strong>Approvals</strong><br>One-tap approve/reject for managers</div>
+      <div class="feature"><strong>Secure</strong><br>Credentials stored in your iOS Keychain, not in the app</div>
+      <div class="feature"><strong>Auto-updates</strong><br>Check for updates in Settings</div>
+    </div>
+
+    <div class="manual-link">
+      Or install manually from <a href="https://github.com/jaime-alvarez-trilogy/worksmart">GitHub</a>
+    </div>
+  </div>
+</body>
+</html>
