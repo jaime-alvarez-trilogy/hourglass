@@ -236,6 +236,27 @@ async function runOnboarding() {
   let primaryTeam = teams.length > 0 ? teams[0] : null;
   let managerId = primaryTeam?.managerId || userId;
 
+  // If no teams found, try to get assignment info from profile
+  if (!primaryTeam) {
+    try {
+      const profileReq2 = new Request(`${apiBase}/api/v3/users/current`);
+      profileReq2.headers = { "x-auth-token": token };
+      const profile = await profileReq2.loadJSON();
+      if (profile.assignment) {
+        managerId = profile.assignment.manager?.userId || profile.assignment.managerId || userId;
+        if (profile.assignment.team) {
+          primaryTeam = {
+            id: profile.assignment.team.id,
+            name: profile.assignment.team.name || "My Team",
+            companyName: profile.assignment.team.company?.name || "",
+            managerId: managerId
+          };
+          teams = [primaryTeam];
+        }
+      }
+    } catch (e) {}
+  }
+
   // Auto-detect manager role: user is a manager if they own any team
   const isManager = teams.some(t => t.managerId === userId);
 
@@ -539,7 +560,12 @@ async function getTimesheetData(token) {
   const today = new Date();
   const dateStr = today.toISOString().split('T')[0];
 
-  const url = `${TIMESHEET_URL}?date=${dateStr}&managerId=${CONFIG.managerId}&period=WEEK&teamId=${CONFIG.primaryTeamId}&userId=${CONFIG.userId}`;
+  // Build URL — include teamId only if we have a real one
+  let url = `${TIMESHEET_URL}?date=${dateStr}&period=WEEK&userId=${CONFIG.userId}`;
+  if (CONFIG.managerId) url += `&managerId=${CONFIG.managerId}`;
+  if (CONFIG.primaryTeamId) url += `&teamId=${CONFIG.primaryTeamId}`;
+
+  if (CONFIG.debugMode) console.log("📊 Fetching timesheet:", url);
 
   const request = new Request(url);
   request.headers = {
@@ -548,6 +574,14 @@ async function getTimesheetData(token) {
 
   try {
     const response = await request.loadJSON();
+    // If empty and we had team filters, retry without them
+    if ((!response || (Array.isArray(response) && response.length === 0)) && CONFIG.primaryTeamId) {
+      if (CONFIG.debugMode) console.log("📊 Timesheet empty with teamId, retrying without...");
+      const fallbackUrl = `${TIMESHEET_URL}?date=${dateStr}&period=WEEK&userId=${CONFIG.userId}`;
+      const fallbackReq = new Request(fallbackUrl);
+      fallbackReq.headers = { "x-auth-token": token };
+      return await fallbackReq.loadJSON();
+    }
     return response;
   } catch (error) {
     console.error("Failed to fetch timesheet:", error);
