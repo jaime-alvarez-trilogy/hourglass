@@ -1,4 +1,4 @@
 {
-  "version": "1.0.0",
-  "changelog": "Initial release — unified hours tracking and approval management."
+  "version": "1.1.0",
+  "changelog": "Bug fixes: overtime approvals now show, timesheet works without team data, re-login fixed, update button in Settings."
 }

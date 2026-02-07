@@ -6,7 +6,7 @@
 // Failover cache: shows last known data when API fails
 
 // ─── Version & Auto-Update ───────────────────────────────────
-const SCRIPT_VERSION = "1.0.0";
+const SCRIPT_VERSION = "1.1.0";
 const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/jaime-alvarez-trilogy/worksmart/main";
 
 async function checkForUpdate() {
