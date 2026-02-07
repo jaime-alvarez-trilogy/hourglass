@@ -560,33 +560,41 @@ async function getTimesheetData(token) {
   const today = new Date();
   const dateStr = today.toISOString().split('T')[0];
 
-  // Build URL — include teamId only if we have a real one
-  let url = `${TIMESHEET_URL}?date=${dateStr}&period=WEEK&userId=${CONFIG.userId}`;
-  if (CONFIG.managerId) url += `&managerId=${CONFIG.managerId}`;
-  if (CONFIG.primaryTeamId) url += `&teamId=${CONFIG.primaryTeamId}`;
+  // Try multiple URL strategies — some accounts need different params
+  const urls = [];
 
-  if (CONFIG.debugMode) console.log("📊 Fetching timesheet:", url);
-
-  const request = new Request(url);
-  request.headers = {
-    "x-auth-token": token
-  };
-
-  try {
-    const response = await request.loadJSON();
-    // If empty and we had team filters, retry without them
-    if ((!response || (Array.isArray(response) && response.length === 0)) && CONFIG.primaryTeamId) {
-      if (CONFIG.debugMode) console.log("📊 Timesheet empty with teamId, retrying without...");
-      const fallbackUrl = `${TIMESHEET_URL}?date=${dateStr}&period=WEEK&userId=${CONFIG.userId}`;
-      const fallbackReq = new Request(fallbackUrl);
-      fallbackReq.headers = { "x-auth-token": token };
-      return await fallbackReq.loadJSON();
-    }
-    return response;
-  } catch (error) {
-    console.error("Failed to fetch timesheet:", error);
-    return null;
+  // Strategy 1: full params (team + manager + user)
+  if (CONFIG.primaryTeamId && CONFIG.managerId) {
+    urls.push(`${TIMESHEET_URL}?date=${dateStr}&managerId=${CONFIG.managerId}&period=WEEK&teamId=${CONFIG.primaryTeamId}&userId=${CONFIG.userId}`);
   }
+
+  // Strategy 2: manager + user only (no team)
+  if (CONFIG.managerId && CONFIG.managerId !== CONFIG.userId) {
+    urls.push(`${TIMESHEET_URL}?date=${dateStr}&managerId=${CONFIG.managerId}&period=WEEK&userId=${CONFIG.userId}`);
+  }
+
+  // Strategy 3: just user + period (minimal)
+  urls.push(`${TIMESHEET_URL}?date=${dateStr}&period=WEEK&userId=${CONFIG.userId}`);
+
+  for (const url of urls) {
+    if (CONFIG.debugMode) console.log("📊 Fetching timesheet:", url);
+    try {
+      const request = new Request(url);
+      request.headers = { "x-auth-token": token };
+      const response = await request.loadJSON();
+      if (response && Array.isArray(response) && response.length > 0) {
+        return response;
+      }
+      if (response && !Array.isArray(response) && Object.keys(response).length > 0) {
+        return response;
+      }
+    } catch (e) {
+      if (CONFIG.debugMode) console.log("📊 Strategy failed, trying next...");
+    }
+  }
+
+  console.error("Failed to fetch timesheet with all strategies");
+  return null;
 }
 
 // Calculate total hours from timesheet
