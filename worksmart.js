@@ -500,7 +500,14 @@ async function getPendingManualTime(token) {
 // ─── Fetch Pending Overtime ──────────────────────────────────
 
 async function getPendingOvertime(token) {
-  const weekStartStr = getWeekStartDate();
+  // Crossover uses Monday-based weeks for overtime
+  const today = new Date();
+  const day = today.getDay(); // 0=Sun
+  const mondayOffset = day === 0 ? 6 : day - 1;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - mondayOffset);
+  const weekStartStr = monday.toISOString().split('T')[0];
+
   const url = `${PENDING_OVERTIME_URL}?status=PENDING&weekStartDate=${weekStartStr}`;
 
   if (CONFIG.debugMode) console.log("⏰ Fetching overtime:", url);
@@ -513,8 +520,12 @@ async function getPendingOvertime(token) {
 
   try {
     const response = await request.loadJSON();
-    if (CONFIG.debugMode) console.log("✅ Overtime received");
-    return response;
+    if (CONFIG.debugMode) console.log("✅ Overtime received:", JSON.stringify(response).substring(0, 200));
+    // Handle both plain array and paginated {content: [...]} responses
+    if (Array.isArray(response)) return response;
+    if (response && Array.isArray(response.content)) return response.content;
+    if (response && typeof response === "object") return [response];
+    return [];
   } catch (error) {
     console.error("❌ Overtime fetch failed:", error);
     return [];
