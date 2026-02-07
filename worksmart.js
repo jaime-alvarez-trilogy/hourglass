@@ -115,8 +115,9 @@ function updateConfigField(field, value) {
 }
 
 function clearConfig() {
-  try { Keychain.remove(KEY_USERNAME); } catch (e) {}
-  try { Keychain.remove(KEY_PASSWORD); } catch (e) {}
+  // Keychain has no remove() — overwrite with empty strings
+  try { Keychain.set(KEY_USERNAME, ""); } catch (e) {}
+  try { Keychain.set(KEY_PASSWORD, ""); } catch (e) {}
   const fm = FileManager.local();
   const path = fm.joinPath(fm.documentsDirectory(), CONFIG_FILE);
   if (fm.fileExists(path)) fm.remove(path);
