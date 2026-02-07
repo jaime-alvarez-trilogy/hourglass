@@ -216,39 +216,67 @@ async function runOnboarding() {
     fullName = profile.fullName || profile.printableName || "Unknown";
   } catch (e) {}
 
-  // Fetch assignment data — primary method for discovering teamId, managerId, userId
-  // The assignments endpoint returns all IDs needed in one call.
-  // Note: candidate.id is the assignment/avatar ID used for timesheet queries,
-  // which differs from the login userId extracted from the auth token.
+  // Fetch user detail — single endpoint returns all IDs, rate, role, and team info
+  // /api/identity/users/current/detail has assignment with team.id, manager.id,
+  // candidate avatar id (the userId for timesheet API), salary, and avatarTypes
   let teams = [];
   let primaryTeam = null;
   let managerId = userId;
+  let isManager = false;
+  let hourlyRate = 0;
 
+  // Strategy 1: /api/identity/users/current/detail (best — has everything)
   try {
-    const assignReq = new Request(`${apiBase}/api/v2/teams/assignments?avatarType=CANDIDATE&status=ACTIVE&page=0`);
-    assignReq.headers = { "x-auth-token": token };
-    const assignResp = await assignReq.loadJSON();
-    const assignments = assignResp?.content || (Array.isArray(assignResp) ? assignResp : []);
+    const detailReq = new Request(`${apiBase}/api/identity/users/current/detail`);
+    detailReq.headers = { "x-auth-token": token };
+    const detail = await detailReq.loadJSON();
 
-    if (assignments.length > 0) {
-      const a = assignments[0];
+    if (detail?.assignment?.team) {
+      const a = detail.assignment;
       primaryTeam = {
-        id: a.team?.id || 0,
-        name: a.team?.name || "My Team",
-        companyName: a.team?.company?.name || "",
+        id: a.team.id,
+        name: a.team.name || "My Team",
+        companyName: a.team.company?.name || "",
         managerId: a.manager?.id || userId
       };
       managerId = a.manager?.id || userId;
-      // candidate.id is the assignment userId needed for timesheet API (NOT the login userId)
-      if (a.candidate?.id && a.candidate.id !== userId) {
-        userId = a.candidate.id;
-      }
       teams = [primaryTeam];
-      if (a.candidate?.printableName) fullName = a.candidate.printableName;
+
+      // candidate avatar ID is the userId for timesheet API (NOT the login userId)
+      const candidateAvatar = (detail.userAvatars || []).find(av => av.type === "CANDIDATE");
+      if (candidateAvatar?.id) userId = candidateAvatar.id;
+      // Also available deeper: a.selection.marketplaceMember.application.candidate.id
+      if (detail.fullName) fullName = detail.fullName;
+      if (a.salary > 0) hourlyRate = Math.round(a.salary);
+      isManager = (detail.avatarTypes || []).includes("MANAGER");
     }
   } catch (e) {}
 
-  // Fallback: try /api/v2/teams (works for team owners/managers)
+  // Strategy 2: /api/v2/teams/assignments (fallback — also has all IDs)
+  if (!primaryTeam) {
+    try {
+      const assignReq = new Request(`${apiBase}/api/v2/teams/assignments?avatarType=CANDIDATE&status=ACTIVE&page=0`);
+      assignReq.headers = { "x-auth-token": token };
+      const assignResp = await assignReq.loadJSON();
+      const assignments = assignResp?.content || (Array.isArray(assignResp) ? assignResp : []);
+
+      if (assignments.length > 0) {
+        const a = assignments[0];
+        primaryTeam = {
+          id: a.team?.id || 0,
+          name: a.team?.name || "My Team",
+          companyName: a.team?.company?.name || "",
+          managerId: a.manager?.id || userId
+        };
+        managerId = a.manager?.id || userId;
+        if (a.candidate?.id) userId = a.candidate.id;
+        teams = [primaryTeam];
+        if (a.candidate?.printableName) fullName = a.candidate.printableName;
+      }
+    } catch (e) {}
+  }
+
+  // Strategy 3: /api/v2/teams (works for team owners/managers only)
   if (!primaryTeam) {
     try {
       const teamsReq = new Request(`${apiBase}/api/v2/teams`);
@@ -263,6 +291,7 @@ async function runOnboarding() {
         }));
         primaryTeam = teams[0];
         managerId = primaryTeam.managerId || userId;
+        isManager = true; // /api/v2/teams only succeeds for managers
       }
     } catch (e) {}
   }
@@ -296,39 +325,25 @@ async function runOnboarding() {
     }
   }
 
-  // Auto-detect manager role: user is a manager if they own any team
-  // managerId on the team is the team owner — if it equals the user, they're a manager
-  // Also try /api/v2/teams (only succeeds for managers/team owners)
-  let isManager = managerId === userId;
-  if (!isManager) {
+  // Detect hourly rate from payments if not already found from detail endpoint
+  if (hourlyRate === 0) {
     try {
-      const teamsReq = new Request(`${apiBase}/api/v2/teams`);
-      teamsReq.headers = { "x-auth-token": token };
-      const teamsResp = await teamsReq.loadJSON();
-      if (Array.isArray(teamsResp) && teamsResp.length > 0) {
-        isManager = true; // If /api/v2/teams succeeds, user is a team owner
-      }
-    } catch (e) {} // 403 = not a manager, which is fine
-  }
-
-  // Auto-detect hourly rate from payments API
-  let hourlyRate = 0;
-  try {
-    const now = new Date();
-    const from = new Date(now);
-    from.setMonth(from.getMonth() - 3);
-    const paymentsReq = new Request(`${apiBase}/api/v3/users/current/payments?from=${from.toISOString().split('T')[0]}&to=${now.toISOString().split('T')[0]}`);
-    paymentsReq.headers = { "x-auth-token": token };
-    const payments = await paymentsReq.loadJSON();
-    if (Array.isArray(payments)) {
-      for (const p of payments) {
-        if (p.paidHours > 0 && p.amount > 0) {
-          hourlyRate = Math.round(p.amount / p.paidHours);
-          break;
+      const now = new Date();
+      const from = new Date(now);
+      from.setMonth(from.getMonth() - 3);
+      const paymentsReq = new Request(`${apiBase}/api/v3/users/current/payments?from=${from.toISOString().split('T')[0]}&to=${now.toISOString().split('T')[0]}`);
+      paymentsReq.headers = { "x-auth-token": token };
+      const payments = await paymentsReq.loadJSON();
+      if (Array.isArray(payments)) {
+        for (const p of payments) {
+          if (p.paidHours > 0 && p.amount > 0) {
+            hourlyRate = Math.round(p.amount / p.paidHours);
+            break;
+          }
         }
       }
-    }
-  } catch (e) {}
+    } catch (e) {}
+  }
 
   if (hourlyRate === 0) {
     // Fallback: ask user manually
@@ -421,74 +436,42 @@ async function weeklyRefresh(token) {
 
   if (CONFIG.debugMode) console.log("🔄 Weekly refresh: checking role and rate...");
 
-  // Re-check assignment for role detection and ID updates
+  // Re-check user detail for role, rate, and ID updates
   try {
-    const assignReq = new Request(`${API_BASE}/api/v2/teams/assignments?avatarType=CANDIDATE&status=ACTIVE&page=0`);
-    assignReq.headers = { "x-auth-token": token };
-    const assignResp = await assignReq.loadJSON();
-    const assignments = assignResp?.content || (Array.isArray(assignResp) ? assignResp : []);
+    const detailReq = new Request(`${API_BASE}/api/identity/users/current/detail`);
+    detailReq.headers = { "x-auth-token": token };
+    const detail = await detailReq.loadJSON();
 
-    if (assignments.length > 0) {
-      const a = assignments[0];
-      // Update team/manager/user IDs if they've changed
+    if (detail?.assignment) {
+      const a = detail.assignment;
       if (a.team?.id && a.team.id !== CONFIG.primaryTeamId) {
         updateConfigField("primaryTeamId", a.team.id);
-        if (CONFIG.debugMode) console.log(`🔄 Team updated: ${CONFIG.primaryTeamId} → ${a.team.id}`);
+        if (CONFIG.debugMode) console.log(`🔄 Team updated: → ${a.team.id}`);
       }
       if (a.manager?.id && a.manager.id !== CONFIG.managerId) {
         updateConfigField("managerId", a.manager.id);
-        if (CONFIG.debugMode) console.log(`🔄 Manager updated: ${CONFIG.managerId} → ${a.manager.id}`);
+        if (CONFIG.debugMode) console.log(`🔄 Manager updated: → ${a.manager.id}`);
       }
-      if (a.candidate?.id && a.candidate.id !== CONFIG.userId) {
-        updateConfigField("userId", a.candidate.id);
-        if (CONFIG.debugMode) console.log(`🔄 User ID updated: ${CONFIG.userId} → ${a.candidate.id}`);
+      const candidateAvatar = (detail.userAvatars || []).find(av => av.type === "CANDIDATE");
+      if (candidateAvatar?.id && candidateAvatar.id !== CONFIG.userId) {
+        updateConfigField("userId", candidateAvatar.id);
+        if (CONFIG.debugMode) console.log(`🔄 User ID updated: → ${candidateAvatar.id}`);
       }
-      // Check manager role: user is manager if they own the team
-      const isManager = a.manager?.id === CONFIG.userId || a.manager?.userId === CONFIG.userId;
+      const isManager = (detail.avatarTypes || []).includes("MANAGER");
       if (isManager !== CONFIG.isManager) {
         updateConfigField("isManager", isManager);
         if (CONFIG.debugMode) console.log(`🔄 Role changed: ${isManager ? "Manager" : "Contributor"}`);
       }
-    }
-  } catch (e) {
-    // Fallback: try /api/v2/teams for managers
-    try {
-      const teamsReq = new Request(`${API_BASE}/api/v2/teams`);
-      teamsReq.headers = { "x-auth-token": token };
-      const teamsResp = await teamsReq.loadJSON();
-      if (Array.isArray(teamsResp)) {
-        const isManager = teamsResp.some(t => (t.teamOwner?.userId || 0) === CONFIG.userId);
-        if (isManager !== CONFIG.isManager) {
-          updateConfigField("isManager", isManager);
-        }
-      }
-    } catch (e2) {
-      if (CONFIG.debugMode) console.log("🔄 Role check failed, keeping current role");
-    }
-  }
-
-  // Re-check rate from payments
-  try {
-    const from = new Date(now);
-    from.setMonth(from.getMonth() - 3);
-    const paymentsReq = new Request(`${API_BASE}/api/v3/users/current/payments?from=${from.toISOString().split('T')[0]}&to=${now.toISOString().split('T')[0]}`);
-    paymentsReq.headers = { "x-auth-token": token };
-    const payments = await paymentsReq.loadJSON();
-
-    if (Array.isArray(payments)) {
-      for (const p of payments) {
-        if (p.paidHours > 0 && p.amount > 0) {
-          const newRate = Math.round(p.amount / p.paidHours);
-          if (newRate !== CONFIG.hourlyRate && newRate > 0) {
-            updateConfigField("hourlyRate", newRate);
-            if (CONFIG.debugMode) console.log(`🔄 Rate updated: $${CONFIG.hourlyRate} → $${newRate}`);
-          }
-          break;
+      if (a.salary > 0) {
+        const newRate = Math.round(a.salary);
+        if (newRate !== CONFIG.hourlyRate) {
+          updateConfigField("hourlyRate", newRate);
+          if (CONFIG.debugMode) console.log(`🔄 Rate updated: $${CONFIG.hourlyRate} → $${newRate}`);
         }
       }
     }
   } catch (e) {
-    if (CONFIG.debugMode) console.log("🔄 Rate check failed, keeping current rate");
+    if (CONFIG.debugMode) console.log("🔄 Detail check failed, keeping current config");
   }
 
   updateConfigField("lastRoleCheck", now.toISOString());
