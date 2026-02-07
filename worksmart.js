@@ -6,7 +6,7 @@
 // Failover cache: shows last known data when API fails
 
 // ─── Version & Auto-Update ───────────────────────────────────
-const SCRIPT_VERSION = "1.3.0";
+const SCRIPT_VERSION = "1.4.0";
 const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/jaime-alvarez-trilogy/worksmart/main";
 
 async function checkForUpdate() {
@@ -216,50 +216,58 @@ async function runOnboarding() {
     fullName = profile.fullName || profile.printableName || "Unknown";
   } catch (e) {}
 
-  // Fetch teams
+  // Fetch assignment data — primary method for discovering teamId, managerId, userId
+  // The assignments endpoint returns all IDs needed in one call.
+  // Note: candidate.id is the assignment/avatar ID used for timesheet queries,
+  // which differs from the login userId extracted from the auth token.
   let teams = [];
+  let primaryTeam = null;
+  let managerId = userId;
+
   try {
-    const teamsReq = new Request(`${apiBase}/api/v2/teams`);
-    teamsReq.headers = { "x-auth-token": token };
-    const teamsResp = await teamsReq.loadJSON();
-    if (Array.isArray(teamsResp)) {
-      teams = teamsResp.map(t => ({
-        id: t.id,
-        name: t.name,
-        companyName: t.company?.name || "",
-        managerId: t.teamOwner?.userId || 0
-      }));
+    const assignReq = new Request(`${apiBase}/api/v2/teams/assignments?avatarType=CANDIDATE&status=ACTIVE&page=0`);
+    assignReq.headers = { "x-auth-token": token };
+    const assignResp = await assignReq.loadJSON();
+    const assignments = assignResp?.content || (Array.isArray(assignResp) ? assignResp : []);
+
+    if (assignments.length > 0) {
+      const a = assignments[0];
+      primaryTeam = {
+        id: a.team?.id || 0,
+        name: a.team?.name || "My Team",
+        companyName: a.team?.company?.name || "",
+        managerId: a.manager?.id || userId
+      };
+      managerId = a.manager?.id || userId;
+      // candidate.id is the assignment userId needed for timesheet API (NOT the login userId)
+      if (a.candidate?.id && a.candidate.id !== userId) {
+        userId = a.candidate.id;
+      }
+      teams = [primaryTeam];
+      if (a.candidate?.printableName) fullName = a.candidate.printableName;
     }
   } catch (e) {}
 
-  // Auto-select first team (no user prompt needed)
-  let primaryTeam = teams.length > 0 ? teams[0] : null;
-  let managerId = primaryTeam?.managerId || userId;
-
-  // If no teams found, try to get assignment info from profile
+  // Fallback: try /api/v2/teams (works for team owners/managers)
   if (!primaryTeam) {
     try {
-      const profileReq2 = new Request(`${apiBase}/api/v3/users/current`);
-      profileReq2.headers = { "x-auth-token": token };
-      const profile = await profileReq2.loadJSON();
-      if (profile.assignment) {
-        managerId = profile.assignment.manager?.userId || profile.assignment.managerId || userId;
-        if (profile.assignment.team) {
-          primaryTeam = {
-            id: profile.assignment.team.id,
-            name: profile.assignment.team.name || "My Team",
-            companyName: profile.assignment.team.company?.name || "",
-            managerId: managerId
-          };
-          teams = [primaryTeam];
-        }
+      const teamsReq = new Request(`${apiBase}/api/v2/teams`);
+      teamsReq.headers = { "x-auth-token": token };
+      const teamsResp = await teamsReq.loadJSON();
+      if (Array.isArray(teamsResp) && teamsResp.length > 0) {
+        teams = teamsResp.map(t => ({
+          id: t.id,
+          name: t.name,
+          companyName: t.company?.name || "",
+          managerId: t.teamOwner?.userId || 0
+        }));
+        primaryTeam = teams[0];
+        managerId = primaryTeam.managerId || userId;
       }
     } catch (e) {}
   }
 
-  // If still no team, ask the user for their IDs manually
-  // The token userId (profile ID) may differ from the assignment userId
-  // needed for timesheet queries. We need: teamId, managerId, userId (assignment)
+  // Last resort: manual ID entry
   if (!primaryTeam) {
     const idAlert = new Alert();
     idAlert.title = "Setup IDs";
@@ -284,14 +292,24 @@ async function runOnboarding() {
         managerId = enteredManagerId;
         teams = [primaryTeam];
       }
-      if (enteredUserId !== userId) {
-        userId = enteredUserId;
-      }
+      if (enteredUserId !== userId) userId = enteredUserId;
     }
   }
 
   // Auto-detect manager role: user is a manager if they own any team
-  const isManager = teams.some(t => t.managerId === userId);
+  // managerId on the team is the team owner — if it equals the user, they're a manager
+  // Also try /api/v2/teams (only succeeds for managers/team owners)
+  let isManager = managerId === userId;
+  if (!isManager) {
+    try {
+      const teamsReq = new Request(`${apiBase}/api/v2/teams`);
+      teamsReq.headers = { "x-auth-token": token };
+      const teamsResp = await teamsReq.loadJSON();
+      if (Array.isArray(teamsResp) && teamsResp.length > 0) {
+        isManager = true; // If /api/v2/teams succeeds, user is a team owner
+      }
+    } catch (e) {} // 403 = not a manager, which is fine
+  }
 
   // Auto-detect hourly rate from payments API
   let hourlyRate = 0;
@@ -403,21 +421,50 @@ async function weeklyRefresh(token) {
 
   if (CONFIG.debugMode) console.log("🔄 Weekly refresh: checking role and rate...");
 
-  // Re-check teams for role detection
+  // Re-check assignment for role detection and ID updates
   try {
-    const teamsReq = new Request(`${API_BASE}/api/v2/teams`);
-    teamsReq.headers = { "x-auth-token": token };
-    const teamsResp = await teamsReq.loadJSON();
+    const assignReq = new Request(`${API_BASE}/api/v2/teams/assignments?avatarType=CANDIDATE&status=ACTIVE&page=0`);
+    assignReq.headers = { "x-auth-token": token };
+    const assignResp = await assignReq.loadJSON();
+    const assignments = assignResp?.content || (Array.isArray(assignResp) ? assignResp : []);
 
-    if (Array.isArray(teamsResp)) {
-      const isManager = teamsResp.some(t => (t.teamOwner?.userId || 0) === CONFIG.userId);
+    if (assignments.length > 0) {
+      const a = assignments[0];
+      // Update team/manager/user IDs if they've changed
+      if (a.team?.id && a.team.id !== CONFIG.primaryTeamId) {
+        updateConfigField("primaryTeamId", a.team.id);
+        if (CONFIG.debugMode) console.log(`🔄 Team updated: ${CONFIG.primaryTeamId} → ${a.team.id}`);
+      }
+      if (a.manager?.id && a.manager.id !== CONFIG.managerId) {
+        updateConfigField("managerId", a.manager.id);
+        if (CONFIG.debugMode) console.log(`🔄 Manager updated: ${CONFIG.managerId} → ${a.manager.id}`);
+      }
+      if (a.candidate?.id && a.candidate.id !== CONFIG.userId) {
+        updateConfigField("userId", a.candidate.id);
+        if (CONFIG.debugMode) console.log(`🔄 User ID updated: ${CONFIG.userId} → ${a.candidate.id}`);
+      }
+      // Check manager role: user is manager if they own the team
+      const isManager = a.manager?.id === CONFIG.userId || a.manager?.userId === CONFIG.userId;
       if (isManager !== CONFIG.isManager) {
         updateConfigField("isManager", isManager);
         if (CONFIG.debugMode) console.log(`🔄 Role changed: ${isManager ? "Manager" : "Contributor"}`);
       }
     }
   } catch (e) {
-    if (CONFIG.debugMode) console.log("🔄 Teams check failed, keeping current role");
+    // Fallback: try /api/v2/teams for managers
+    try {
+      const teamsReq = new Request(`${API_BASE}/api/v2/teams`);
+      teamsReq.headers = { "x-auth-token": token };
+      const teamsResp = await teamsReq.loadJSON();
+      if (Array.isArray(teamsResp)) {
+        const isManager = teamsResp.some(t => (t.teamOwner?.userId || 0) === CONFIG.userId);
+        if (isManager !== CONFIG.isManager) {
+          updateConfigField("isManager", isManager);
+        }
+      }
+    } catch (e2) {
+      if (CONFIG.debugMode) console.log("🔄 Role check failed, keeping current role");
+    }
   }
 
   // Re-check rate from payments

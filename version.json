@@ -1,4 +1,4 @@
 {
-  "version": "1.3.0",
-  "changelog": "Fix: manual entry for Team ID, Manager ID, and User ID when auto-detection fails on production accounts."
+  "version": "1.4.0",
+  "changelog": "Auto-detect Team ID, Manager ID, and User ID via assignments API. No more manual entry needed for production accounts."
 }
