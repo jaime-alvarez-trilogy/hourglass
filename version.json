@@ -1,4 +1,4 @@
 {
-  "version": "1.4.0",
-  "changelog": "Auto-detect Team ID, Manager ID, and User ID via assignments API. No more manual entry needed for production accounts."
+  "version": "1.5.0",
+  "changelog": "Renamed to HourGlass. Auto-detect all IDs via identity API. Fix widget Alert crash in widget mode."
 }

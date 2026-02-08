@@ -1,4 +1,4 @@
-// WorkSmart — Crossover Unified Widget
+// HourGlass — Crossover Unified Widget
 // Adaptive Hours + Approval Manager
 // Non-manager: nimble hours-only widget
 // Manager: hours + approval management with notifications
@@ -6,7 +6,7 @@
 // Failover cache: shows last known data when API fails
 
 // ─── Version & Auto-Update ───────────────────────────────────
-const SCRIPT_VERSION = "1.4.0";
+const SCRIPT_VERSION = "1.5.0";
 const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/jaime-alvarez-trilogy/worksmart/main";
 
 async function checkForUpdate() {
@@ -33,7 +33,7 @@ async function checkForUpdate() {
 
 async function performUpdate() {
   try {
-    const req = new Request(`${GITHUB_RAW_BASE}/worksmart.js`);
+    const req = new Request(`${GITHUB_RAW_BASE}/hourglass.js`);
     req.timeoutInterval = 15;
     const code = await req.loadString();
     if (!code || code.length < 500) return false;
@@ -44,7 +44,7 @@ async function performUpdate() {
   } catch (e) {
     // Try local storage as fallback
     try {
-      const req = new Request(`${GITHUB_RAW_BASE}/worksmart.js`);
+      const req = new Request(`${GITHUB_RAW_BASE}/hourglass.js`);
       const code = await req.loadString();
       if (!code || code.length < 500) return false;
       const fm = FileManager.local();
@@ -2172,18 +2172,29 @@ async function createWidget(allItems, logo = null, error = null, hoursData = nul
 
 async function main() {
   try {
-    // ── Load or run onboarding ──
-    const cfg = await getConfig();
-    if (!cfg) {
-      return null;
-    }
-    initUrls(cfg);
-
     const widgetFamily = config.widgetFamily || "medium";
     const useSmallLogo = (widgetFamily === "small" ||
                           widgetFamily === "accessoryRectangular" ||
                           widgetFamily === "accessoryCircular" ||
                           widgetFamily === "accessoryInline");
+
+    // ── Load or run onboarding ──
+    // In widget mode, Alerts are not available — show setup message instead
+    let cfg = loadConfig();
+    if (!cfg) {
+      if (config.runsInWidget) {
+        const cached = loadCache();
+        if (cached) {
+          const logo = await loadLogo(useSmallLogo);
+          return await createWidget([], logo, null, cached.hoursData, cached.cachedAt);
+        }
+        const logo = await loadLogo(useSmallLogo);
+        return await createWidget(null, logo, "Open app to set up");
+      }
+      cfg = await runOnboarding();
+      if (!cfg) return null;
+    }
+    initUrls(cfg);
 
     // ── Authenticate ──
     const token = await getAuthToken();
@@ -2196,7 +2207,7 @@ async function main() {
           return await createWidget([], logo, null, cached.hoursData, cached.cachedAt);
         }
         const logo = await loadLogo(useSmallLogo);
-        return await createWidget(null, logo, "Setup needed — tap to configure");
+        return await createWidget(null, logo, "Login expired — tap to fix");
       }
       // Auth failed — re-run onboarding
       clearConfig();

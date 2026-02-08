@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WorkSmart — Install</title>
+  <title>HourGlass — Install</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -139,7 +139,7 @@
     .manual-link a { color: #6BA4FF; text-decoration: none; }
   </style>
   <script>
-    var SCRIPT_URL = "https://raw.githubusercontent.com/jaime-alvarez-trilogy/worksmart/main/worksmart.js";
+    var SCRIPT_URL = "https://raw.githubusercontent.com/jaime-alvarez-trilogy/worksmart/main/hourglass.js";
 
     function installScript(e) {
       e.preventDefault();
@@ -154,7 +154,7 @@
           var scriptable = {
             always_run_in_app: false,
             icon: { color: "green", glyph: "clock" },
-            name: "WorkSmart",
+            name: "HourGlass",
             script: code,
             share_sheet_inputs: []
           };
@@ -162,7 +162,7 @@
           var url = URL.createObjectURL(blob);
           var a = document.createElement("a");
           a.href = url;
-          a.download = "WorkSmart.scriptable";
+          a.download = "HourGlass.scriptable";
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
@@ -175,7 +175,7 @@
           btn.textContent = "Download failed — tap to retry";
           btn.style.background = "#f44336";
           setTimeout(function() {
-            btn.textContent = "Download WorkSmart";
+            btn.textContent = "Download HourGlass";
             btn.style.background = "#4CAF50";
           }, 3000);
         });
@@ -191,11 +191,11 @@
 </head>
 <body>
   <div class="card">
-    <div class="logo">⏱️</div>
-    <h1>WorkSmart</h1>
+    <div class="logo">&#8987;</div>
+    <h1>HourGlass</h1>
     <p class="subtitle">Crossover hours tracking & approval management — right on your iOS Home Screen.</p>
 
-    <a id="install-btn" href="#" class="install-btn" onclick="installScript(event)">Download WorkSmart</a>
+    <a id="install-btn" href="#" class="install-btn" onclick="installScript(event)">Download HourGlass</a>
 
     <p class="prereq">Requires <a href="https://apps.apple.com/app/scriptable/id1405459188">Scriptable</a> (free) on your iPhone.</p>
 
@@ -211,11 +211,11 @@
       <h2>Setup (2 minutes)</h2>
       <div class="step">
         <div class="step-num">1</div>
-        <div class="step-text">Tap <strong>Download WorkSmart</strong> above — then open the downloaded file and choose <strong>Open in Scriptable</strong></div>
+        <div class="step-text">Tap <strong>Download HourGlass</strong> above — then open the downloaded file and choose <strong>Open in Scriptable</strong></div>
       </div>
       <div class="step">
         <div class="step-num">2</div>
-        <div class="step-text">Run <strong>WorkSmart</strong> in Scriptable — the setup wizard walks you through login and team detection</div>
+        <div class="step-text">Run <strong>HourGlass</strong> in Scriptable — the setup wizard walks you through login and team detection</div>
       </div>
       <div class="step">
         <div class="step-num">3</div>
@@ -223,7 +223,7 @@
       </div>
       <div class="step">
         <div class="step-num">4</div>
-        <div class="step-text">Long-press the widget → <strong>Edit Widget</strong> → set Script to <strong>WorkSmart</strong> and When Interacting to <strong>Open App</strong></div>
+        <div class="step-text">Long-press the widget → <strong>Edit Widget</strong> → set Script to <strong>HourGlass</strong> and When Interacting to <strong>Open App</strong></div>
       </div>
     </div>
 

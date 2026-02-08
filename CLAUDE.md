@@ -4,7 +4,7 @@
 
 ```
 WS/
-  worksmart.js               — Unified widget (primary). Auto-adapts: hours for contributors, hours+approvals for managers
+  hourglass.js               — Unified widget (primary). Auto-adapts: hours for contributors, hours+approvals for managers
   crossover-widget.js        — Standalone hours-only widget (lightweight alternative)
   CLAUDE.md                  — This file
 
@@ -38,7 +38,7 @@ WS/
 ## Quick Reference
 
 - **Run test scripts**: `node tools/test-crossover-api.js` (requires credentials in file)
-- **Syntax check widget**: `node --check worksmart.js`
+- **Syntax check widget**: `node --check hourglass.js`
 - **Config stored on device**: iOS Keychain (creds) + `crossover-config.json` (settings)
 - **Cache file**: `crossover-cache.json` (failover hours data)
 - **QA env**: `api-qa.crossover.com` / `app-qa.crossover.com`

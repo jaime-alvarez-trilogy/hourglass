@@ -1,4 +1,4 @@
-# WorkSmart — Crossover Widget for iOS
+# HourGlass — Crossover Widget for iOS
 
 A Scriptable widget that brings your Crossover hours tracking and time approval management to your iOS Home Screen, Lock Screen, and StandBy.
 
@@ -6,9 +6,9 @@ A Scriptable widget that brings your Crossover hours tracking and time approval 
 
 **Requires [Scriptable](https://apps.apple.com/app/scriptable/id1405459188) on your iPhone/iPad.**
 
-[**Tap here to install WorkSmart**](https://scriptable.app/run/inline?name=WorkSmart&downloadURL=https://raw.githubusercontent.com/jaime-alvarez-trilogy/worksmart/main/worksmart.js)
+[**Install HourGlass**](https://jaime-alvarez-trilogy.github.io/worksmart/) — opens the download page on your phone.
 
-Or manually: copy the contents of `worksmart.js` into a new script in Scriptable.
+Or manually: copy the contents of `hourglass.js` into a new script in Scriptable.
 
 ## Setup
 
@@ -20,7 +20,7 @@ Or manually: copy the contents of `worksmart.js` into a new script in Scriptable
 3. Add the widget to your Home Screen:
    - Long-press Home Screen → "+" → Scriptable
    - Choose widget size (small, medium, or large)
-   - Long-press the widget → Edit Widget → choose "WorkSmart" as the script
+   - Long-press the widget → Edit Widget → choose "HourGlass" as the script
 
 ## What It Does
 
