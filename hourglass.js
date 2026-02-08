@@ -7,7 +7,7 @@
 
 // ─── Version & Auto-Update ───────────────────────────────────
 const SCRIPT_VERSION = "1.5.0";
-const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/jaime-alvarez-trilogy/worksmart/main";
+const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/jaime-alvarez-trilogy/hourglass/main";
 
 async function checkForUpdate() {
   try {
