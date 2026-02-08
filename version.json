@@ -1,4 +1,4 @@
 {
-  "version": "1.5.0",
-  "changelog": "Renamed to HourGlass. Auto-detect all IDs via identity API. Fix widget Alert crash in widget mode."
+  "version": "1.5.1",
+  "changelog": "Cap earnings at weekly hour limit. Store weeklyLimit from assignment API. Replace hardcoded 40h with per-user limit."
 }

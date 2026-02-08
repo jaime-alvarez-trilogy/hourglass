@@ -224,6 +224,7 @@ async function runOnboarding() {
   let managerId = userId;
   let isManager = false;
   let hourlyRate = 0;
+  let weeklyLimit = 40;
 
   // Strategy 1: /api/identity/users/current/detail (best — has everything)
   try {
@@ -248,6 +249,7 @@ async function runOnboarding() {
       // Also available deeper: a.selection.marketplaceMember.application.candidate.id
       if (detail.fullName) fullName = detail.fullName;
       if (a.salary > 0) hourlyRate = Math.round(a.salary);
+      if (a.weeklyLimit > 0) weeklyLimit = a.weeklyLimit;
       isManager = (detail.avatarTypes || []).includes("MANAGER");
     }
   } catch (e) {}
@@ -363,7 +365,7 @@ async function runOnboarding() {
   const settings = {
     userId, fullName, managerId,
     primaryTeamId: primaryTeam?.id || 0,
-    teams, hourlyRate, useQA,
+    teams, hourlyRate, weeklyLimit, useQA,
     isManager,
     lastRoleCheck: new Date().toISOString(),
     debugMode: false
@@ -468,6 +470,10 @@ async function weeklyRefresh(token) {
           updateConfigField("hourlyRate", newRate);
           if (CONFIG.debugMode) console.log(`🔄 Rate updated: $${CONFIG.hourlyRate} → $${newRate}`);
         }
+      }
+      if (a.weeklyLimit > 0 && a.weeklyLimit !== CONFIG.weeklyLimit) {
+        updateConfigField("weeklyLimit", a.weeklyLimit);
+        if (CONFIG.debugMode) console.log(`🔄 Weekly limit updated: ${CONFIG.weeklyLimit} → ${a.weeklyLimit}`);
       }
     }
   } catch (e) {
@@ -672,7 +678,7 @@ function calculateHours(timesheetData) {
     return {
       total: 0, average: 0, today: 0, daily: [],
       weeklyEarnings: 0, todayEarnings: 0,
-      hoursRemaining: 40, timeRemaining: deadline - now, deadline: deadline
+      hoursRemaining: (CONFIG?.weeklyLimit || 40), timeRemaining: deadline - now, deadline: deadline
     };
   }
 
@@ -686,8 +692,10 @@ function calculateHours(timesheetData) {
   const todayData = daily.find(d => d.date.startsWith(today));
   const todayHours = todayData ? todayData.hours : 0;
 
-  // Calculate earnings
-  const weeklyEarnings = totalHours * CONFIG.hourlyRate;
+  // Calculate earnings (cap at weekly limit — overtime only counts if approved)
+  const limit = CONFIG.weeklyLimit || 40;
+  const cappedHours = Math.min(totalHours, limit);
+  const weeklyEarnings = cappedHours * CONFIG.hourlyRate;
   const todayEarnings = todayHours * CONFIG.hourlyRate;
 
   // Calculate deadline (Sunday midnight GMT)
@@ -700,7 +708,7 @@ function calculateHours(timesheetData) {
   deadline.setUTCHours(23, 59, 59, 999);
 
   const timeRemaining = deadline - now;
-  const hoursRemaining = Math.max(0, 40 - totalHours);
+  const hoursRemaining = Math.max(0, limit - totalHours);
 
   return {
     total: totalHours,
@@ -1207,7 +1215,7 @@ function buildTableRows(table, allItems, hoursData) {
         remainRow.height = 45;
         const potentialEarnings = hoursData.hoursRemaining * CONFIG.hourlyRate;
         const remainText = remainRow.addText(
-          `${hoursData.hoursRemaining.toFixed(1)} hrs left to 40`,
+          `${hoursData.hoursRemaining.toFixed(1)} hrs left to ${CONFIG.weeklyLimit || 40}`,
           `$${potentialEarnings.toFixed(0)} potential • ${formatTimeRemaining(hoursData.timeRemaining)} until deadline`
         );
         remainText.titleFont = Font.boldSystemFont(16);
@@ -1219,7 +1227,7 @@ function buildTableRows(table, allItems, hoursData) {
         const goalRow = new UITableRow();
         goalRow.backgroundColor = new Color("#1a1a1a");
         goalRow.height = 40;
-        const goalText = goalRow.addText("40 hour goal reached!", `$${hoursData.weeklyEarnings.toFixed(0)}+ earned this week`);
+        const goalText = goalRow.addText(`${CONFIG.weeklyLimit || 40} hour goal reached!`, `$${hoursData.weeklyEarnings.toFixed(0)}+ earned this week`);
         goalText.titleFont = Font.boldSystemFont(16);
         goalText.titleColor = new Color("#4CAF50");
         goalText.subtitleFont = Font.systemFont(13);
@@ -1893,7 +1901,7 @@ async function createWidget(allItems, logo = null, error = null, hoursData = nul
           const infoStack = widget.addStack();
           infoStack.layoutHorizontally();
 
-          const remainingText = infoStack.addText(`${hoursData.hoursRemaining.toFixed(1)}h left to 40`);
+          const remainingText = infoStack.addText(`${hoursData.hoursRemaining.toFixed(1)}h left to ${CONFIG.weeklyLimit || 40}`);
           remainingText.font = Font.systemFont(smallTextSize);
           remainingText.textColor = new Color("#FF9800");
 
@@ -1903,7 +1911,7 @@ async function createWidget(allItems, logo = null, error = null, hoursData = nul
           deadlineText.font = Font.systemFont(smallTextSize);
           deadlineText.textColor = new Color("#FF5722");
         } else {
-          const goalText = widget.addText("40h goal reached!");
+          const goalText = widget.addText(`${CONFIG.weeklyLimit || 40}h goal reached!`);
           goalText.font = Font.systemFont(textSize);
           goalText.textColor = new Color("#4CAF50");
         }
@@ -1936,7 +1944,7 @@ async function createWidget(allItems, logo = null, error = null, hoursData = nul
         widget.addSpacer(spacing);
 
         if (hoursData.hoursRemaining > 0) {
-          const remainingText = widget.addText(`${hoursData.hoursRemaining.toFixed(1)} hrs left to 40`);
+          const remainingText = widget.addText(`${hoursData.hoursRemaining.toFixed(1)} hrs left to ${CONFIG.weeklyLimit || 40}`);
           remainingText.font = Font.systemFont(textSize);
           remainingText.textColor = new Color("#FF9800");
 
@@ -1946,7 +1954,7 @@ async function createWidget(allItems, logo = null, error = null, hoursData = nul
           deadlineText.font = Font.systemFont(smallTextSize);
           deadlineText.textColor = new Color("#FF5722");
         } else {
-          const goalText = widget.addText("40 hour goal reached!");
+          const goalText = widget.addText(`${CONFIG.weeklyLimit || 40} hour goal reached!`);
           goalText.font = Font.systemFont(textSize);
           goalText.textColor = new Color("#4CAF50");
         }
