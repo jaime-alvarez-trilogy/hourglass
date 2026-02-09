@@ -6,7 +6,7 @@
 // Failover cache: shows last known data when API fails
 
 // ─── Version & Auto-Update ───────────────────────────────────
-const SCRIPT_VERSION = "1.6.1";
+const SCRIPT_VERSION = "1.6.2";
 const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/jaime-alvarez-trilogy/hourglass/main";
 
 async function checkForUpdate() {
@@ -690,10 +690,13 @@ async function getPaymentsWorkedHours(token) {
     const payments = await request.loadJSON();
 
     if (Array.isArray(payments) && payments.length > 0) {
-      // Find the current week's entry
       const entry = payments[0];
-      if (CONFIG.debugMode) console.log(`💰 Payments: workedHours=${entry.workedHours}, paidHours=${entry.paidHours}`);
-      return entry.workedHours || entry.paidHours || null;
+      if (CONFIG.debugMode) console.log(`💰 Payments: workedHours=${entry.workedHours}, paidHours=${entry.paidHours}, amount=${entry.amount}`);
+      return {
+        workedHours: entry.workedHours || 0,
+        paidHours: entry.paidHours || 0,
+        amount: entry.amount || 0
+      };
     }
   } catch (e) {
     if (CONFIG.debugMode) console.log("💰 Payments fetch failed, using timesheet hours");
@@ -701,8 +704,8 @@ async function getPaymentsWorkedHours(token) {
   return null;
 }
 
-// Calculate total hours from timesheet
-function calculateHours(timesheetData, paymentsWorkedHours) {
+// Calculate total hours from timesheet + payments
+function calculateHours(timesheetData, paymentsData) {
   if (!timesheetData || !Array.isArray(timesheetData) || timesheetData.length === 0) {
     const now = new Date();
     const currentDay = now.getUTCDay();
@@ -719,9 +722,9 @@ function calculateHours(timesheetData, paymentsWorkedHours) {
 
   const firstEntry = timesheetData[0];
   const timesheetTotal = parseFloat(firstEntry.totalHours || firstEntry.hourWorked || 0);
-  // Prefer payments API total (timezone-aware) over timesheet (UTC-based)
-  const totalHours = (paymentsWorkedHours != null && paymentsWorkedHours >= 0)
-    ? paymentsWorkedHours
+  // Prefer payments API (timezone-aware, source of truth) over timesheet (UTC-based)
+  const totalHours = (paymentsData?.workedHours > 0)
+    ? paymentsData.workedHours
     : timesheetTotal;
   const averageHours = parseFloat(firstEntry.averageHoursPerDay || 0);
   const daily = firstEntry.stats || [];
@@ -731,10 +734,11 @@ function calculateHours(timesheetData, paymentsWorkedHours) {
   const todayData = daily.find(d => d.date.startsWith(today));
   const todayHours = todayData ? todayData.hours : 0;
 
-  // Calculate earnings (cap at weekly limit — overtime only counts if approved)
+  // Earnings: use payments amount (what you actually get paid) or calculate as fallback
   const limit = CONFIG.weeklyLimit || 40;
-  const cappedHours = Math.min(totalHours, limit);
-  const weeklyEarnings = cappedHours * CONFIG.hourlyRate;
+  const weeklyEarnings = (paymentsData?.amount > 0)
+    ? paymentsData.amount
+    : Math.min(totalHours, limit) * CONFIG.hourlyRate;
   const todayEarnings = todayHours * CONFIG.hourlyRate;
 
   // Calculate deadline (Sunday midnight GMT)
@@ -1143,7 +1147,7 @@ async function fetchApprovalData(token) {
   let hoursData = null;
 
   if (CONFIG.isManager) {
-    const [manualData, overtimeData, timesheetData, paymentsHours] = await Promise.all([
+    const [manualData, overtimeData, timesheetData, paymentsData] = await Promise.all([
       getPendingManualTime(token),
       getPendingOvertime(token),
       getTimesheetData(token),
@@ -1153,13 +1157,13 @@ async function fetchApprovalData(token) {
     const manualItems = parseManualData(manualData || []);
     const overtimeItems = parseOvertimeData(overtimeData || []);
     allItems = [...manualItems, ...overtimeItems];
-    hoursData = timesheetData ? calculateHours(timesheetData, paymentsHours) : null;
+    hoursData = timesheetData ? calculateHours(timesheetData, paymentsData) : null;
   } else {
-    const [timesheetData, paymentsHours] = await Promise.all([
+    const [timesheetData, paymentsData] = await Promise.all([
       getTimesheetData(token),
       getPaymentsWorkedHours(token)
     ]);
-    hoursData = timesheetData ? calculateHours(timesheetData, paymentsHours) : null;
+    hoursData = timesheetData ? calculateHours(timesheetData, paymentsData) : null;
   }
 
   if (hoursData) {

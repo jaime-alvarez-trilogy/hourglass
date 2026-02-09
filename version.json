@@ -1,4 +1,4 @@
 {
-  "version": "1.6.1",
-  "changelog": "Fix weekly hours using payments API (timezone-aware) instead of UTC-based timesheet total."
+  "version": "1.6.2",
+  "changelog": "Use payments API as source of truth for both hours and earnings. Actual pay amount from API, not calculated."
 }
