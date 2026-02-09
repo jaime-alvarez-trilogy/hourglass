@@ -6,7 +6,7 @@
 // Failover cache: shows last known data when API fails
 
 // ─── Version & Auto-Update ───────────────────────────────────
-const SCRIPT_VERSION = "1.5.0";
+const SCRIPT_VERSION = "1.6.0";
 const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/jaime-alvarez-trilogy/hourglass/main";
 
 async function checkForUpdate() {
@@ -2176,10 +2176,121 @@ async function createWidget(allItems, logo = null, error = null, hoursData = nul
   return widget;
 }
 
+// ─── Siri Shortcut Support ────────────────────────────────────
+
+function buildSummaryResponse(hoursData, allItems) {
+  const parts = [];
+  if (hoursData) {
+    const limit = CONFIG.weeklyLimit || 40;
+    parts.push(`You've worked ${hoursData.total.toFixed(1)} hours this week, earning $${Math.round(hoursData.weeklyEarnings)}.`);
+    if (hoursData.hoursRemaining > 0) {
+      parts.push(`${hoursData.hoursRemaining.toFixed(1)} hours remaining to reach your ${limit} hour goal.`);
+      parts.push(`Deadline in ${formatTimeRemaining(hoursData.timeRemaining)}.`);
+    } else {
+      parts.push(`You've reached your ${limit} hour goal.`);
+    }
+  } else {
+    parts.push("Couldn't fetch your hours. Try again in a moment.");
+  }
+  if (CONFIG.isManager && allItems.length > 0) {
+    parts.push(`${allItems.length} pending approval${allItems.length === 1 ? "" : "s"}.`);
+  } else if (CONFIG.isManager) {
+    parts.push("No pending approvals.");
+  }
+  return parts.join(" ");
+}
+
+function buildHoursResponse(hoursData) {
+  if (!hoursData) return "Couldn't fetch your hours. Try again in a moment.";
+  const limit = CONFIG.weeklyLimit || 40;
+  const parts = [
+    `${hoursData.total.toFixed(1)} hours this week.`,
+    `${hoursData.today.toFixed(1)} hours today.`
+  ];
+  if (hoursData.hoursRemaining > 0) {
+    parts.push(`${hoursData.hoursRemaining.toFixed(1)} hours left to reach your ${limit} hour goal.`);
+    parts.push(`Deadline in ${formatTimeRemaining(hoursData.timeRemaining)}.`);
+  } else {
+    parts.push(`You've reached your ${limit} hour goal.`);
+  }
+  return parts.join(" ");
+}
+
+function buildEarningsResponse(hoursData) {
+  if (!hoursData) return "Couldn't fetch your earnings. Try again in a moment.";
+  const limit = CONFIG.weeklyLimit || 40;
+  return `You've earned $${Math.round(hoursData.weeklyEarnings)} this week at $${CONFIG.hourlyRate} per hour. ${hoursData.total.toFixed(1)} of ${limit} hours worked.`;
+}
+
+function buildApprovalsResponse(allItems) {
+  if (!CONFIG.isManager) return "Approvals are only available for managers.";
+  if (allItems.length === 0) return "No pending approvals.";
+  const manual = allItems.filter(i => i.category === "MANUAL");
+  const overtime = allItems.filter(i => i.category === "OVERTIME");
+  const parts = [`${allItems.length} pending approval${allItems.length === 1 ? "" : "s"}.`];
+  if (manual.length > 0) {
+    const totalHrs = manual.reduce((sum, i) => sum + parseFloat(i.hours), 0).toFixed(1);
+    const names = [...new Set(manual.map(i => i.fullName.split(" ")[0]))].join(", ");
+    parts.push(`${manual.length} manual time request${manual.length === 1 ? "" : "s"} totaling ${totalHrs} hours from ${names}.`);
+  }
+  if (overtime.length > 0) {
+    const totalHrs = overtime.reduce((sum, i) => sum + parseFloat(i.hours), 0).toFixed(1);
+    const names = [...new Set(overtime.map(i => i.fullName.split(" ")[0]))].join(", ");
+    parts.push(`${overtime.length} overtime request${overtime.length === 1 ? "" : "s"} for ${totalHrs} hours from ${names}.`);
+  }
+  return parts.join(" ");
+}
+
+async function approveAllViaSiri(token, allItems) {
+  if (!CONFIG.isManager) return "Approve is only available for managers.";
+  if (allItems.length === 0) return "No pending approvals to approve.";
+  let approved = 0;
+  let failed = 0;
+  for (const item of allItems) {
+    try {
+      const ok = await approveItemViaAPI(token, item);
+      if (ok) approved++; else failed++;
+    } catch (e) {
+      failed++;
+    }
+  }
+  if (failed === 0) return `Approved ${approved} of ${approved} request${approved === 1 ? "" : "s"}.`;
+  return `Approved ${approved} of ${approved + failed} request${approved + failed === 1 ? "" : "s"}. ${failed} failed.`;
+}
+
+async function handleSiriRequest(param) {
+  const cfg = loadConfig();
+  if (!cfg) return "Open HourGlass to set up first.";
+  initUrls(cfg);
+
+  const token = await getAuthToken();
+  if (!token) return "Login expired. Open HourGlass to re-authenticate.";
+  ACTIVE_TOKEN = token;
+
+  const { allItems, hoursData } = await fetchApprovalData(token);
+
+  switch ((param || "summary").toLowerCase().trim()) {
+    case "summary": return buildSummaryResponse(hoursData, allItems);
+    case "hours":   return buildHoursResponse(hoursData);
+    case "earnings": return buildEarningsResponse(hoursData);
+    case "approvals": return buildApprovalsResponse(allItems);
+    case "approve": return await approveAllViaSiri(token, allItems);
+    default: return "Unknown command. Try: summary, hours, earnings, approvals, or approve.";
+  }
+}
+
 // ─── Main ────────────────────────────────────────────────────
 
 async function main() {
   try {
+    // ── Siri / Shortcuts detection ──
+    const siriParam = args.shortcutParameter;
+    if (siriParam || config.runsWithSiri) {
+      const result = await handleSiriRequest(siriParam || "summary");
+      Script.setShortcutOutput(result);
+      return null;
+    }
+
     const widgetFamily = config.widgetFamily || "medium";
     const useSmallLogo = (widgetFamily === "small" ||
                           widgetFamily === "accessoryRectangular" ||

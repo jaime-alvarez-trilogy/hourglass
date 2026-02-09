@@ -132,6 +132,80 @@
       border: 1px solid #004400;
       color: #66cc66;
     }
+    .siri-section {
+      margin-top: 24px;
+      border-top: 1px solid #333;
+      padding-top: 24px;
+      text-align: left;
+    }
+    .siri-section h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #ccc;
+    }
+    .siri-section .siri-desc {
+      font-size: 13px;
+      color: #999;
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+    .shortcut-card {
+      background: #222;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+    }
+    .shortcut-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .shortcut-phrase {
+      font-size: 14px;
+      font-weight: 600;
+      color: #f5f5f5;
+    }
+    .shortcut-badge {
+      font-size: 10px;
+      color: #999;
+      background: #333;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .shortcut-what {
+      font-size: 12px;
+      color: #999;
+      margin-bottom: 8px;
+    }
+    .shortcut-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .shortcut-param {
+      font-family: "SF Mono", Menlo, monospace;
+      font-size: 11px;
+      background: #1a2a1a;
+      color: #4CAF50;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid #2a3a2a;
+    }
+    .shortcut-try {
+      font-size: 11px;
+      color: #6BA4FF;
+      text-decoration: none;
+      background: #1a2a3a;
+      border: 1px solid #2a3a4a;
+      padding: 4px 10px;
+      border-radius: 6px;
+    }
+    .shortcut-try:hover { background: #2a3a4a; }
     .manual-link {
       margin-top: 16px;
       font-size: 13px;
@@ -232,6 +306,88 @@
       <div class="feature"><strong>Approvals</strong><br>One-tap approve/reject for managers</div>
       <div class="feature"><strong>Secure</strong><br>Credentials stored in your iOS Keychain, not in the app</div>
       <div class="feature"><strong>Auto-updates</strong><br>Check for updates in Settings</div>
+    </div>
+
+    <div class="siri-section">
+      <h2>Siri Voice Commands</h2>
+      <p class="siri-desc">Ask Siri about your hours, earnings, and approvals. Create a Shortcut for each command you want, then trigger it by voice or tap.</p>
+
+      <div class="shortcut-card">
+        <div class="shortcut-header">
+          <span class="shortcut-phrase">"Hey Siri, Crossover summary"</span>
+        </div>
+        <div class="shortcut-what">Hours, earnings, deadline, and pending approval count</div>
+        <div class="shortcut-row">
+          <span class="shortcut-param">summary</span>
+          <a class="shortcut-try" href="scriptable:///run/HourGlass?shortcutParameter=summary">Try it</a>
+        </div>
+      </div>
+
+      <div class="shortcut-card">
+        <div class="shortcut-header">
+          <span class="shortcut-phrase">"Hey Siri, check my hours"</span>
+        </div>
+        <div class="shortcut-what">Weekly total, today's hours, remaining goal, deadline</div>
+        <div class="shortcut-row">
+          <span class="shortcut-param">hours</span>
+          <a class="shortcut-try" href="scriptable:///run/HourGlass?shortcutParameter=hours">Try it</a>
+        </div>
+      </div>
+
+      <div class="shortcut-card">
+        <div class="shortcut-header">
+          <span class="shortcut-phrase">"Hey Siri, Crossover earnings"</span>
+        </div>
+        <div class="shortcut-what">Weekly earnings and hourly rate breakdown</div>
+        <div class="shortcut-row">
+          <span class="shortcut-param">earnings</span>
+          <a class="shortcut-try" href="scriptable:///run/HourGlass?shortcutParameter=earnings">Try it</a>
+        </div>
+      </div>
+
+      <div class="shortcut-card">
+        <div class="shortcut-header">
+          <span class="shortcut-phrase">"Hey Siri, check approvals"</span>
+          <span class="shortcut-badge">Managers</span>
+        </div>
+        <div class="shortcut-what">Pending manual time and overtime request details</div>
+        <div class="shortcut-row">
+          <span class="shortcut-param">approvals</span>
+          <a class="shortcut-try" href="scriptable:///run/HourGlass?shortcutParameter=approvals">Try it</a>
+        </div>
+      </div>
+
+      <div class="shortcut-card">
+        <div class="shortcut-header">
+          <span class="shortcut-phrase">"Hey Siri, approve timecards"</span>
+          <span class="shortcut-badge">Managers</span>
+        </div>
+        <div class="shortcut-what">Approve all pending requests in one command</div>
+        <div class="shortcut-row">
+          <span class="shortcut-param">approve</span>
+          <a class="shortcut-try" href="scriptable:///run/HourGlass?shortcutParameter=approve">Try it</a>
+        </div>
+      </div>
+
+      <div class="steps" style="margin-top: 16px; border-top: none; padding-top: 0;">
+        <h2>How to Create Each Shortcut</h2>
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-text">Open the <strong>Shortcuts</strong> app → tap <strong>+</strong> → <strong>Add Action</strong> → search for <strong>Scriptable</strong> → choose <strong>Run Script</strong></div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-text">Set Script to <strong>HourGlass</strong>. Tap <strong>Show More</strong>, then set Text to the green command above (e.g. <strong>hours</strong>)</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-text">Tap the name at the top and rename it to your Siri phrase (e.g. <strong>Check my hours</strong>). That's what you'll say to trigger it.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-text">Repeat for each command you want. Or just use Scriptable's built-in <strong>Add to Siri</strong> (tap <strong>...</strong> on HourGlass) for a quick summary shortcut.</div>
+        </div>
+      </div>
     </div>
 
     <div class="manual-link">

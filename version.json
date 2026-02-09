@@ -1,4 +1,4 @@
 {
-  "version": "1.5.1",
-  "changelog": "Cap earnings at weekly hour limit. Store weeklyLimit from assignment API. Replace hardcoded 40h with per-user limit."
+  "version": "1.6.0",
+  "changelog": "Siri Shortcut integration. Ask Siri about hours, earnings, approvals. Approve all pending requests via voice command."
 }
