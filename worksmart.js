@@ -6,7 +6,7 @@
 // Failover cache: shows last known data when API fails
 
 // ─── Version & Auto-Update ───────────────────────────────────
-const SCRIPT_VERSION = "1.6.0";
+const SCRIPT_VERSION = "1.6.1";
 const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/jaime-alvarez-trilogy/hourglass/main";
 
 async function checkForUpdate() {
@@ -666,8 +666,43 @@ async function getTimesheetData(token) {
   return null;
 }
 
+// ─── Fetch Payments (timezone-aware weekly hours) ─────────────
+
+async function getPaymentsWorkedHours(token) {
+  try {
+    const now = new Date();
+    // Current week: Mon-Sun (payments API uses Mon-based weeks)
+    const day = now.getDay(); // 0=Sun
+    const mondayOffset = day === 0 ? 6 : day - 1;
+    const monday = new Date(now);
+    monday.setDate(monday.getDate() - mondayOffset);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+
+    const from = monday.toISOString().split('T')[0];
+    const to = sunday.toISOString().split('T')[0];
+
+    const url = `${API_BASE}/api/v3/users/current/payments?from=${from}&to=${to}`;
+    if (CONFIG.debugMode) console.log("💰 Fetching payments:", url);
+
+    const request = new Request(url);
+    request.headers = { "x-auth-token": token };
+    const payments = await request.loadJSON();
+
+    if (Array.isArray(payments) && payments.length > 0) {
+      // Find the current week's entry
+      const entry = payments[0];
+      if (CONFIG.debugMode) console.log(`💰 Payments: workedHours=${entry.workedHours}, paidHours=${entry.paidHours}`);
+      return entry.workedHours || entry.paidHours || null;
+    }
+  } catch (e) {
+    if (CONFIG.debugMode) console.log("💰 Payments fetch failed, using timesheet hours");
+  }
+  return null;
+}
+
 // Calculate total hours from timesheet
-function calculateHours(timesheetData) {
+function calculateHours(timesheetData, paymentsWorkedHours) {
   if (!timesheetData || !Array.isArray(timesheetData) || timesheetData.length === 0) {
     const now = new Date();
     const currentDay = now.getUTCDay();
@@ -683,7 +718,11 @@ function calculateHours(timesheetData) {
   }
 
   const firstEntry = timesheetData[0];
-  const totalHours = parseFloat(firstEntry.totalHours || firstEntry.hourWorked || 0);
+  const timesheetTotal = parseFloat(firstEntry.totalHours || firstEntry.hourWorked || 0);
+  // Prefer payments API total (timezone-aware) over timesheet (UTC-based)
+  const totalHours = (paymentsWorkedHours != null && paymentsWorkedHours >= 0)
+    ? paymentsWorkedHours
+    : timesheetTotal;
   const averageHours = parseFloat(firstEntry.averageHoursPerDay || 0);
   const daily = firstEntry.stats || [];
 
@@ -1104,19 +1143,23 @@ async function fetchApprovalData(token) {
   let hoursData = null;
 
   if (CONFIG.isManager) {
-    const [manualData, overtimeData, timesheetData] = await Promise.all([
+    const [manualData, overtimeData, timesheetData, paymentsHours] = await Promise.all([
       getPendingManualTime(token),
       getPendingOvertime(token),
-      getTimesheetData(token)
+      getTimesheetData(token),
+      getPaymentsWorkedHours(token)
     ]);
 
     const manualItems = parseManualData(manualData || []);
     const overtimeItems = parseOvertimeData(overtimeData || []);
     allItems = [...manualItems, ...overtimeItems];
-    hoursData = timesheetData ? calculateHours(timesheetData) : null;
+    hoursData = timesheetData ? calculateHours(timesheetData, paymentsHours) : null;
   } else {
-    const timesheetData = await getTimesheetData(token);
-    hoursData = timesheetData ? calculateHours(timesheetData) : null;
+    const [timesheetData, paymentsHours] = await Promise.all([
+      getTimesheetData(token),
+      getPaymentsWorkedHours(token)
+    ]);
+    hoursData = timesheetData ? calculateHours(timesheetData, paymentsHours) : null;
   }
 
   if (hoursData) {

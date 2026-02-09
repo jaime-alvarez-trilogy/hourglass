@@ -1,4 +1,4 @@
 {
-  "version": "1.6.0",
-  "changelog": "Siri Shortcut integration. Ask Siri about hours, earnings, approvals. Approve all pending requests via voice command."
+  "version": "1.6.1",
+  "changelog": "Fix weekly hours using payments API (timezone-aware) instead of UTC-based timesheet total."
 }
