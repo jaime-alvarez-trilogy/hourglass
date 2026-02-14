@@ -6,7 +6,7 @@
 // Failover cache: shows last known data when API fails
 
 // ─── Version & Auto-Update ───────────────────────────────────
-const SCRIPT_VERSION = "1.6.5";
+const SCRIPT_VERSION = "1.6.6";
 const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/jaime-alvarez-trilogy/hourglass/main";
 
 async function checkForUpdate() {
@@ -670,15 +670,14 @@ async function getTimesheetData(token) {
 async function getPaymentsWorkedHours(token) {
   try {
     const now = new Date();
-    // Payments API uses Sun-based weeks (Sun "from" to next Sun "to" exclusive)
-    const day = now.getDay(); // 0=Sun
-    const sunday = new Date(now);
-    sunday.setDate(sunday.getDate() - day); // Roll back to this week's Sunday
-    const nextSunday = new Date(sunday);
-    nextSunday.setDate(sunday.getDate() + 7);
+    // Earnings tab uses Mon-Sun UTC weeks. Calculate UTC Monday.
+    const utcDay = now.getUTCDay(); // 0=Sun
+    const utcMondayOffset = utcDay === 0 ? 6 : utcDay - 1;
+    const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - utcMondayOffset));
+    const sunday = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate() + 6));
 
-    const from = sunday.toISOString().split('T')[0];
-    const to = nextSunday.toISOString().split('T')[0];
+    const from = monday.toISOString().split('T')[0];
+    const to = sunday.toISOString().split('T')[0];
 
     const url = `${API_BASE}/api/v3/users/current/payments?from=${from}&to=${to}`;
     if (CONFIG.debugMode) console.log("💰 Fetching payments:", url);
