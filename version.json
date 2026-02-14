@@ -1,4 +1,4 @@
 {
-  "version": "1.6.2",
-  "changelog": "Use payments API as source of truth for both hours and earnings. Actual pay amount from API, not calculated."
+  "version": "1.6.4",
+  "changelog": "Fix hours display: use paidHours from payments API (matches earnings page) instead of workedHours (matches dashboard)."
 }

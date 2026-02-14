@@ -6,7 +6,7 @@
 // Failover cache: shows last known data when API fails
 
 // ─── Version & Auto-Update ───────────────────────────────────
-const SCRIPT_VERSION = "1.6.2";
+const SCRIPT_VERSION = "1.6.4";
 const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/jaime-alvarez-trilogy/hourglass/main";
 
 async function checkForUpdate() {
@@ -115,9 +115,8 @@ function updateConfigField(field, value) {
 }
 
 function clearConfig() {
-  // Keychain has no remove() — overwrite with empty strings
-  try { Keychain.set(KEY_USERNAME, ""); } catch (e) {}
-  try { Keychain.set(KEY_PASSWORD, ""); } catch (e) {}
+  try { Keychain.remove(KEY_USERNAME); } catch (e) {}
+  try { Keychain.remove(KEY_PASSWORD); } catch (e) {}
   const fm = FileManager.local();
   const path = fm.joinPath(fm.documentsDirectory(), CONFIG_FILE);
   if (fm.fileExists(path)) fm.remove(path);
@@ -548,8 +547,8 @@ async function getAuthToken() {
     return token;
   } catch (error) {
     console.error("❌ Auth failed:", error);
-    // If auth fails, credentials may have changed — clear config so onboarding runs next time
-    clearConfig();
+    // Don't clear config on transient errors (network, timeout, 5xx)
+    // Only return null — let caller decide whether to use cache or re-onboard
     return null;
   }
 }
@@ -722,9 +721,9 @@ function calculateHours(timesheetData, paymentsData) {
 
   const firstEntry = timesheetData[0];
   const timesheetTotal = parseFloat(firstEntry.totalHours || firstEntry.hourWorked || 0);
-  // Prefer payments API (timezone-aware, source of truth) over timesheet (UTC-based)
-  const totalHours = (paymentsData?.workedHours > 0)
-    ? paymentsData.workedHours
+  // Prefer payments API paidHours (matches earnings page, source of truth) over timesheet
+  const totalHours = (paymentsData?.paidHours > 0)
+    ? paymentsData.paidHours
     : timesheetTotal;
   const averageHours = parseFloat(firstEntry.averageHoursPerDay || 0);
   const daily = firstEntry.stats || [];
@@ -2363,11 +2362,11 @@ async function main() {
     initUrls(cfg);
 
     // ── Authenticate ──
-    const token = await getAuthToken();
+    let token = await getAuthToken();
     if (!token) {
+      // Try cache first in ALL modes — don't nuke config on transient errors
+      const cached = loadCache();
       if (config.runsInWidget) {
-        // Try cache before showing error
-        const cached = loadCache();
         if (cached) {
           const logo = await loadLogo(useSmallLogo);
           return await createWidget([], logo, null, cached.hoursData, cached.cachedAt);
@@ -2375,16 +2374,36 @@ async function main() {
         const logo = await loadLogo(useSmallLogo);
         return await createWidget(null, logo, "Login expired — tap to fix");
       }
-      // Auth failed — re-run onboarding
-      clearConfig();
-      const retryCfg = await runOnboarding();
-      if (!retryCfg) return null;
-      initUrls(retryCfg);
-      const retryToken = await getAuthToken();
-      if (!retryToken) return null;
+      // In-app: offer retry or cached data — reconfigure is in Settings
+      if (cached) {
+        const retryAlert = new Alert();
+        retryAlert.title = "Connection Issue";
+        retryAlert.message = "Could not authenticate. Showing cached data.\nUse Settings to reconfigure if needed.";
+        retryAlert.addAction("Retry");
+        retryAlert.addAction("Use Cached Data");
+        retryAlert.addCancelAction("Cancel");
+        const choice = await retryAlert.presentAlert();
+        if (choice === 0) {
+          token = await getAuthToken();
+        } else if (choice === 1) {
+          await showInteractiveView([], cached.hoursData);
+          return null;
+        }
+      } else {
+        const retryAlert = new Alert();
+        retryAlert.title = "Connection Issue";
+        retryAlert.message = "Could not authenticate. Check your network and retry.\nUse Settings to reconfigure if needed.";
+        retryAlert.addAction("Retry");
+        retryAlert.addCancelAction("Cancel");
+        const choice = await retryAlert.presentAlert();
+        if (choice === 0) {
+          token = await getAuthToken();
+        }
+      }
+      if (!token) return null;
     }
 
-    const activeToken = token || await getAuthToken();
+    const activeToken = token;
     ACTIVE_TOKEN = activeToken;
 
     // ── Weekly role/rate refresh (non-blocking, skips if already checked) ──
