@@ -6,7 +6,7 @@
 // Failover cache: shows last known data when API fails
 
 // ─── Version & Auto-Update ───────────────────────────────────
-const SCRIPT_VERSION = "1.7.0";
+const SCRIPT_VERSION = "1.7.1";
 const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/jaime-alvarez-trilogy/hourglass/main";
 
 async function checkForUpdate() {
@@ -828,13 +828,14 @@ function formatTimeRemaining(milliseconds) {
 // ─── AI Usage & BrainLift Tracking ───────────────────────────
 
 async function fetchWorkDiary(token, assignmentId, dateStr) {
-  const url = `${API_BASE}/api/v1/work-diaries/assignments/${assignmentId}?date=${dateStr}`;
+  const url = `${API_BASE}/api/timetracking/workdiaries?assignmentId=${assignmentId}&date=${dateStr}`;
   if (CONFIG.debugMode) console.log("🤖 Fetching diary:", dateStr);
   const request = new Request(url);
   request.headers = { "x-auth-token": token };
   try {
     const resp = await request.loadJSON();
-    return resp?.slots || resp?.timeSlots || [];
+    // Response is a flat array of slot objects
+    return Array.isArray(resp) ? resp : (resp?.slots || resp?.timeSlots || []);
   } catch (e) {
     if (CONFIG.debugMode) console.log(`🤖 Diary fetch failed for ${dateStr}`);
     return [];
@@ -845,16 +846,19 @@ function countDiaryTags(slots) {
   let total = 0, aiUsage = 0, secondBrain = 0, noTags = 0;
   for (const slot of slots) {
     total++;
-    const tags = slot.tags || slot.activityTags || [];
-    const tagNames = tags.map(t => (typeof t === "string" ? t : t.name || t.tag || "").toLowerCase());
-    if (tagNames.some(t => t.includes("second_brain") || t.includes("secondbrain") || t.includes("brainlift"))) {
+    // Tags are simple strings: ["ai_usage", "not_second_brain"] or ["ai_usage", "second_brain"]
+    const tags = slot.tags || [];
+    const hasAI = tags.includes("ai_usage");
+    // Exact match — "second_brain" but NOT "not_second_brain"
+    const hasBL = tags.includes("second_brain");
+
+    if (hasBL) {
       secondBrain++;
       aiUsage++; // second_brain counts as AI usage too
-    } else if (tagNames.some(t => t.includes("ai_usage") || t.includes("ai usage") || t.includes("aiusage"))) {
+    } else if (hasAI) {
       aiUsage++;
-    } else if (tagNames.length === 0 || tagNames.every(t => t === "" || t === "none")) {
-      noTags++;
     }
+    if (tags.length === 0) noTags++;
   }
   return { total, aiUsage, secondBrain, noTags };
 }

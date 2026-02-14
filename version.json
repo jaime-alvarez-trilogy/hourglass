@@ -1,4 +1,4 @@
 {
-  "version": "1.7.0",
-  "changelog": "Add real-time AI% and BrainLift tracking: widget dots (small), inline metrics (medium), progress bars (large), per-day breakdown in interactive view, and Siri 'ai' command."
+  "version": "1.7.1",
+  "changelog": "Fix work diary API endpoint and tag matching for AI%/BrainLift tracking."
 }
