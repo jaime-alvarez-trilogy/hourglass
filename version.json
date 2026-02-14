@@ -1,4 +1,4 @@
 {
-  "version": "1.6.6",
-  "changelog": "Fix payments date range: use UTC Mon-Sun (matching earnings tab) instead of local dates that shift via toISOString()."
+  "version": "1.7.0",
+  "changelog": "Add real-time AI% and BrainLift tracking: widget dots (small), inline metrics (medium), progress bars (large), per-day breakdown in interactive view, and Siri 'ai' command."
 }

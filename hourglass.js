@@ -6,7 +6,7 @@
 // Failover cache: shows last known data when API fails
 
 // ─── Version & Auto-Update ───────────────────────────────────
-const SCRIPT_VERSION = "1.6.6";
+const SCRIPT_VERSION = "1.7.0";
 const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/jaime-alvarez-trilogy/hourglass/main";
 
 async function checkForUpdate() {
@@ -63,6 +63,7 @@ async function performUpdate() {
 
 const CONFIG_FILE = "crossover-config.json";
 const CACHE_FILE = "crossover-cache.json";
+const AI_CACHE_FILE = "crossover-ai-cache.json";
 const KEY_USERNAME = "crossover_username";
 const KEY_PASSWORD = "crossover_password";
 
@@ -149,6 +150,44 @@ function loadCache() {
   }
 }
 
+// ─── AI Usage Cache ──────────────────────────────────────────
+
+function loadAICache() {
+  try {
+    const fm = FileManager.local();
+    const path = fm.joinPath(fm.documentsDirectory(), AI_CACHE_FILE);
+    if (!fm.fileExists(path)) return {};
+    return JSON.parse(fm.readString(path));
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveAICache(cache) {
+  try {
+    const fm = FileManager.local();
+    const path = fm.joinPath(fm.documentsDirectory(), AI_CACHE_FILE);
+    fm.writeString(path, JSON.stringify(cache));
+  } catch (e) {}
+}
+
+function pruneAICache(cache) {
+  // Remove entries before this week's Monday (local timezone)
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? 6 : day - 1;
+  const monday = new Date(now);
+  monday.setDate(monday.getDate() - diff);
+  monday.setHours(0, 0, 0, 0);
+  const mondayStr = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
+
+  const pruned = {};
+  for (const [date, data] of Object.entries(cache)) {
+    if (date >= mondayStr) pruned[date] = data;
+  }
+  return pruned;
+}
+
 // ─── Onboarding Flow ─────────────────────────────────────────
 
 async function runOnboarding() {
@@ -224,6 +263,7 @@ async function runOnboarding() {
   let isManager = false;
   let hourlyRate = 0;
   let weeklyLimit = 40;
+  let assignmentId = 0;
 
   // Strategy 1: /api/identity/users/current/detail (best — has everything)
   try {
@@ -247,6 +287,7 @@ async function runOnboarding() {
       if (candidateAvatar?.id) userId = candidateAvatar.id;
       // Also available deeper: a.selection.marketplaceMember.application.candidate.id
       if (detail.fullName) fullName = detail.fullName;
+      if (a.id) assignmentId = a.id;
       if (a.salary > 0) hourlyRate = Math.round(a.salary);
       if (a.weeklyLimit > 0) weeklyLimit = a.weeklyLimit;
       isManager = (detail.avatarTypes || []).includes("MANAGER");
@@ -270,6 +311,7 @@ async function runOnboarding() {
           managerId: a.manager?.id || userId
         };
         managerId = a.manager?.id || userId;
+        if (a.id) assignmentId = a.id;
         if (a.candidate?.id) userId = a.candidate.id;
         teams = [primaryTeam];
         if (a.candidate?.printableName) fullName = a.candidate.printableName;
@@ -365,7 +407,7 @@ async function runOnboarding() {
     userId, fullName, managerId,
     primaryTeamId: primaryTeam?.id || 0,
     teams, hourlyRate, weeklyLimit, useQA,
-    isManager,
+    isManager, assignmentId,
     lastRoleCheck: new Date().toISOString(),
     debugMode: false
   };
@@ -462,6 +504,10 @@ async function weeklyRefresh(token) {
       if (isManager !== CONFIG.isManager) {
         updateConfigField("isManager", isManager);
         if (CONFIG.debugMode) console.log(`🔄 Role changed: ${isManager ? "Manager" : "Contributor"}`);
+      }
+      if (a.id && a.id !== CONFIG.assignmentId) {
+        updateConfigField("assignmentId", a.id);
+        if (CONFIG.debugMode) console.log(`🔄 Assignment ID updated: → ${a.id}`);
       }
       if (a.salary > 0) {
         const newRate = Math.round(a.salary);
@@ -777,6 +823,172 @@ function formatTimeRemaining(milliseconds) {
   } else {
     return `${minutes}m`;
   }
+}
+
+// ─── AI Usage & BrainLift Tracking ───────────────────────────
+
+async function fetchWorkDiary(token, assignmentId, dateStr) {
+  const url = `${API_BASE}/api/v1/work-diaries/assignments/${assignmentId}?date=${dateStr}`;
+  if (CONFIG.debugMode) console.log("🤖 Fetching diary:", dateStr);
+  const request = new Request(url);
+  request.headers = { "x-auth-token": token };
+  try {
+    const resp = await request.loadJSON();
+    return resp?.slots || resp?.timeSlots || [];
+  } catch (e) {
+    if (CONFIG.debugMode) console.log(`🤖 Diary fetch failed for ${dateStr}`);
+    return [];
+  }
+}
+
+function countDiaryTags(slots) {
+  let total = 0, aiUsage = 0, secondBrain = 0, noTags = 0;
+  for (const slot of slots) {
+    total++;
+    const tags = slot.tags || slot.activityTags || [];
+    const tagNames = tags.map(t => (typeof t === "string" ? t : t.name || t.tag || "").toLowerCase());
+    if (tagNames.some(t => t.includes("second_brain") || t.includes("secondbrain") || t.includes("brainlift"))) {
+      secondBrain++;
+      aiUsage++; // second_brain counts as AI usage too
+    } else if (tagNames.some(t => t.includes("ai_usage") || t.includes("ai usage") || t.includes("aiusage"))) {
+      aiUsage++;
+    } else if (tagNames.length === 0 || tagNames.every(t => t === "" || t === "none")) {
+      noTags++;
+    }
+  }
+  return { total, aiUsage, secondBrain, noTags };
+}
+
+const AI_REFRESH_INTERVAL = 2 * 60 * 60 * 1000; // 2 hours
+
+function aggregateAICache(cache) {
+  let totalSlots = 0, totalAI = 0, totalBL = 0, totalNoTags = 0;
+  let workdaysElapsed = 0;
+  const dailyBreakdown = [];
+
+  const entries = Object.entries(cache)
+    .filter(([k]) => k !== "_lastFetchedAt")
+    .sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [date, data] of entries) {
+    totalSlots += data.total;
+    totalAI += data.aiUsage;
+    totalBL += data.secondBrain;
+    totalNoTags += data.noTags;
+    if (data.total > 0) workdaysElapsed++;
+    dailyBreakdown.push({ date, ...data });
+  }
+
+  const taggedSlots = totalSlots - totalNoTags;
+  const aiPct = taggedSlots > 0 ? (totalAI / taggedSlots) * 100 : 0;
+  const aiPctLow = Math.max(0, Math.round(aiPct - 2));
+  const aiPctHigh = Math.min(100, Math.round(aiPct + 2));
+  const brainliftHours = (totalBL * 10) / 60;
+
+  return {
+    aiPctLow, aiPctHigh, brainliftHours,
+    totalSlots, taggedSlots, workdaysElapsed,
+    dailyBreakdown
+  };
+}
+
+async function getAIData(token) {
+  if (!CONFIG.assignmentId) return null;
+
+  const rawCache = loadAICache();
+  const cache = pruneAICache(rawCache);
+  const now = new Date();
+
+  // If cache was fetched within the refresh interval, return cached aggregation
+  const lastFetched = cache._lastFetchedAt ? new Date(cache._lastFetchedAt) : null;
+  const hasCachedDays = Object.keys(cache).some(k => k !== "_lastFetchedAt");
+  if (lastFetched && (now - lastFetched) < AI_REFRESH_INTERVAL && hasCachedDays) {
+    if (CONFIG.debugMode) console.log("🤖 AI cache fresh, skipping fetch");
+    return aggregateAICache(cache);
+  }
+
+  const day = now.getDay();
+  const diff = day === 0 ? 6 : day - 1;
+  const monday = new Date(now);
+  monday.setDate(monday.getDate() - diff);
+  monday.setHours(0, 0, 0, 0);
+
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const fetchPromises = [];
+  const datesToFetch = [];
+
+  // Build list of dates Mon..today; fetch only uncached (always re-fetch today)
+  for (let i = 0; i <= diff + (day === 0 ? 6 : 0); i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    if (d > now) break;
+    const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    if (ds === todayStr || !cache[ds]) {
+      datesToFetch.push(ds);
+      fetchPromises.push(fetchWorkDiary(token, CONFIG.assignmentId, ds));
+    }
+  }
+
+  if (fetchPromises.length > 0) {
+    const results = await Promise.all(fetchPromises);
+    for (let i = 0; i < datesToFetch.length; i++) {
+      cache[datesToFetch[i]] = countDiaryTags(results[i]);
+    }
+  }
+
+  cache._lastFetchedAt = now.toISOString();
+  saveAICache(cache);
+
+  return aggregateAICache(cache);
+}
+
+// ─── Status Colors ───────────────────────────────────────────
+
+function getHoursStatusColor(hoursData) {
+  if (!hoursData || hoursData.total === undefined) return new Color("#999999");
+  const now = new Date();
+  const day = now.getDay();
+  const completedDays = day === 0 ? 6 : day; // Mon=1..Sat=6, Sun=6
+  const expectedHours = completedDays * 8;
+  if (expectedHours === 0) return new Color("#4CAF50");
+  const ratio = hoursData.total / expectedHours;
+  if (ratio >= 0.9) return new Color("#4CAF50"); // green
+  if (ratio >= 0.7) return new Color("#FFC107"); // yellow
+  return new Color("#FF5722"); // red
+}
+
+function getAIStatusColor(aiData) {
+  if (!aiData || aiData.taggedSlots < 20) return new Color("#999999"); // gray — not enough data
+  const target = 75;
+  const avgPct = (aiData.aiPctLow + aiData.aiPctHigh) / 2;
+  if (avgPct >= target * 0.9) return new Color("#4CAF50"); // green ≥67.5%
+  if (avgPct >= target * 0.7) return new Color("#FFC107"); // yellow ≥52.5%
+  return new Color("#FF5722"); // red
+}
+
+function getBLStatusColor(aiData) {
+  if (!aiData || aiData.workdaysElapsed === 0) return new Color("#999999");
+  const proRatedTarget = aiData.workdaysElapsed * 1; // 1h per workday (5h/week)
+  const ratio = aiData.brainliftHours / proRatedTarget;
+  if (ratio >= 0.9) return new Color("#4CAF50");
+  if (ratio >= 0.7) return new Color("#FFC107");
+  return new Color("#FF5722");
+}
+
+function getAIStatusDot(aiData) {
+  if (!aiData || aiData.taggedSlots < 20) return "⚪";
+  const avgPct = (aiData.aiPctLow + aiData.aiPctHigh) / 2;
+  if (avgPct >= 75 * 0.9) return "🟢";
+  if (avgPct >= 75 * 0.7) return "🟡";
+  return "🔴";
+}
+
+function getBLStatusDot(aiData) {
+  if (!aiData || aiData.workdaysElapsed === 0) return "⚪";
+  const proRatedTarget = aiData.workdaysElapsed * 1;
+  const ratio = aiData.brainliftHours / proRatedTarget;
+  if (ratio >= 0.9) return "🟢";
+  if (ratio >= 0.7) return "🟡";
+  return "🔴";
 }
 
 // ─── Parse Manual Time Data ──────────────────────────────────
@@ -1142,50 +1354,55 @@ async function scheduleDeadlineReminders(allItems) {
 async function fetchApprovalData(token) {
   let allItems = [];
   let hoursData = null;
+  let aiData = null;
 
   if (CONFIG.isManager) {
-    const [manualData, overtimeData, timesheetData, paymentsData] = await Promise.all([
+    const [manualData, overtimeData, timesheetData, paymentsData, aiResult] = await Promise.all([
       getPendingManualTime(token),
       getPendingOvertime(token),
       getTimesheetData(token),
-      getPaymentsWorkedHours(token)
+      getPaymentsWorkedHours(token),
+      getAIData(token)
     ]);
 
     const manualItems = parseManualData(manualData || []);
     const overtimeItems = parseOvertimeData(overtimeData || []);
     allItems = [...manualItems, ...overtimeItems];
     hoursData = timesheetData ? calculateHours(timesheetData, paymentsData) : null;
+    aiData = aiResult;
   } else {
-    const [timesheetData, paymentsData] = await Promise.all([
+    const [timesheetData, paymentsData, aiResult] = await Promise.all([
       getTimesheetData(token),
-      getPaymentsWorkedHours(token)
+      getPaymentsWorkedHours(token),
+      getAIData(token)
     ]);
     hoursData = timesheetData ? calculateHours(timesheetData, paymentsData) : null;
+    aiData = aiResult;
   }
 
   if (hoursData) {
     saveCache(hoursData, allItems.length);
   }
 
-  return { allItems, hoursData };
+  return { allItems, hoursData, aiData };
 }
 
 // ─── Interactive In-App View (UITable) ───────────────────────
 
-async function showInteractiveView(allItems, hoursData = null) {
+async function showInteractiveView(allItems, hoursData = null, aiData = null) {
   const table = new UITable();
   table.showSeparators = true;
-  buildTableRows(table, allItems, hoursData);
+  buildTableRows(table, allItems, hoursData, aiData);
   await table.present(false);
 }
 
-function buildTableRows(table, allItems, hoursData) {
+function buildTableRows(table, allItems, hoursData, aiData) {
   table.removeAllRows();
 
   // Closure to refresh the table after actions
   const refreshTable = async () => {
     const data = await fetchApprovalData(ACTIVE_TOKEN);
-    buildTableRows(table, data.allItems, data.hoursData);
+    buildTableRows(table, data.allItems, data.hoursData, data.aiData);
     table.reload();
   };
 
@@ -1342,6 +1559,64 @@ function buildTableRows(table, allItems, hoursData) {
           table.addRow(dayRow);
         }
       }
+      // ── AI Usage & BrainLift section ──
+      if (aiData) {
+        const aiSp = new UITableRow();
+        aiSp.backgroundColor = new Color("#1a1a1a");
+        aiSp.height = 8;
+        table.addRow(aiSp);
+
+        const aiTitleRow = new UITableRow();
+        aiTitleRow.backgroundColor = new Color("#0a0a2a");
+        aiTitleRow.height = 30;
+        const aiTitle = aiTitleRow.addText("AI Usage & BrainLift");
+        aiTitle.titleFont = Font.boldSystemFont(13);
+        aiTitle.titleColor = new Color("#64B5F6");
+        table.addRow(aiTitleRow);
+
+        // Weekly summary
+        const aiSummaryRow = new UITableRow();
+        aiSummaryRow.backgroundColor = new Color("#1a1a1a");
+        aiSummaryRow.height = 45;
+        const aiPctStr = aiData.taggedSlots < 20
+          ? `AI: ~${aiData.aiPctLow}-${aiData.aiPctHigh}% (low data)`
+          : `AI: ${aiData.aiPctLow}-${aiData.aiPctHigh}%`;
+        const blTarget = 5;
+        const aiSummary = aiSummaryRow.addText(
+          `${aiPctStr}  •  BrainLift: ${aiData.brainliftHours.toFixed(1)}h`,
+          `Target: 75% AI • ${blTarget}h BrainLift/week • ${aiData.totalSlots} slots tracked`
+        );
+        aiSummary.titleFont = Font.boldSystemFont(15);
+        aiSummary.titleColor = getAIStatusColor(aiData);
+        aiSummary.subtitleFont = Font.systemFont(12);
+        aiSummary.subtitleColor = new Color("#999999");
+        table.addRow(aiSummaryRow);
+
+        // Per-day breakdown
+        for (const day of aiData.dailyBreakdown) {
+          if (day.total === 0) continue;
+          const date = new Date(day.date + "T12:00:00");
+          const dayName = date.toLocaleDateString("en-US", { weekday: "long" });
+          const dayTagged = day.total - day.noTags;
+          const dayAIPct = dayTagged > 0 ? Math.round((day.aiUsage / dayTagged) * 100) : 0;
+          const dayBL = (day.secondBrain * 10 / 60).toFixed(1);
+
+          const dayRow = new UITableRow();
+          dayRow.backgroundColor = new Color("#1a1a1a");
+          dayRow.height = 32;
+          const dayColor = dayAIPct >= 68 ? new Color("#4CAF50") : (dayAIPct >= 52 ? new Color("#FFC107") : new Color("#FF5722"));
+          const dayText = dayRow.addText(
+            `${dayName}  —  AI ${dayAIPct}%  •  BL ${dayBL}h`,
+            `${day.total} slots • ${dayTagged} tagged`
+          );
+          dayText.titleFont = Font.systemFont(14);
+          dayText.titleColor = dayColor;
+          dayText.subtitleFont = Font.systemFont(11);
+          dayText.subtitleColor = new Color("#666666");
+          table.addRow(dayRow);
+        }
+      }
+
     } else {
       const emptyRow = new UITableRow();
       emptyRow.backgroundColor = new Color("#1a1a1a");
@@ -1738,7 +2013,7 @@ function addItemRows(table, items, refreshTable) {
 
 // ─── Home Screen Widget ──────────────────────────────────────
 
-async function createWidget(allItems, logo = null, error = null, hoursData = null, cachedAt = null) {
+async function createWidget(allItems, logo = null, error = null, hoursData = null, cachedAt = null, aiData = null) {
   const widget = new ListWidget();
   const urgency = getUrgencyLevel();
   const hasItems = allItems && allItems.length > 0;
@@ -1795,6 +2070,12 @@ async function createWidget(allItems, logo = null, error = null, hoursData = nul
         remainingText.font = Font.systemFont(9);
         remainingText.textColor = new Color("#FF9800");
       }
+    }
+
+    if (aiData && aiData.taggedSlots >= 20) {
+      const aiLockText = widget.addText(`AI ${aiData.aiPctLow}-${aiData.aiPctHigh}%`);
+      aiLockText.font = Font.systemFont(9);
+      aiLockText.textColor = getAIStatusColor(aiData);
     }
 
     if (hasItems) {
@@ -1909,6 +2190,14 @@ async function createWidget(allItems, logo = null, error = null, hoursData = nul
           goalText.textColor = new Color("#4CAF50");
         }
 
+        // AI & BrainLift dots
+        if (aiData) {
+          widget.addSpacer(spacing);
+          const aiDotText = widget.addText(`${getAIStatusDot(aiData)} AI  ${getBLStatusDot(aiData)} BL`);
+          aiDotText.font = Font.systemFont(smallTextSize);
+          aiDotText.textColor = new Color("#999999");
+        }
+
       } else if (widgetFamily === "medium") {
         // Medium: two-column layout (hours left, earnings right) + deadline
         const mainStack = widget.addStack();
@@ -1965,6 +2254,27 @@ async function createWidget(allItems, logo = null, error = null, hoursData = nul
           const todayText = widget.addText(`Today: ${hoursData.today.toFixed(1)}h ($${Math.round(hoursData.todayEarnings)})`);
           todayText.font = Font.systemFont(smallTextSize);
           todayText.textColor = new Color("#64B5F6");
+        }
+
+        // AI & BrainLift row
+        if (aiData) {
+          widget.addSpacer(spacing);
+          const aiStack = widget.addStack();
+          aiStack.layoutHorizontally();
+
+          const aiPctStr = aiData.taggedSlots < 20
+            ? `AI ~${aiData.aiPctLow}-${aiData.aiPctHigh}%`
+            : `AI ${aiData.aiPctLow}-${aiData.aiPctHigh}%`;
+          const aiText = aiStack.addText(aiPctStr);
+          aiText.font = Font.boldSystemFont(smallTextSize);
+          aiText.textColor = getAIStatusColor(aiData);
+
+          aiStack.addSpacer();
+
+          const blTarget = aiData.workdaysElapsed > 0 ? Math.min(aiData.workdaysElapsed, 5) : 5;
+          const blText = aiStack.addText(`BL ${aiData.brainliftHours.toFixed(1)}/${blTarget}h`);
+          blText.font = Font.boldSystemFont(smallTextSize);
+          blText.textColor = getBLStatusColor(aiData);
         }
 
       } else {
@@ -2061,6 +2371,61 @@ async function createWidget(allItems, logo = null, error = null, hoursData = nul
 
             widget.addSpacer(1);
           });
+        }
+
+        // AI & BrainLift progress bars
+        if (aiData) {
+          widget.addSpacer(spacing);
+
+          // Header row
+          const aiHeaderStack = widget.addStack();
+          aiHeaderStack.layoutHorizontally();
+
+          const aiPctStr = aiData.taggedSlots < 20
+            ? `AI ~${aiData.aiPctLow}-${aiData.aiPctHigh}%`
+            : `AI ${aiData.aiPctLow}-${aiData.aiPctHigh}%`;
+          const aiLabel = aiHeaderStack.addText(aiPctStr);
+          aiLabel.font = Font.boldSystemFont(smallTextSize);
+          aiLabel.textColor = getAIStatusColor(aiData);
+
+          aiHeaderStack.addSpacer();
+
+          const blTarget = 5;
+          const blLabel = aiHeaderStack.addText(`BL ${aiData.brainliftHours.toFixed(1)}/${blTarget.toFixed(1)}h`);
+          blLabel.font = Font.boldSystemFont(smallTextSize);
+          blLabel.textColor = getBLStatusColor(aiData);
+
+          widget.addSpacer(2);
+
+          // AI progress bar
+          const aiBarRow = widget.addStack();
+          aiBarRow.layoutHorizontally();
+          aiBarRow.centerAlignContent();
+
+          const avgAIPct = (aiData.aiPctLow + aiData.aiPctHigh) / 2;
+          const aiBarFill = Math.min(avgAIPct / 100, 1);
+          const aiBarWidth = 100;
+          const aiFilledStack = aiBarRow.addStack();
+          aiFilledStack.size = new Size(aiBarWidth * aiBarFill, 6);
+          aiFilledStack.backgroundColor = getAIStatusColor(aiData);
+          aiFilledStack.cornerRadius = 3;
+          const aiEmptyStack = aiBarRow.addStack();
+          aiEmptyStack.size = new Size(aiBarWidth * (1 - aiBarFill), 6);
+          aiEmptyStack.backgroundColor = new Color("#333333");
+          aiEmptyStack.cornerRadius = 3;
+
+          aiBarRow.addSpacer(8);
+
+          // BL progress bar
+          const blBarFill = Math.min(aiData.brainliftHours / blTarget, 1);
+          const blFilledStack = aiBarRow.addStack();
+          blFilledStack.size = new Size(aiBarWidth * blBarFill, 6);
+          blFilledStack.backgroundColor = getBLStatusColor(aiData);
+          blFilledStack.cornerRadius = 3;
+          const blEmptyStack = aiBarRow.addStack();
+          blEmptyStack.size = new Size(aiBarWidth * (1 - blBarFill), 6);
+          blEmptyStack.backgroundColor = new Color("#333333");
+          blEmptyStack.cornerRadius = 3;
         }
       }
 
@@ -2222,7 +2587,7 @@ async function createWidget(allItems, logo = null, error = null, hoursData = nul
 
 // ─── Siri Shortcut Support ────────────────────────────────────
 
-function buildSummaryResponse(hoursData, allItems) {
+function buildSummaryResponse(hoursData, allItems, aiData) {
   const parts = [];
   if (hoursData) {
     const limit = CONFIG.weeklyLimit || 40;
@@ -2236,11 +2601,27 @@ function buildSummaryResponse(hoursData, allItems) {
   } else {
     parts.push("Couldn't fetch your hours. Try again in a moment.");
   }
+  if (aiData && aiData.taggedSlots >= 20) {
+    parts.push(`AI usage is ${aiData.aiPctLow} to ${aiData.aiPctHigh} percent. BrainLift: ${aiData.brainliftHours.toFixed(1)} of 5 hours.`);
+  }
   if (CONFIG.isManager && allItems.length > 0) {
     parts.push(`${allItems.length} pending approval${allItems.length === 1 ? "" : "s"}.`);
   } else if (CONFIG.isManager) {
     parts.push("No pending approvals.");
   }
+  return parts.join(" ");
+}
+
+function buildAIResponse(aiData) {
+  if (!aiData) return "Couldn't fetch AI data. Make sure your assignment ID is configured.";
+  if (aiData.taggedSlots < 20) {
+    return `Not enough tagged slots yet (${aiData.taggedSlots} of 20 minimum). AI percentage: roughly ${aiData.aiPctLow} to ${aiData.aiPctHigh} percent. BrainLift: ${aiData.brainliftHours.toFixed(1)} hours of 5 target.`;
+  }
+  const parts = [
+    `AI usage: ${aiData.aiPctLow} to ${aiData.aiPctHigh} percent. Target is 75%.`,
+    `BrainLift: ${aiData.brainliftHours.toFixed(1)} of 5 hours.`,
+    `${aiData.totalSlots} total slots, ${aiData.taggedSlots} tagged, across ${aiData.workdaysElapsed} work days.`
+  ];
   return parts.join(" ");
 }
 
@@ -2311,15 +2692,16 @@ async function handleSiriRequest(param) {
   if (!token) return "Login expired. Open HourGlass to re-authenticate.";
   ACTIVE_TOKEN = token;
 
-  const { allItems, hoursData } = await fetchApprovalData(token);
+  const { allItems, hoursData, aiData } = await fetchApprovalData(token);
 
   switch ((param || "summary").toLowerCase().trim()) {
-    case "summary": return buildSummaryResponse(hoursData, allItems);
+    case "summary": return buildSummaryResponse(hoursData, allItems, aiData);
     case "hours":   return buildHoursResponse(hoursData);
     case "earnings": return buildEarningsResponse(hoursData);
+    case "ai":      return buildAIResponse(aiData);
     case "approvals": return buildApprovalsResponse(allItems);
     case "approve": return await approveAllViaSiri(token, allItems);
-    default: return "Unknown command. Try: summary, hours, earnings, approvals, or approve.";
+    default: return "Unknown command. Try: summary, hours, earnings, ai, approvals, or approve.";
   }
 }
 
@@ -2358,6 +2740,13 @@ async function main() {
       if (!cfg) return null;
     }
     initUrls(cfg);
+
+    // ── One-time migration: backfill assignmentId if missing ──
+    if (!CONFIG.assignmentId) {
+      // Will be populated by weeklyRefresh() or next onboarding
+      // Force a refresh by clearing lastRoleCheck
+      CONFIG.lastRoleCheck = null;
+    }
 
     // ── Authenticate ──
     let token = await getAuthToken();
@@ -2409,7 +2798,7 @@ async function main() {
 
     // ── Fetch data (role-aware) ──
     const data = await fetchApprovalData(activeToken);
-    let { allItems, hoursData } = data;
+    let { allItems, hoursData, aiData } = data;
 
     if (CONFIG.debugMode) {
       if (CONFIG.isManager) console.log(`📋 Total: ${allItems.length} items`);
@@ -2439,7 +2828,7 @@ async function main() {
     // Widget mode → show summary widget with logo
     if (config.runsInWidget) {
       const logo = await loadLogo(useSmallLogo);
-      return await createWidget(allItems, logo, null, hoursData);
+      return await createWidget(allItems, logo, null, hoursData, null, aiData);
     }
 
     // In-app mode → check for updates, then show interactive UITable
@@ -2461,7 +2850,7 @@ async function main() {
       }
     }
 
-    await showInteractiveView(allItems, hoursData);
+    await showInteractiveView(allItems, hoursData, aiData);
     return null;
 
   } catch (error) {
