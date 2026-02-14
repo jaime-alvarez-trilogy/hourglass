@@ -1,4 +1,4 @@
 {
-  "version": "1.6.4",
-  "changelog": "Fix hours display: use paidHours from payments API (matches earnings page) instead of workedHours (matches dashboard)."
+  "version": "1.6.5",
+  "changelog": "Fix payments date range: use Sun-Sun weeks (matching earnings page) instead of Mon-Sun (which returned empty)."
 }

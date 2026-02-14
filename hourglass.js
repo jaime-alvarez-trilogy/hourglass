@@ -6,7 +6,7 @@
 // Failover cache: shows last known data when API fails
 
 // ─── Version & Auto-Update ───────────────────────────────────
-const SCRIPT_VERSION = "1.6.4";
+const SCRIPT_VERSION = "1.6.5";
 const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/jaime-alvarez-trilogy/hourglass/main";
 
 async function checkForUpdate() {
@@ -670,16 +670,15 @@ async function getTimesheetData(token) {
 async function getPaymentsWorkedHours(token) {
   try {
     const now = new Date();
-    // Current week: Mon-Sun (payments API uses Mon-based weeks)
+    // Payments API uses Sun-based weeks (Sun "from" to next Sun "to" exclusive)
     const day = now.getDay(); // 0=Sun
-    const mondayOffset = day === 0 ? 6 : day - 1;
-    const monday = new Date(now);
-    monday.setDate(monday.getDate() - mondayOffset);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
+    const sunday = new Date(now);
+    sunday.setDate(sunday.getDate() - day); // Roll back to this week's Sunday
+    const nextSunday = new Date(sunday);
+    nextSunday.setDate(sunday.getDate() + 7);
 
-    const from = monday.toISOString().split('T')[0];
-    const to = sunday.toISOString().split('T')[0];
+    const from = sunday.toISOString().split('T')[0];
+    const to = nextSunday.toISOString().split('T')[0];
 
     const url = `${API_BASE}/api/v3/users/current/payments?from=${from}&to=${to}`;
     if (CONFIG.debugMode) console.log("💰 Fetching payments:", url);
