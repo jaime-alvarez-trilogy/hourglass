@@ -1,4 +1,4 @@
 {
-  "version": "1.7.1",
-  "changelog": "Fix work diary API endpoint and tag matching for AI%/BrainLift tracking."
+  "version": "1.7.2",
+  "changelog": "Fix stale AI cache from broken v1.7.0 endpoint: re-fetch days with zero slots, require real data before using cache."
 }

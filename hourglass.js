@@ -6,7 +6,7 @@
 // Failover cache: shows last known data when API fails
 
 // ─── Version & Auto-Update ───────────────────────────────────
-const SCRIPT_VERSION = "1.7.1";
+const SCRIPT_VERSION = "1.7.2";
 const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/jaime-alvarez-trilogy/hourglass/main";
 
 async function checkForUpdate() {
@@ -902,10 +902,10 @@ async function getAIData(token) {
   const cache = pruneAICache(rawCache);
   const now = new Date();
 
-  // If cache was fetched within the refresh interval, return cached aggregation
+  // If cache was fetched within the refresh interval and has real data, skip re-fetch
   const lastFetched = cache._lastFetchedAt ? new Date(cache._lastFetchedAt) : null;
-  const hasCachedDays = Object.keys(cache).some(k => k !== "_lastFetchedAt");
-  if (lastFetched && (now - lastFetched) < AI_REFRESH_INTERVAL && hasCachedDays) {
+  const hasRealData = Object.entries(cache).some(([k, v]) => k !== "_lastFetchedAt" && v.total > 0);
+  if (lastFetched && (now - lastFetched) < AI_REFRESH_INTERVAL && hasRealData) {
     if (CONFIG.debugMode) console.log("🤖 AI cache fresh, skipping fetch");
     return aggregateAICache(cache);
   }
@@ -920,13 +920,13 @@ async function getAIData(token) {
   const fetchPromises = [];
   const datesToFetch = [];
 
-  // Build list of dates Mon..today; fetch only uncached (always re-fetch today)
+  // Build list of dates Mon..today; re-fetch today + any days with zero slots (stale from broken endpoint)
   for (let i = 0; i <= diff + (day === 0 ? 6 : 0); i++) {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
     if (d > now) break;
     const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    if (ds === todayStr || !cache[ds]) {
+    if (ds === todayStr || !cache[ds] || cache[ds].total === 0) {
       datesToFetch.push(ds);
       fetchPromises.push(fetchWorkDiary(token, CONFIG.assignmentId, ds));
     }
