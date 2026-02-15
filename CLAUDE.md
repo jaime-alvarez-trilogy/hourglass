@@ -35,6 +35,22 @@ WS/
     favicon.ico                  — Favicon
 ```
 
+## Rules
+
+### API Documentation Rule
+**Every time you discover, test, or use a Crossover API endpoint, you MUST immediately document it in `memory/MEMORY.md` under "Key API Endpoints".** This includes:
+- The full URL pattern with parameter names
+- HTTP method (GET, PUT, POST)
+- Request body format (if applicable)
+- Response format (array vs object, key field names, data types)
+- Which ID to use (assignmentId vs userId vs candidateId — these are different!)
+- Any gotchas (e.g. exact string match needed, date format, timezone behavior)
+
+**Never assume an endpoint path.** Always check MEMORY.md first. If it's not documented there, search the codebase (`tools/test-*.js`) for prior discovery work before hitting the API blind.
+
+### Version Bump Rule
+When modifying `hourglass.js`, **always bump `SCRIPT_VERSION` and `version.json` together in the same commit.** They must match. If they don't, the auto-updater enters an infinite loop.
+
 ## Quick Reference
 
 - **Run test scripts**: `node tools/test-crossover-api.js` (requires credentials in file)
