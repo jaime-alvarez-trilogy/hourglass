@@ -6,9 +6,13 @@ A Scriptable widget that brings your Crossover hours tracking, AI usage metrics,
 
 **Requires [Scriptable](https://apps.apple.com/app/scriptable/id1405459188) on your iPhone/iPad.**
 
-[**Install HourGlass**](https://jaime-alvarez-trilogy.github.io/worksmart/) — opens the download page on your phone.
+[**Install HourGlass**](https://jaime-alvarez-trilogy.github.io/hourglass/) — opens the download page on your phone.
 
 Or manually: copy the contents of `hourglass.js` into a new script in Scriptable.
+
+## Video Tutorial
+
+Watch the 1-minute install walkthrough on the [install page](https://jaime-alvarez-trilogy.github.io/hourglass/), or view the video directly: [`assets/hourglass-install-tutorial.mp4`](assets/hourglass-install-tutorial.mp4).
 
 ## Setup
 
@@ -63,15 +67,6 @@ Tap any widget to open the full in-app dashboard with:
 - AI Usage & BrainLift section with per-day AI% and BL hours
 - Settings (update check, rate change, reconfigure)
 - For managers: per-item approve/reject buttons and bulk actions
-
-### Siri Shortcuts
-Add the script as a Shortcut with a text parameter:
-- `"summary"` — hours, earnings, AI%, approvals (default)
-- `"hours"` — detailed hours breakdown
-- `"earnings"` — earnings focus
-- `"ai"` — AI usage and BrainLift status
-- `"approvals"` — pending approval details (managers)
-- `"approve"` — approve all pending items (managers)
 
 ## How It Works
 

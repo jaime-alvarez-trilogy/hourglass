@@ -6,8 +6,9 @@ package-lock.json
 # Tools & test scripts (may contain credentials)
 tools/
 
-# Assets (logo files — embedded in script via base64)
-assets/
+# Assets (logo files — embedded in script via base64, video tracked)
+assets/*
+!assets/hourglass-install-tutorial.mp4
 
 # Local config & cache (device-specific)
 crossover-config.json
