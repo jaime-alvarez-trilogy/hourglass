@@ -23,9 +23,16 @@ const VALID_CONFIG: CrossoverConfig = {
   debugMode: false,
 };
 
+/** Wait for async React Query operations to complete via multiple event loop turns. */
+async function flushAsync() {
+  await act(async () => {
+    await new Promise<void>((res) => setTimeout(res, 0));
+  });
+}
+
 function setupHook() {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   let current!: ReturnType<typeof useConfig>;
   const Wrapper = () =>
@@ -45,7 +52,7 @@ beforeEach(() => {
 describe('FR9: useConfig', () => {
   it('returns config: null and isLoading: false when AsyncStorage is empty', async () => {
     const { get } = setupHook();
-    await act(async () => { await Promise.resolve(); });
+    await flushAsync();
     expect(get().config).toBeNull();
     expect(get().isLoading).toBe(false);
   });
@@ -53,7 +60,7 @@ describe('FR9: useConfig', () => {
   it('returns populated config when AsyncStorage has valid JSON', async () => {
     await AsyncStorage.setItem('crossover_config', JSON.stringify(VALID_CONFIG));
     const { get } = setupHook();
-    await act(async () => { await Promise.resolve(); });
+    await flushAsync();
     expect(get().config).toEqual(VALID_CONFIG);
     expect(get().isLoading).toBe(false);
   });
@@ -61,20 +68,20 @@ describe('FR9: useConfig', () => {
   it('returns null (no throw) when AsyncStorage contains invalid JSON', async () => {
     await AsyncStorage.setItem('crossover_config', '{{not valid json}}');
     const { get } = setupHook();
-    await act(async () => { await Promise.resolve(); });
+    await flushAsync();
     expect(get().config).toBeNull();
     expect(get().isLoading).toBe(false);
   });
 
   it('refetch triggers fresh AsyncStorage read and updates config', async () => {
     const { get } = setupHook();
-    await act(async () => { await Promise.resolve(); });
+    await flushAsync();
     expect(get().config).toBeNull();
 
     await AsyncStorage.setItem('crossover_config', JSON.stringify(VALID_CONFIG));
     await act(async () => {
       await get().refetch();
-      await Promise.resolve();
+      await new Promise<void>((res) => setTimeout(res, 0));
     });
     expect(get().config).toEqual(VALID_CONFIG);
   });
@@ -82,20 +89,18 @@ describe('FR9: useConfig', () => {
   it('SC9.6: does NOT write to AsyncStorage (read-only hook)', async () => {
     const spySetItem = jest.spyOn(AsyncStorage, 'setItem');
     const { get } = setupHook();
-    await act(async () => { await Promise.resolve(); });
-    // Calling refetch should also not write
+    await flushAsync();
     await act(async () => { await get().refetch(); });
     expect(spySetItem).not.toHaveBeenCalled();
     spySetItem.mockRestore();
   });
 
   it('SC9.7: returns configs missing isManager as-is without mutation', async () => {
-    // A legacy config without isManager
     const legacyConfig = { ...VALID_CONFIG } as Record<string, unknown>;
     delete legacyConfig.isManager;
     await AsyncStorage.setItem('crossover_config', JSON.stringify(legacyConfig));
     const { get } = setupHook();
-    await act(async () => { await Promise.resolve(); });
+    await flushAsync();
     // Config is returned as-is — isManager absent in raw storage, hook does not add it
     expect((get().config as Record<string, unknown> | null)?.isManager).toBeUndefined();
   });

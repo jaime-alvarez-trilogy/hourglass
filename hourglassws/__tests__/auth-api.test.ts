@@ -33,7 +33,10 @@ const makeDetail = (overrides: Record<string, unknown> = {}) => ({
 });
 
 const MOCK_TOKEN = 'token123';
-const MOCK_PAYMENTS = [{ amount: 2000, currency: 'USD' }];
+const MOCK_PAYMENTS = [{ amount: 2000, paidHours: 40, currency: 'USD' }];
+// Detail with salary:0 to trigger payments-path tests
+const makeDetailNoSalary = (overrides: Record<string, unknown> = {}) =>
+  makeDetail({ assignment: { ...makeDetail().assignment, salary: 0, ...overrides } });
 
 // Compute a 3-month-ago date in local YYYY-MM-DD for testing
 function localDateStr(date: Date): string {
@@ -44,11 +47,16 @@ function localDateStr(date: Date): string {
 }
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  // resetAllMocks clears mock.calls AND the mockResolvedValueOnce queue
+  jest.resetAllMocks();
   mockGetAuthToken.mockResolvedValue(MOCK_TOKEN);
-  mockApiGet
-    .mockResolvedValueOnce(makeDetail()) // first call → detail
-    .mockResolvedValueOnce(MOCK_PAYMENTS); // second call → payments
+  // Use mockImplementation as a safe default so leftover Once-mocks from one test
+  // never bleed into the next test's mock queue.
+  mockApiGet.mockImplementation(async (path: string) => {
+    if (path.includes('detail')) return makeDetail();
+    if (path.includes('payments')) return MOCK_PAYMENTS;
+    return {};
+  });
 });
 
 // --- ID Extraction ---
@@ -158,6 +166,8 @@ describe('FR5: fetchAndBuildConfig — happy path', () => {
   });
 
   it('calls payments endpoint with local YYYY-MM-DD date range (not ISO)', async () => {
+    // Salary=0 triggers the payments path
+    mockApiGet.mockImplementationOnce(async () => makeDetailNoSalary());
     await fetchAndBuildConfig('user@test.com', 'pass', false);
     const [path, params] = mockApiGet.mock.calls[1];
     expect(path).toBe('/api/v3/users/current/payments');
@@ -213,16 +223,18 @@ describe('FR5: fetchAndBuildConfig — error cases', () => {
   });
 
   it('sets hourlyRate to 0 when payments call fails (does not throw)', async () => {
+    // salary=0 triggers payments path; payments then throws
     mockApiGet
-      .mockResolvedValueOnce(makeDetail())
+      .mockImplementationOnce(async () => makeDetailNoSalary())
       .mockRejectedValueOnce(new Error('payments down'));
     const config = await fetchAndBuildConfig('user@test.com', 'pass', false);
     expect(config.hourlyRate).toBe(0);
   });
 
   it('sets hourlyRate to 0 when payments returns empty array', async () => {
+    // salary=0 triggers payments path; payments returns []
     mockApiGet
-      .mockResolvedValueOnce(makeDetail())
+      .mockImplementationOnce(async () => makeDetailNoSalary())
       .mockResolvedValueOnce([]);
     const config = await fetchAndBuildConfig('user@test.com', 'pass', false);
     expect(config.hourlyRate).toBe(0);

@@ -3,9 +3,14 @@ import { shouldRunRoleRefresh, runRoleRefresh } from '../src/hooks/useRoleRefres
 import { QueryClient } from '@tanstack/react-query';
 import type { CrossoverConfig } from '../src/types/config';
 
-// Mock auth and store modules
+// Mock auth, client, and store modules
 jest.mock('../src/api/auth', () => ({
   getProfileDetail: jest.fn(),
+}));
+jest.mock('../src/api/client', () => ({
+  getAuthToken: jest.fn(),
+  apiGet: jest.fn(),
+  apiPut: jest.fn(),
 }));
 jest.mock('../src/store/config', () => ({
   ...jest.requireActual('../src/store/config'),
@@ -13,8 +18,10 @@ jest.mock('../src/store/config', () => ({
 }));
 
 const { getProfileDetail } = require('../src/api/auth');
+const { getAuthToken } = require('../src/api/client');
 const { saveConfig } = require('../src/store/config');
 const mockGetProfileDetail = getProfileDetail as jest.MockedFunction<typeof getProfileDetail>;
+const mockGetAuthToken = getAuthToken as jest.MockedFunction<typeof getAuthToken>;
 const mockSaveConfig = saveConfig as jest.MockedFunction<typeof saveConfig>;
 
 const MONDAY = new Date('2026-01-05T12:00:00'); // Monday
@@ -60,6 +67,7 @@ const makeDetailResponse = (overrides: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockGetAuthToken.mockResolvedValue(MOCK_TOKEN);
   mockSaveConfig.mockResolvedValue(undefined);
 });
 
