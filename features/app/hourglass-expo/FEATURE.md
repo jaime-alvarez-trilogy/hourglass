@@ -80,6 +80,12 @@ Widget reads local store
 - Team-level analytics
 - Full backend credential storage (Option A architecture)
 
+## Changelog
+
+| Date | Spec | Description |
+|------|------|-------------|
+| 2026-03-08 | [01-foundation](specs/01-foundation/spec.md) | Project skeleton, API client, SecureStore/AsyncStorage config layer, shared TypeScript types |
+
 ## Files Created/Modified
 
 ```
