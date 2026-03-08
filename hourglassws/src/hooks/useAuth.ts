@@ -63,6 +63,7 @@ export function useSetup(): UseSetupResult {
           isManager: false, teams: [], lastRoleCheck: now,
           setupComplete: false, setupDate: now, debugMode: false,
         });
+        setPendingCredentials({ username, password });
         setStep('setup');
       } else {
         setStep('credentials');

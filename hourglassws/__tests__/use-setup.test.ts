@@ -160,6 +160,8 @@ describe('FR8: useSetup — submitCredentials transitions', () => {
     // pendingConfig should have placeholder IDs but store the username
     expect(get().pendingConfig?.fullName).toBe('u@e.com');
     expect(get().pendingConfig?.hourlyRate).toBe(0);
+    // pendingCredentials MUST be set so success screen can persist them
+    expect(get().pendingCredentials).toEqual({ username: 'u@e.com', password: 'p' });
   });
 
   it('reverts to credentials and sets connection error message on NetworkError', async () => {
