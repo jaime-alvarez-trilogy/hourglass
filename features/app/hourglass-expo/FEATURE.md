@@ -85,6 +85,7 @@ Widget reads local store
 | Date | Spec | Description |
 |------|------|-------------|
 | 2026-03-08 | [01-foundation](specs/01-foundation/spec.md) | Project skeleton, API client, SecureStore/AsyncStorage config layer, shared TypeScript types |
+| 2026-03-08 | [02-auth-onboarding](specs/02-auth-onboarding/spec.md) | Auth gate, 5-screen onboarding flow, fetchAndBuildConfig, useSetup/useConfig/useRoleRefresh hooks |
 
 ## Files Created/Modified
 
