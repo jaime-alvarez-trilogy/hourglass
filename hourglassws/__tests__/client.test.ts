@@ -39,15 +39,16 @@ describe('FR3: getAuthToken', () => {
 
   it('throws AuthError(401) on 401 response', async () => {
     mockFetch.mockResolvedValueOnce({ ok: false, status: 401, text: async () => '' });
-    await expect(getAuthToken('u', 'p', false)).rejects.toThrow(AuthError);
-    await expect(getAuthToken('u', 'p', false)).rejects.toMatchObject({ statusCode: 401 });
+    const err = await getAuthToken('u', 'p', false).catch((e) => e);
+    expect(err).toBeInstanceOf(AuthError);
+    expect(err.statusCode).toBe(401);
   });
 
   it('throws AuthError(403) on 403 response', async () => {
     mockFetch.mockResolvedValueOnce({ ok: false, status: 403, text: async () => '' });
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 403, text: async () => '' });
-    await expect(getAuthToken('u', 'p', false)).rejects.toThrow(AuthError);
-    await expect(getAuthToken('u', 'p', false)).rejects.toMatchObject({ statusCode: 403 });
+    const err = await getAuthToken('u', 'p', false).catch((e) => e);
+    expect(err).toBeInstanceOf(AuthError);
+    expect(err.statusCode).toBe(403);
   });
 
   it('throws NetworkError when fetch rejects', async () => {

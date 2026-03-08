@@ -67,6 +67,12 @@ describe('FR7: Config Layer — AsyncStorage', () => {
     const result = await loadConfig();
     expect(result).toBeNull();
   });
+
+  it('saveConfig propagates AsyncStorage errors — does not swallow', async () => {
+    const error = new Error('AsyncStorage write failed');
+    mockAsyncStorage.setItem.mockRejectedValueOnce(error);
+    await expect(saveConfig(sampleConfig)).rejects.toThrow('AsyncStorage write failed');
+  });
 });
 
 // --- FR8: Credentials Layer ---
@@ -129,5 +135,11 @@ describe('FR9: clearAll', () => {
   it('clearAll calls SecureStore.deleteItemAsync for crossover_password', async () => {
     await clearAll();
     expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('crossover_password');
+  });
+
+  it('clearAll propagates errors — does not swallow deletion failures', async () => {
+    const error = new Error('SecureStore delete failed');
+    mockSecureStore.deleteItemAsync.mockRejectedValueOnce(error);
+    await expect(clearAll()).rejects.toThrow('SecureStore delete failed');
   });
 });
