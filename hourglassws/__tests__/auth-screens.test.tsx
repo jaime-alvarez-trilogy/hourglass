@@ -31,6 +31,10 @@ jest.mock('../src/store/config', () => ({
   saveCredentials: jest.fn(),
 }));
 
+jest.mock('@tanstack/react-query', () => ({
+  useQueryClient: jest.fn(() => ({ setQueryData: jest.fn() })),
+}));
+
 // Static imports of screens after mocks are registered
 import WelcomeScreen from '../app/(auth)/welcome';
 import CredentialsScreen from '../app/(auth)/credentials';

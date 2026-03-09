@@ -2,11 +2,13 @@
 import { useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { useOnboarding } from '@/src/contexts/OnboardingContext';
 import { saveConfig, saveCredentials } from '@/src/store/config';
 
 export default function SuccessScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { pendingConfig, pendingCredentials } = useOnboarding();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -21,8 +23,11 @@ export default function SuccessScreen() {
     setSaving(true);
     setSaveError(null);
     try {
+      const finalConfig = { ...pendingConfig, setupComplete: true };
       await saveCredentials(pendingCredentials.username, pendingCredentials.password);
-      await saveConfig({ ...pendingConfig, setupComplete: true });
+      await saveConfig(finalConfig);
+      // Update React Query cache immediately so auth gate sees setupComplete: true
+      queryClient.setQueryData(['config'], finalConfig);
       router.replace('/(tabs)');
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save. Please try again.');
