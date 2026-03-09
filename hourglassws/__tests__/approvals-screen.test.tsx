@@ -123,7 +123,7 @@ describe('FR6: Approvals screen', () => {
     mockUseConfig.mockReturnValue({ config: CONTRIBUTOR_CONFIG, isLoading: false });
     render();
     await act(async () => { await new Promise<void>((res) => setTimeout(res, 0)); });
-    expect(mockReplace).toHaveBeenCalledWith('/(tabs)/');
+    expect(mockReplace).toHaveBeenCalledWith('/(tabs)');
   });
 
   it('FR6_does_not_redirect_when_isManager_true', async () => {

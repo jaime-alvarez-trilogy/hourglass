@@ -30,7 +30,7 @@ export default function ApprovalsScreen() {
   // Role guard: redirect contributors to hours tab
   useEffect(() => {
     if (config && config.isManager === false) {
-      router.replace('/(tabs)/')
+      router.replace('/(tabs)')
     }
   }, [config])
 
