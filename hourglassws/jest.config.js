@@ -1,6 +1,8 @@
 module.exports = {
   preset: 'jest-expo/node',
   testMatch: ['**/__tests__/**/*.test.ts', '**/__tests__/**/*.test.tsx'],
+  // Exclude server/ — it has its own package.json and jest config (runs separately)
+  testPathIgnorePatterns: ['/node_modules/', '/server/'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
   },

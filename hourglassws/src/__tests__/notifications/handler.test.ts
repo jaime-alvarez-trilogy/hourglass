@@ -3,25 +3,19 @@
  * Tests for src/notifications/handler.ts: handleBackgroundPush, scheduleLocalNotification
  */
 
-// Mock expo-notifications
-const mockScheduleNotification = jest.fn();
-const mockAddNotificationReceivedListener = jest.fn();
-
+// Mock expo-notifications — use jest.fn() inside factory (hoisting safe)
 jest.mock('expo-notifications', () => ({
-  scheduleNotificationAsync: mockScheduleNotification,
-  addNotificationReceivedListener: mockAddNotificationReceivedListener,
+  scheduleNotificationAsync: jest.fn(),
+  addNotificationReceivedListener: jest.fn(),
 }));
 
 // Mock boundary dependencies (from other specs)
-const mockFetchFreshData = jest.fn();
-const mockUpdateWidgetData = jest.fn();
-
 jest.mock('../../lib/crossoverData', () => ({
-  fetchFreshData: mockFetchFreshData,
+  fetchFreshData: jest.fn(),
 }));
 
 jest.mock('../../lib/widgetBridge', () => ({
-  updateWidgetData: mockUpdateWidgetData,
+  updateWidgetData: jest.fn(),
 }));
 
 // Mock AsyncStorage for previous approval count
@@ -35,6 +29,14 @@ import {
   handleBackgroundPush,
   scheduleLocalNotification,
 } from '../../notifications/handler';
+import * as Notifications from 'expo-notifications';
+import { fetchFreshData } from '../../lib/crossoverData';
+import { updateWidgetData } from '../../lib/widgetBridge';
+
+// Cast to jest.Mock after import (factories used jest.fn() directly)
+const mockScheduleNotification = Notifications.scheduleNotificationAsync as jest.Mock;
+const mockFetchFreshData = fetchFreshData as jest.Mock;
+const mockUpdateWidgetData = updateWidgetData as jest.Mock;
 
 // Realistic CrossoverSnapshot shape matching spec boundary contract
 const makeFreshData = (pendingApprovalCount = 0, isManager = false) => ({

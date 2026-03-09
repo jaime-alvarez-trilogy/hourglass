@@ -5,17 +5,15 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Mock expo-notifications
-const mockRequestPermissions = jest.fn();
-const mockGetExpoPushToken = jest.fn();
-
+// Mock expo-notifications — use jest.fn() inside factory (hoisting safe)
 jest.mock('expo-notifications', () => ({
-  requestPermissionsAsync: mockRequestPermissions,
-  getExpoPushTokenAsync: mockGetExpoPushToken,
+  requestPermissionsAsync: jest.fn(),
+  getExpoPushTokenAsync: jest.fn(),
 }));
 
 // Mock expo-constants
 jest.mock('expo-constants', () => ({
+  __esModule: true,
   default: {
     expoConfig: {
       extra: {
@@ -40,6 +38,11 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 // Import after mocks
 import { registerPushToken, unregisterPushToken } from '../../lib/pushToken';
+import * as Notifications from 'expo-notifications';
+
+// Cast to jest.Mock after import
+const mockRequestPermissions = Notifications.requestPermissionsAsync as jest.Mock;
+const mockGetExpoPushToken = Notifications.getExpoPushTokenAsync as jest.Mock;
 
 const PING_SERVER_URL = process.env.EXPO_PUBLIC_PING_SERVER_URL ?? 'https://hourglass-ping.railway.app';
 const VALID_TOKEN = 'ExponentPushToken[abc123def456]';
