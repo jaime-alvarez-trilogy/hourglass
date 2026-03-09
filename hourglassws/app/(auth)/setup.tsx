@@ -1,10 +1,18 @@
 // FR6: Setup screen — manual rate fallback when auto-detect fails
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useOnboarding } from '@/src/contexts/OnboardingContext';
 
 export default function SetupScreen() {
-  const { submitRate, isLoading, error } = useOnboarding();
+  const router = useRouter();
+  const { submitRate, isLoading, error, step } = useOnboarding();
+
+  useEffect(() => {
+    if (step === 'success') {
+      router.replace('/(auth)/success');
+    }
+  }, [step]);
   const [rateText, setRateText] = useState('');
   const [rateError, setRateError] = useState('');
 
