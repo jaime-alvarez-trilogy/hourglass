@@ -5,7 +5,7 @@ import { OnboardingProvider } from '@/src/contexts/OnboardingContext';
 export default function AuthLayout() {
   return (
     <OnboardingProvider>
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack screenOptions={{ headerShown: false }} initialRouteName="welcome">
         <Stack.Screen name="welcome" />
         <Stack.Screen name="credentials" />
         <Stack.Screen name="verifying" options={{ gestureEnabled: false }} />

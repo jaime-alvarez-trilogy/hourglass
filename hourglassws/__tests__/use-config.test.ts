@@ -25,9 +25,8 @@ const VALID_CONFIG: CrossoverConfig = {
 
 /** Wait for async React Query operations to complete via multiple event loop turns. */
 async function flushAsync() {
-  await act(async () => {
-    await new Promise<void>((res) => setTimeout(res, 0));
-  });
+  await act(async () => { await new Promise<void>((res) => setTimeout(res, 0)); });
+  await act(async () => { await new Promise<void>((res) => setTimeout(res, 0)); });
 }
 
 function setupHook() {

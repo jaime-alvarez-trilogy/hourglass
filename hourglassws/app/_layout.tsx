@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Redirect, Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
@@ -26,6 +26,8 @@ const queryClient = new QueryClient({
 function RootLayout() {
   const colorScheme = useColorScheme();
   const { config, isLoading } = useConfig();
+  const router = useRouter();
+  const segments = useSegments();
   useRoleRefresh();
 
   // SC1.3: hide native splash once config resolves
@@ -35,18 +37,24 @@ function RootLayout() {
     }
   }, [isLoading]);
 
-  // SC1.3: show loading indicator while config reads from AsyncStorage
+  // SC1.1 + SC1.2: auth gate — redirect after config resolves
+  useEffect(() => {
+    if (isLoading) return;
+    const inAuthGroup = segments[0] === '(auth)';
+    if (!config?.setupComplete && !inAuthGroup) {
+      router.replace('/(auth)/welcome');
+    } else if (config?.setupComplete && inAuthGroup) {
+      router.replace('/(tabs)');
+    }
+  }, [isLoading, config, segments, router]);
+
+  // SC1.3: overlay while config loads (Stack still mounted for navigation context)
   if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0D1117' }}>
         <ActivityIndicator size="large" color="#00FF88" />
       </View>
     );
-  }
-
-  // SC1.1 + SC1.2: auth gate
-  if (!config?.setupComplete) {
-    return <Redirect href="/(auth)/welcome" />;
   }
 
   return (
