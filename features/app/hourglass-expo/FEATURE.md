@@ -89,6 +89,7 @@ Widget reads local store
 | 2026-03-08 | [07-ping-server](specs/07-ping-server/spec.md) | Railway ping server (Express + SQLite + node-cron), silent push dispatch, app push token registration and background handler |
 | 2026-03-08 | [05-manager-approvals](specs/05-manager-approvals/spec.md) | Pending manual time + overtime fetch, approve/reject actions, optimistic updates, role-guarded approvals screen |
 | 2026-03-08 | [03-hours-dashboard](specs/03-hours-dashboard/spec.md) | Contributor dashboard: hours, earnings, deadline countdown, daily bar chart, cache failover, urgency theming |
+| 2026-03-08 | [04-ai-brainlift](specs/04-ai-brainlift/spec.md) | Work diary fetch, tag parsing, AI% formula, BrainLift hours, per-day AsyncStorage cache, AI tab screen |
 
 ## Files Created/Modified
 
