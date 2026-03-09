@@ -109,35 +109,6 @@ beforeEach(() => {
 // ============================================================
 
 describe('FR2: Welcome Screen', () => {
-  it('renders both Production and QA toggle options (SC2.1)', () => {
-    const { UNSAFE_getAllByType } = render(<WelcomeScreen />);
-    const texts = UNSAFE_getAllByType(Text).map((t) => String(t.props.children));
-    expect(texts.some((t) => t.includes('Production'))).toBe(true);
-    expect(texts.some((t) => t.includes('QA'))).toBe(true);
-  });
-
-  it('calls setEnvironment(false) when Production is selected (SC2.2)', () => {
-    const setEnvironment = jest.fn();
-    mockUseOnboarding.mockReturnValue(makeSetupResult({ setEnvironment }));
-    const { UNSAFE_getAllByType } = render(<WelcomeScreen />);
-    const touchables = UNSAFE_getAllByType(TouchableOpacity);
-    const prodOption = touchables.find((t) => collectText(t.props.children).includes('Production'));
-    expect(prodOption).toBeDefined(); // guard: fail fast if button not found
-    fireEvent.press(prodOption!);
-    expect(setEnvironment).toHaveBeenCalledWith(false);
-  });
-
-  it('calls setEnvironment(true) when QA is selected (SC2.2)', () => {
-    const setEnvironment = jest.fn();
-    mockUseOnboarding.mockReturnValue(makeSetupResult({ setEnvironment }));
-    const { UNSAFE_getAllByType } = render(<WelcomeScreen />);
-    const touchables = UNSAFE_getAllByType(TouchableOpacity);
-    const qaOption = touchables.find((t) => collectText(t.props.children).includes('QA'));
-    expect(qaOption).toBeDefined(); // guard: fail fast if button not found
-    fireEvent.press(qaOption!);
-    expect(setEnvironment).toHaveBeenCalledWith(true);
-  });
-
   it('navigates to /(auth)/credentials on "Get Started" (SC2.4)', () => {
     const { push } = makeRouter();
     const { UNSAFE_getAllByType } = render(<WelcomeScreen />);
@@ -226,6 +197,35 @@ describe('FR3: Credentials Screen', () => {
     const { UNSAFE_getAllByType } = render(<CredentialsScreen />);
     const texts = UNSAFE_getAllByType(Text).map((t) => String(t.props.children));
     expect(texts.some((t) => t.includes('Invalid email or password.'))).toBe(true);
+  });
+
+  it('renders Production and QA environment toggle options (SC2.1)', () => {
+    const { UNSAFE_getAllByType } = render(<CredentialsScreen />);
+    const texts = UNSAFE_getAllByType(Text).map((t) => String(t.props.children));
+    expect(texts.some((t) => t.includes('Production'))).toBe(true);
+    expect(texts.some((t) => t.includes('QA'))).toBe(true);
+  });
+
+  it('calls setEnvironment(false) when Production is selected (SC2.2)', () => {
+    const setEnvironment = jest.fn();
+    mockUseOnboarding.mockReturnValue(makeSetupResult({ setEnvironment }));
+    const { UNSAFE_getAllByType } = render(<CredentialsScreen />);
+    const touchables = UNSAFE_getAllByType(TouchableOpacity);
+    const prodOption = touchables.find((t) => collectText(t.props.children).includes('Production'));
+    expect(prodOption).toBeDefined();
+    fireEvent.press(prodOption!);
+    expect(setEnvironment).toHaveBeenCalledWith(false);
+  });
+
+  it('calls setEnvironment(true) when QA is selected (SC2.2)', () => {
+    const setEnvironment = jest.fn();
+    mockUseOnboarding.mockReturnValue(makeSetupResult({ setEnvironment }));
+    const { UNSAFE_getAllByType } = render(<CredentialsScreen />);
+    const touchables = UNSAFE_getAllByType(TouchableOpacity);
+    const qaOption = touchables.find((t) => collectText(t.props.children).includes('QA'));
+    expect(qaOption).toBeDefined();
+    fireEvent.press(qaOption!);
+    expect(setEnvironment).toHaveBeenCalledWith(true);
   });
 });
 

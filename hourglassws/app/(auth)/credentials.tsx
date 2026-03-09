@@ -6,7 +6,15 @@ import { useOnboarding } from '@/src/contexts/OnboardingContext';
 
 export default function CredentialsScreen() {
   const router = useRouter();
-  const { submitCredentials, isLoading, error, step } = useOnboarding();
+  const { submitCredentials, setEnvironment, isLoading, error, step } = useOnboarding();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [useQA, setUseQA] = useState(false);
+
+  function handleEnvSelect(qa: boolean) {
+    setUseQA(qa);
+    setEnvironment(qa);
+  }
 
   // Navigate when step transitions away from credentials
   useEffect(() => {
@@ -14,8 +22,6 @@ export default function CredentialsScreen() {
       router.push('/(auth)/verifying');
     }
   }, [step]);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
@@ -84,6 +90,22 @@ export default function CredentialsScreen() {
         <Text style={styles.forgotNote}>
           Forgot your password? Reset it at crossover.com
         </Text>
+
+        <Text style={[styles.label, { marginTop: 28 }]}>Environment</Text>
+        <View style={styles.toggle}>
+          <TouchableOpacity
+            style={[styles.option, !useQA && styles.selected]}
+            onPress={() => handleEnvSelect(false)}
+          >
+            <Text style={[styles.optionText, !useQA && styles.selectedText]}>Production</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.option, useQA && styles.selected]}
+            onPress={() => handleEnvSelect(true)}
+          >
+            <Text style={[styles.optionText, useQA && styles.selectedText]}>QA (Testing)</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <TouchableOpacity
@@ -114,6 +136,11 @@ const styles = StyleSheet.create({
   inputError: { borderColor: '#F85149' },
   fieldError: { color: '#F85149', fontSize: 12, marginTop: 4 },
   forgotNote: { color: '#484F58', fontSize: 12, marginTop: 12 },
+  toggle: { flexDirection: 'row', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#30363D' },
+  option: { flex: 1, paddingVertical: 12, alignItems: 'center', backgroundColor: '#161B22' },
+  selected: { backgroundColor: '#00FF88' },
+  optionText: { fontSize: 14, fontWeight: '500', color: '#8B949E' },
+  selectedText: { color: '#0D1117' },
   cta: { backgroundColor: '#00FF88', borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginBottom: 16 },
   ctaDisabled: { opacity: 0.6 },
   ctaText: { fontSize: 17, fontWeight: '700', color: '#0D1117' },

@@ -4,6 +4,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import type { CrossoverConfig, Credentials } from '../types/config';
 
+// expo-secure-store exports an empty object on web — fall back to AsyncStorage
+const hasSecureStore = typeof SecureStore.setItemAsync === 'function';
+
+async function secureGet(key: string): Promise<string | null> {
+  if (!hasSecureStore) return AsyncStorage.getItem(key);
+  return SecureStore.getItemAsync(key);
+}
+async function secureSet(key: string, value: string): Promise<void> {
+  if (!hasSecureStore) { await AsyncStorage.setItem(key, value); return; }
+  await SecureStore.setItemAsync(key, value);
+}
+async function secureDelete(key: string): Promise<void> {
+  if (!hasSecureStore) { await AsyncStorage.removeItem(key); return; }
+  await SecureStore.deleteItemAsync(key);
+}
+
 const CONFIG_KEY = 'crossover_config';
 const USERNAME_KEY = 'crossover_username';
 const PASSWORD_KEY = 'crossover_password';
@@ -35,8 +51,8 @@ export async function saveConfig(config: CrossoverConfig): Promise<void> {
 // FR8: SecureStore credentials layer
 export async function loadCredentials(): Promise<Credentials | null> {
   const [username, password] = await Promise.all([
-    SecureStore.getItemAsync(USERNAME_KEY),
-    SecureStore.getItemAsync(PASSWORD_KEY),
+    secureGet(USERNAME_KEY),
+    secureGet(PASSWORD_KEY),
   ]);
   if (!username || !password) return null;
   return { username, password };
@@ -44,8 +60,8 @@ export async function loadCredentials(): Promise<Credentials | null> {
 
 export async function saveCredentials(username: string, password: string): Promise<void> {
   await Promise.all([
-    SecureStore.setItemAsync(USERNAME_KEY, username),
-    SecureStore.setItemAsync(PASSWORD_KEY, password),
+    secureSet(USERNAME_KEY, username),
+    secureSet(PASSWORD_KEY, password),
   ]);
 }
 
@@ -53,7 +69,7 @@ export async function saveCredentials(username: string, password: string): Promi
 export async function clearAll(): Promise<void> {
   await Promise.all([
     AsyncStorage.removeItem(CONFIG_KEY),
-    SecureStore.deleteItemAsync(USERNAME_KEY),
-    SecureStore.deleteItemAsync(PASSWORD_KEY),
+    secureDelete(USERNAME_KEY),
+    secureDelete(PASSWORD_KEY),
   ]);
 }
