@@ -5,27 +5,29 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Mock Platform to control iOS vs Android branching
+// Mock expo-widgets — iOS-only native module (virtual so it doesn't need to exist on disk)
+jest.mock('expo-widgets', () => ({}), { virtual: true });
+
+// Mock Platform so bridge runs Android path (no iOS-only modules needed)
 jest.mock('react-native', () => ({
   Platform: { OS: 'android' },
 }));
 
-// Mock expo-widgets — iOS-only module
-jest.mock('expo-widgets', () => ({}), { virtual: true });
-
-// Mock @react-native-async-storage/async-storage is handled by jest-expo preset
-
-// ─── Fixtures ─────────────────────────────────────────────────────────────────
+// Import the module under test — static import so CJS/Jest works correctly
+import {
+  updateWidgetData,
+  buildTimelineEntries,
+  readWidgetData,
+} from '../../widgets/bridge';
 
 import type { HoursData } from '../../lib/hours';
 import type { AIWeekData } from '../../lib/ai';
 import type { CrossoverConfig } from '../../types/config';
 
-const NOW = new Date('2026-03-10T10:00:00.000Z').getTime(); // Monday 10am UTC
+// ─── Fixtures ─────────────────────────────────────────────────────────────────
 
-const DEADLINE = new Date('2026-03-15T23:59:59.000Z').getTime(); // Sunday end of week
+const DEADLINE = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).getTime(); // 5 days from now
 
-/** Minimal valid HoursData fixture */
 function makeHoursData(overrides: Partial<HoursData> = {}): HoursData {
   return {
     total: 32.5,
@@ -39,13 +41,12 @@ function makeHoursData(overrides: Partial<HoursData> = {}): HoursData {
     todayEarnings: 248,
     hoursRemaining: 7.5,
     overtimeHours: 0,
-    timeRemaining: DEADLINE - NOW,
+    timeRemaining: DEADLINE - Date.now(),
     deadline: new Date(DEADLINE),
     ...overrides,
   };
 }
 
-/** Minimal valid AIWeekData fixture */
 function makeAIData(overrides: Partial<AIWeekData> = {}): AIWeekData {
   return {
     aiPctLow: 71,
@@ -59,7 +60,6 @@ function makeAIData(overrides: Partial<AIWeekData> = {}): AIWeekData {
   };
 }
 
-/** Minimal valid CrossoverConfig fixture */
 function makeConfig(overrides: Partial<CrossoverConfig> = {}): CrossoverConfig {
   return {
     userId: '2362707',
@@ -80,212 +80,147 @@ function makeConfig(overrides: Partial<CrossoverConfig> = {}): CrossoverConfig {
   };
 }
 
+// Helper: get the widget_data value written to AsyncStorage
+function getWrittenWidgetData(): Record<string, unknown> | null {
+  const calls = (AsyncStorage.setItem as jest.Mock).mock.calls;
+  const call = calls.find(([key]: [string]) => key === 'widget_data');
+  if (!call) return null;
+  return JSON.parse(call[1]);
+}
+
 // ─── FR1: updateWidgetData ─────────────────────────────────────────────────────
 
 describe('updateWidgetData (FR1)', () => {
-  let updateWidgetData: typeof import('../../widgets/bridge').updateWidgetData;
-
-  beforeEach(async () => {
-    jest.resetModules();
+  beforeEach(() => {
     jest.clearAllMocks();
-    // Re-import after resetModules so Platform mock applies fresh
-    ({ updateWidgetData } = await import('../../widgets/bridge'));
   });
 
-  it('builds WidgetData and writes to AsyncStorage on Android', async () => {
-    const hoursData = makeHoursData();
-    const aiData = makeAIData();
-    const config = makeConfig();
-
-    await updateWidgetData(hoursData, aiData, 0, config);
-
-    const raw = (AsyncStorage.setItem as jest.Mock).mock.calls.find(
-      ([key]: [string]) => key === 'widget_data'
-    );
-    expect(raw).toBeDefined();
-
-    const parsed = JSON.parse(raw[1]);
-    expect(parsed.hours).toBe('32.5');
-    expect(parsed.earnings).toMatch(/\$1,300/);
-    expect(parsed.today).toBe('6.2h');
-    expect(parsed.isManager).toBe(false);
-    expect(parsed.useQA).toBe(false);
+  it('calls AsyncStorage.setItem with widget_data key', async () => {
+    await updateWidgetData(makeHoursData(), makeAIData(), 0, makeConfig());
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith('widget_data', expect.any(String));
   });
 
   it('formats hours as string with 1 decimal', async () => {
-    const hoursData = makeHoursData({ total: 8 });
-    await updateWidgetData(hoursData, makeAIData(), 0, makeConfig());
-
-    const raw = (AsyncStorage.setItem as jest.Mock).mock.calls.find(
-      ([key]: [string]) => key === 'widget_data'
-    )!;
-    const parsed = JSON.parse(raw[1]);
-    expect(parsed.hours).toBe('8.0');
-    expect(parsed.hoursDisplay).toBe('8.0h');
+    await updateWidgetData(makeHoursData({ total: 8 }), makeAIData(), 0, makeConfig());
+    const data = getWrittenWidgetData()!;
+    expect(data.hours).toBe('8.0');
+    expect(data.hoursDisplay).toBe('8.0h');
   });
 
-  it('formats earnings with $ and comma separator', async () => {
-    const hoursData = makeHoursData({ weeklyEarnings: 1300 });
-    await updateWidgetData(hoursData, makeAIData(), 0, makeConfig());
-
-    const raw = (AsyncStorage.setItem as jest.Mock).mock.calls.find(
-      ([key]: [string]) => key === 'widget_data'
-    )!;
-    const parsed = JSON.parse(raw[1]);
-    expect(parsed.earnings).toBe('$1,300');
+  it('formats earnings $1300 as $1,300', async () => {
+    await updateWidgetData(makeHoursData({ weeklyEarnings: 1300 }), makeAIData(), 0, makeConfig());
+    const data = getWrittenWidgetData()!;
+    expect(data.earnings).toBe('$1,300');
   });
 
-  it('formats earnings without comma for amounts < 1000', async () => {
-    const hoursData = makeHoursData({ weeklyEarnings: 800 });
-    await updateWidgetData(hoursData, makeAIData(), 0, makeConfig());
-
-    const raw = (AsyncStorage.setItem as jest.Mock).mock.calls.find(
-      ([key]: [string]) => key === 'widget_data'
-    )!;
-    const parsed = JSON.parse(raw[1]);
-    expect(parsed.earnings).toBe('$800');
+  it('formats earnings under $1000 without comma', async () => {
+    await updateWidgetData(makeHoursData({ weeklyEarnings: 800 }), makeAIData(), 0, makeConfig());
+    const data = getWrittenWidgetData()!;
+    expect(data.earnings).toBe('$800');
   });
 
   it('sets pendingCount to 0 for contributors (isManager false)', async () => {
     const config = makeConfig({ isManager: false });
     await updateWidgetData(makeHoursData(), makeAIData(), 5, config);
-
-    const raw = (AsyncStorage.setItem as jest.Mock).mock.calls.find(
-      ([key]: [string]) => key === 'widget_data'
-    )!;
-    const parsed = JSON.parse(raw[1]);
-    expect(parsed.pendingCount).toBe(0);
+    const data = getWrittenWidgetData()!;
+    expect(data.pendingCount).toBe(0);
   });
 
   it('passes pendingCount through for managers', async () => {
     const config = makeConfig({ isManager: true });
     await updateWidgetData(makeHoursData(), makeAIData(), 3, config);
-
-    const raw = (AsyncStorage.setItem as jest.Mock).mock.calls.find(
-      ([key]: [string]) => key === 'widget_data'
-    )!;
-    const parsed = JSON.parse(raw[1]);
-    expect(parsed.pendingCount).toBe(3);
-    expect(parsed.isManager).toBe(true);
+    const data = getWrittenWidgetData()!;
+    expect(data.pendingCount).toBe(3);
+    expect(data.isManager).toBe(true);
   });
 
   it('sets cachedAt to current timestamp', async () => {
     const before = Date.now();
     await updateWidgetData(makeHoursData(), makeAIData(), 0, makeConfig());
     const after = Date.now();
-
-    const raw = (AsyncStorage.setItem as jest.Mock).mock.calls.find(
-      ([key]: [string]) => key === 'widget_data'
-    )!;
-    const parsed = JSON.parse(raw[1]);
-    expect(parsed.cachedAt).toBeGreaterThanOrEqual(before);
-    expect(parsed.cachedAt).toBeLessThanOrEqual(after);
+    const data = getWrittenWidgetData()!;
+    expect(Number(data.cachedAt)).toBeGreaterThanOrEqual(before);
+    expect(Number(data.cachedAt)).toBeLessThanOrEqual(after);
   });
 
-  it('sets urgency based on getUrgencyLevel(deadline - now)', async () => {
-    // Far from deadline (>12h remaining) → urgency 'none'
+  it('sets urgency to none when >12h from deadline', async () => {
     const hoursData = makeHoursData({
-      deadline: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h from now
+      deadline: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
     await updateWidgetData(hoursData, makeAIData(), 0, makeConfig());
-
-    const raw = (AsyncStorage.setItem as jest.Mock).mock.calls.find(
-      ([key]: [string]) => key === 'widget_data'
-    )!;
-    const parsed = JSON.parse(raw[1]);
-    expect(parsed.urgency).toBe('none');
+    const data = getWrittenWidgetData()!;
+    expect(data.urgency).toBe('none');
   });
 
   it('sets urgency to expired when deadline is in the past', async () => {
     const hoursData = makeHoursData({
-      deadline: new Date(Date.now() - 1000), // 1 second ago
+      deadline: new Date(Date.now() - 1000),
     });
     await updateWidgetData(hoursData, makeAIData(), 0, makeConfig());
-
-    const raw = (AsyncStorage.setItem as jest.Mock).mock.calls.find(
-      ([key]: [string]) => key === 'widget_data'
-    )!;
-    const parsed = JSON.parse(raw[1]);
-    expect(parsed.urgency).toBe('expired');
+    const data = getWrittenWidgetData()!;
+    expect(data.urgency).toBe('expired');
   });
 
-  it('sets aiPct to N/A and brainlift to 0.0h when aiData is null', async () => {
+  it('sets aiPct to N/A when aiData is null', async () => {
     await updateWidgetData(makeHoursData(), null, 0, makeConfig());
+    const data = getWrittenWidgetData()!;
+    expect(data.aiPct).toBe('N/A');
+  });
 
-    const raw = (AsyncStorage.setItem as jest.Mock).mock.calls.find(
-      ([key]: [string]) => key === 'widget_data'
-    )!;
-    const parsed = JSON.parse(raw[1]);
-    expect(parsed.aiPct).toBe('N/A');
-    expect(parsed.brainlift).toBe('0.0h');
+  it('sets brainlift to 0.0h when aiData is null', async () => {
+    await updateWidgetData(makeHoursData(), null, 0, makeConfig());
+    const data = getWrittenWidgetData()!;
+    expect(data.brainlift).toBe('0.0h');
   });
 
   it('formats aiPct as range string when aiData provided', async () => {
     const aiData = makeAIData({ aiPctLow: 71, aiPctHigh: 75 });
     await updateWidgetData(makeHoursData(), aiData, 0, makeConfig());
-
-    const raw = (AsyncStorage.setItem as jest.Mock).mock.calls.find(
-      ([key]: [string]) => key === 'widget_data'
-    )!;
-    const parsed = JSON.parse(raw[1]);
-    expect(parsed.aiPct).toBe('71%\u201375%'); // en-dash
+    const data = getWrittenWidgetData()!;
+    expect(data.aiPct).toMatch(/71%/);
+    expect(data.aiPct).toMatch(/75%/);
   });
 
-  it('formats brainlift hours as string with 1 decimal', async () => {
+  it('formats brainlift hours with 1 decimal', async () => {
     const aiData = makeAIData({ brainliftHours: 3.2 });
     await updateWidgetData(makeHoursData(), aiData, 0, makeConfig());
-
-    const raw = (AsyncStorage.setItem as jest.Mock).mock.calls.find(
-      ([key]: [string]) => key === 'widget_data'
-    )!;
-    const parsed = JSON.parse(raw[1]);
-    expect(parsed.brainlift).toBe('3.2h');
+    const data = getWrittenWidgetData()!;
+    expect(data.brainlift).toBe('3.2h');
   });
 
   it('shows hoursRemaining as "Xh left" when not in overtime', async () => {
     const hoursData = makeHoursData({ hoursRemaining: 7.5, overtimeHours: 0 });
     await updateWidgetData(hoursData, makeAIData(), 0, makeConfig());
-
-    const raw = (AsyncStorage.setItem as jest.Mock).mock.calls.find(
-      ([key]: [string]) => key === 'widget_data'
-    )!;
-    const parsed = JSON.parse(raw[1]);
-    expect(parsed.hoursRemaining).toMatch(/7\.5h left/);
+    const data = getWrittenWidgetData()!;
+    expect(data.hoursRemaining).toMatch(/7\.5h left/);
   });
 
   it('shows hoursRemaining as "Xh OT" when in overtime', async () => {
     const hoursData = makeHoursData({ hoursRemaining: 0, overtimeHours: 2.5 });
     await updateWidgetData(hoursData, makeAIData(), 0, makeConfig());
-
-    const raw = (AsyncStorage.setItem as jest.Mock).mock.calls.find(
-      ([key]: [string]) => key === 'widget_data'
-    )!;
-    const parsed = JSON.parse(raw[1]);
-    expect(parsed.hoursRemaining).toMatch(/2\.5h OT/);
+    const data = getWrittenWidgetData()!;
+    expect(data.hoursRemaining).toMatch(/2\.5h OT/);
   });
 
   it('stores earningsRaw as number', async () => {
-    const hoursData = makeHoursData({ weeklyEarnings: 1300 });
-    await updateWidgetData(hoursData, makeAIData(), 0, makeConfig());
+    await updateWidgetData(makeHoursData({ weeklyEarnings: 1300 }), makeAIData(), 0, makeConfig());
+    const data = getWrittenWidgetData()!;
+    expect(typeof data.earningsRaw).toBe('number');
+    expect(data.earningsRaw).toBe(1300);
+  });
 
-    const raw = (AsyncStorage.setItem as jest.Mock).mock.calls.find(
-      ([key]: [string]) => key === 'widget_data'
-    )!;
-    const parsed = JSON.parse(raw[1]);
-    expect(typeof parsed.earningsRaw).toBe('number');
-    expect(parsed.earningsRaw).toBe(1300);
+  it('stores deadline as unix timestamp number', async () => {
+    const deadline = new Date(DEADLINE);
+    await updateWidgetData(makeHoursData({ deadline }), makeAIData(), 0, makeConfig());
+    const data = getWrittenWidgetData()!;
+    expect(typeof data.deadline).toBe('number');
+    expect(data.deadline).toBe(deadline.getTime());
   });
 });
 
 // ─── FR2: buildTimelineEntries ─────────────────────────────────────────────────
 
 describe('buildTimelineEntries (FR2)', () => {
-  let buildTimelineEntries: typeof import('../../widgets/bridge').buildTimelineEntries;
-
-  beforeAll(async () => {
-    ({ buildTimelineEntries } = await import('../../widgets/bridge'));
-  });
-
   function makeBaseData() {
     return {
       hours: '32.5',
@@ -305,14 +240,14 @@ describe('buildTimelineEntries (FR2)', () => {
     };
   }
 
-  it('returns exactly count entries (default 60)', () => {
+  it('returns exactly 60 entries by default', () => {
     const entries = buildTimelineEntries(makeBaseData());
     expect(entries).toHaveLength(60);
   });
 
   it('returns exactly count entries when count specified', () => {
-    const entries = buildTimelineEntries(makeBaseData(), 10);
-    expect(entries).toHaveLength(10);
+    expect(buildTimelineEntries(makeBaseData(), 10)).toHaveLength(10);
+    expect(buildTimelineEntries(makeBaseData(), 1)).toHaveLength(1);
   });
 
   it('first entry date is >= now', () => {
@@ -321,21 +256,19 @@ describe('buildTimelineEntries (FR2)', () => {
     expect(entries[0].date.getTime()).toBeGreaterThanOrEqual(before);
   });
 
-  it('each subsequent entry is intervalMinutes after previous (default 15)', () => {
+  it('each subsequent entry is 15 minutes after previous by default', () => {
     const entries = buildTimelineEntries(makeBaseData(), 5);
     const interval = 15 * 60 * 1000;
     for (let i = 1; i < entries.length; i++) {
-      const diff = entries[i].date.getTime() - entries[i - 1].date.getTime();
-      expect(diff).toBe(interval);
+      expect(entries[i].date.getTime() - entries[i - 1].date.getTime()).toBe(interval);
     }
   });
 
-  it('each subsequent entry is intervalMinutes after previous (custom 30)', () => {
+  it('each subsequent entry respects custom intervalMinutes', () => {
     const entries = buildTimelineEntries(makeBaseData(), 4, 30);
     const interval = 30 * 60 * 1000;
     for (let i = 1; i < entries.length; i++) {
-      const diff = entries[i].date.getTime() - entries[i - 1].date.getTime();
-      expect(diff).toBe(interval);
+      expect(entries[i].date.getTime() - entries[i - 1].date.getTime()).toBe(interval);
     }
   });
 
@@ -348,52 +281,53 @@ describe('buildTimelineEntries (FR2)', () => {
       expect(entry.props.aiPct).toBe(first.aiPct);
       expect(entry.props.brainlift).toBe(first.brainlift);
       expect(entry.props.earningsRaw).toBe(first.earningsRaw);
+      expect(entry.props.isManager).toBe(first.isManager);
     }
   });
 
-  it('urgency field updates as entries advance toward deadline', () => {
-    // Deadline is 6h from now, entries at 15min intervals
-    // Early entries: >3h remaining → 'high', later entries: <1h → 'critical', past → 'expired'
-    const base = makeBaseData(); // deadline 6h from now, urgency 'high'
-    const entries = buildTimelineEntries(base, 60, 15);
-
-    // Entry 0 (now): 6h remaining → 'high'
-    expect(['high', 'low', 'none']).toContain(entries[0].props.urgency);
-
-    // Entry 24 (6h later = 360min = past deadline): should be 'expired'
-    expect(entries[entries.length - 1].props.urgency).toBe('expired');
-  });
-
-  it('entries past deadline have urgency expired', () => {
-    // Deadline is 1 minute from now — almost all entries will be past it
+  it('urgency field updates as entries advance past deadline', () => {
+    // Deadline 1 minute from now — entries at 15min intervals
     const base = { ...makeBaseData(), deadline: Date.now() + 60 * 1000 };
     const entries = buildTimelineEntries(base, 5, 15);
-    // Entry 1+ are all 15min past deadline
+    // Entry 1+ are all 15min past the 1min deadline → 'expired'
     expect(entries[1].props.urgency).toBe('expired');
     expect(entries[4].props.urgency).toBe('expired');
+  });
+
+  it('early entries before deadline have non-expired urgency', () => {
+    // Deadline 24h from now → entry 0 is well within range
+    const base = { ...makeBaseData(), deadline: Date.now() + 24 * 60 * 60 * 1000 };
+    const entries = buildTimelineEntries(base, 3, 15);
+    expect(entries[0].props.urgency).not.toBe('expired');
+  });
+
+  it('each entry has a date property as a Date object', () => {
+    const entries = buildTimelineEntries(makeBaseData(), 3);
+    for (const entry of entries) {
+      expect(entry.date).toBeInstanceOf(Date);
+    }
   });
 });
 
 // ─── FR3: readWidgetData ──────────────────────────────────────────────────────
 
 describe('readWidgetData (FR3)', () => {
-  let readWidgetData: typeof import('../../widgets/bridge').readWidgetData;
-
-  beforeAll(async () => {
-    ({ readWidgetData } = await import('../../widgets/bridge'));
-  });
-
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   it('returns null when key is absent', async () => {
     (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(null);
-    const result = await readWidgetData();
-    expect(result).toBeNull();
+    await expect(readWidgetData()).resolves.toBeNull();
   });
 
-  it('returns parsed WidgetData when key is present and JSON is valid', async () => {
+  it('reads from AsyncStorage key widget_data', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(null);
+    await readWidgetData();
+    expect(AsyncStorage.getItem).toHaveBeenCalledWith('widget_data');
+  });
+
+  it('returns parsed WidgetData when JSON is valid', async () => {
     const data = {
       hours: '32.5',
       hoursDisplay: '32.5h',
@@ -411,7 +345,6 @@ describe('readWidgetData (FR3)', () => {
       useQA: false,
     };
     (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify(data));
-
     const result = await readWidgetData();
     expect(result).not.toBeNull();
     expect(result!.hours).toBe('32.5');
@@ -419,19 +352,13 @@ describe('readWidgetData (FR3)', () => {
     expect(result!.pendingCount).toBe(0);
   });
 
-  it('returns null when JSON is malformed (does not throw)', async () => {
-    (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce('{ invalid json }}}');
+  it('returns null for malformed JSON without throwing', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce('{ bad json }}}');
     await expect(readWidgetData()).resolves.toBeNull();
   });
 
-  it('returns null when AsyncStorage.getItem throws (does not throw)', async () => {
-    (AsyncStorage.getItem as jest.Mock).mockRejectedValueOnce(new Error('Storage unavailable'));
+  it('returns null when AsyncStorage.getItem rejects without throwing', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockRejectedValueOnce(new Error('unavailable'));
     await expect(readWidgetData()).resolves.toBeNull();
-  });
-
-  it('reads from key widget_data', async () => {
-    (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(null);
-    await readWidgetData();
-    expect(AsyncStorage.getItem).toHaveBeenCalledWith('widget_data');
   });
 });

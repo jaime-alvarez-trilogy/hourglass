@@ -15,6 +15,9 @@ jest.mock('react-native', () => ({
   Platform: { OS: 'android' },
 }));
 
+// Static import for the handler under test
+import widgetTaskHandler from '../../../widgets/android/widgetTaskHandler';
+
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 function makeWidgetData() {
@@ -39,12 +42,8 @@ function makeWidgetData() {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('widgetTaskHandler (FR5)', () => {
-  let widgetTaskHandler: (props: { widgetInfo: { widgetName: string; widgetId: number } }) => Promise<void>;
-
-  beforeEach(async () => {
-    jest.resetModules();
+  beforeEach(() => {
     jest.clearAllMocks();
-    ({ default: widgetTaskHandler } = await import('../../../widgets/android/widgetTaskHandler'));
   });
 
   it('reads widget_data from AsyncStorage for HourglassWidget', async () => {
@@ -55,22 +54,21 @@ describe('widgetTaskHandler (FR5)', () => {
     expect(AsyncStorage.getItem).toHaveBeenCalledWith('widget_data');
   });
 
-  it('does not call AsyncStorage for unknown widget names', async () => {
+  it('does not read AsyncStorage for unknown widget names', async () => {
     await widgetTaskHandler({ widgetInfo: { widgetName: 'UnknownWidget', widgetId: 1 } });
 
     expect(AsyncStorage.getItem).not.toHaveBeenCalled();
   });
 
-  it('handles null data gracefully (shows fallback state)', async () => {
+  it('resolves without throwing when data is null (fallback state)', async () => {
     (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(null);
 
-    // Should not throw
     await expect(
       widgetTaskHandler({ widgetInfo: { widgetName: 'HourglassWidget', widgetId: 1 } })
     ).resolves.toBeUndefined();
   });
 
-  it('handles malformed JSON gracefully (shows fallback state)', async () => {
+  it('resolves without throwing when JSON is malformed (fallback state)', async () => {
     (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce('{ bad json }}}');
 
     await expect(
@@ -78,7 +76,7 @@ describe('widgetTaskHandler (FR5)', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('handles valid data without throwing', async () => {
+  it('resolves without throwing when valid data present', async () => {
     (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify(makeWidgetData()));
 
     await expect(
@@ -86,8 +84,8 @@ describe('widgetTaskHandler (FR5)', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('handles AsyncStorage error gracefully', async () => {
-    (AsyncStorage.getItem as jest.Mock).mockRejectedValueOnce(new Error('Storage error'));
+  it('resolves without throwing when AsyncStorage rejects', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockRejectedValueOnce(new Error('storage error'));
 
     await expect(
       widgetTaskHandler({ widgetInfo: { widgetName: 'HourglassWidget', widgetId: 1 } })
