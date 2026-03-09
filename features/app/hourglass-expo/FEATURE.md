@@ -90,7 +90,7 @@ Widget reads local store
 | 2026-03-08 | [05-manager-approvals](specs/05-manager-approvals/spec.md) | Pending manual time + overtime fetch, approve/reject actions, optimistic updates, role-guarded approvals screen |
 | 2026-03-08 | [03-hours-dashboard](specs/03-hours-dashboard/spec.md) | Contributor dashboard: hours, earnings, deadline countdown, daily bar chart, cache failover, urgency theming |
 | 2026-03-08 | [04-ai-brainlift](specs/04-ai-brainlift/spec.md) | Work diary fetch, tag parsing, AI% formula, BrainLift hours, per-day AsyncStorage cache, AI tab screen |
-| 2026-03-08 | [06-widgets](specs/06-widgets/spec.md) | iOS (expo-widgets) + Android (react-native-android-widget) home screen widgets, WidgetData bridge, timeline entry generation, graceful degradation |
+| 2026-03-08 | [06-widgets](specs/06-widgets/spec.md) | iOS (expo-widgets) + Android (react-native-android-widget) home screen widgets, WidgetData bridge, timeline entry generation, graceful degradation — **Complete** |
 
 ## Files Created/Modified
 
@@ -104,7 +104,16 @@ WS/
       api/                      ← Crossover API client
       hooks/                    ← React Query hooks
       store/                    ← SecureStore config
-      widgets/                  ← Widget definitions
+      widgets/                  ← Widget definitions            [06-widgets]
+        types.ts                ← WidgetData interface           [06-widgets]
+        bridge.ts               ← updateWidgetData, buildTimelineEntries, readWidgetData  [06-widgets]
+        ios/
+          HourglassWidget.tsx   ← expo-widgets JSX component (small/medium/large)  [06-widgets]
+        android/
+          HourglassWidget.tsx   ← react-native-android-widget component  [06-widgets]
+          widgetTaskHandler.ts  ← Android widget lifecycle handler  [06-widgets]
+      types/
+        modules.d.ts            ← Type declarations for native-only packages  [06-widgets]
       lib/
         pushToken.ts            ← FR4: register/unregister device tokens  [07-ping-server]
         crossoverData.ts        ← Boundary stub: fetchFreshData()         [07-ping-server]
