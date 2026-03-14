@@ -1,5 +1,10 @@
-// FR9 (04-ai-brainlift): AI & BrainLift screen
-// Shows weekly AI% range, BrainLift hours vs target, daily breakdown, and legend.
+// FR9 (04-ai-brainlift): AI & BrainLift screen — rebuilt for 06-ai-tab design system
+// FR1: AIRingChart integration (two-ring: AI% outer cyan, BrainLift% inner violet)
+// FR2: Hero metric section (MetricValue count-up, SectionLabel, NativeWind tokens)
+// FR3: BrainLift progress bar (ProgressBar bg-violet, /5h target subtext)
+// FR4: Delta badge (week-over-week AI% from AsyncStorage via useAIData)
+// FR5: DailyAIRow (className-only styling)
+// FR6: Loading/skeleton states (SkeletonLoader for ring, metrics, breakdown)
 
 import React from 'react';
 import {
@@ -8,32 +13,41 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
-  StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAIData } from '@/src/hooks/useAIData';
-import { AIProgressBar } from '@/src/components/AIProgressBar';
+import AIRingChart from '@/src/components/AIRingChart';
+import MetricValue from '@/src/components/MetricValue';
+import Card from '@/src/components/Card';
+import SectionLabel from '@/src/components/SectionLabel';
+import ProgressBar from '@/src/components/ProgressBar';
+import SkeletonLoader from '@/src/components/SkeletonLoader';
 import { DailyAIRow } from '@/src/components/DailyAIRow';
+import { colors } from '@/src/lib/colors';
 
-const AI_TARGET_PCT = 75;
-const BRAINLIFT_TARGET_HOURS = 5;
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const RING_SIZE = 160;
+const BRAINLIFT_TARGET = 5;
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function AIScreen() {
   const router = useRouter();
-  const { data, isLoading, lastFetchedAt, error, refetch } = useAIData();
+  const { data, isLoading, lastFetchedAt, error, refetch, previousWeekPercent } = useAIData();
 
   // Auth error state
   if (error === 'auth') {
     return (
-      <View style={styles.centered} testID="error-auth">
-        <Text style={styles.errorTitle}>Session expired</Text>
-        <Text style={styles.errorSubText}>Please re-login to continue.</Text>
+      <View className="flex-1 bg-background items-center justify-center p-6 gap-3" testID="error-auth">
+        <Text className="text-xl font-bold text-textPrimary text-center">Session expired</Text>
+        <Text className="text-sm text-textSecondary text-center">Please re-login to continue.</Text>
         <TouchableOpacity
-          style={styles.actionButton}
+          className="bg-success rounded-xl px-6 py-3 mt-2"
           onPress={() => router.replace('/(auth)/welcome')}
           testID="relogin-button"
         >
-          <Text style={styles.actionButtonText}>Re-login</Text>
+          <Text className="text-base font-bold text-background">Re-login</Text>
         </TouchableOpacity>
       </View>
     );
@@ -42,11 +56,15 @@ export default function AIScreen() {
   // Network error state
   if (error === 'network') {
     return (
-      <View style={styles.centered} testID="error-network">
-        <Text style={styles.errorTitle}>No connection</Text>
-        <Text style={styles.errorSubText}>Pull to refresh when connected.</Text>
-        <TouchableOpacity style={styles.actionButton} onPress={refetch} testID="retry-button">
-          <Text style={styles.actionButtonText}>Retry</Text>
+      <View className="flex-1 bg-background items-center justify-center p-6 gap-3" testID="error-network">
+        <Text className="text-xl font-bold text-textPrimary text-center">No connection</Text>
+        <Text className="text-sm text-textSecondary text-center">Pull to refresh when connected.</Text>
+        <TouchableOpacity
+          className="bg-success rounded-xl px-6 py-3 mt-2"
+          onPress={refetch}
+          testID="retry-button"
+        >
+          <Text className="text-base font-bold text-background">Retry</Text>
         </TouchableOpacity>
       </View>
     );
@@ -55,241 +73,215 @@ export default function AIScreen() {
   // Empty state
   if (!data && !isLoading) {
     return (
-      <View style={styles.centered} testID="empty-state">
-        <Text style={styles.emptyText}>No data yet.</Text>
-        <Text style={styles.errorSubText}>Come back after tracking some hours.</Text>
-        <TouchableOpacity style={styles.actionButton} onPress={refetch}>
-          <Text style={styles.actionButtonText}>Refresh</Text>
+      <View className="flex-1 bg-background items-center justify-center p-6 gap-3" testID="empty-state">
+        <Text className="text-xl font-bold text-textPrimary text-center">No data yet.</Text>
+        <Text className="text-sm text-textSecondary text-center">Come back after tracking some hours.</Text>
+        <TouchableOpacity
+          className="bg-success rounded-xl px-6 py-3 mt-2"
+          onPress={refetch}
+        >
+          <Text className="text-base font-bold text-background">Refresh</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  const aiMid = data ? (data.aiPctLow + data.aiPctHigh) / 2 : 0;
-  const blProgress = data
-    ? Math.min(data.brainliftHours / BRAINLIFT_TARGET_HOURS, 1) * 100
-    : 0;
+  // Derive display values from data (or 0 while loading)
+  const aiPercent = data ? (data.aiPctLow + data.aiPctHigh) / 2 : 0;
+  const brainliftHours = data?.brainliftHours ?? 0;
+  const brainliftPercent = Math.min(100, (brainliftHours / BRAINLIFT_TARGET) * 100);
+
+  // Week-over-week delta (FR4)
+  const delta = previousWeekPercent !== undefined ? aiPercent - previousWeekPercent : null;
+
+  // Skeleton layout: shown only when isLoading=true AND no data yet
+  const showSkeleton = isLoading && !data;
 
   return (
     <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
+      className="flex-1 bg-background"
+      contentContainerStyle={{ padding: 16, paddingTop: 56, gap: 12 }}
       refreshControl={
         <RefreshControl
           refreshing={isLoading}
           onRefresh={refetch}
-          tintColor="#00FF88"
+          tintColor={colors.success}
         />
       }
     >
       {/* Header */}
-      <Text style={styles.title}>AI &amp; BrainLift</Text>
+      <Text className="text-3xl font-bold text-textPrimary mb-1">AI &amp; BrainLift</Text>
 
-      {/* AI% Card */}
-      <View style={styles.card} testID="ai-pct-card">
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardLabel}>AI USAGE</Text>
-          <Text style={styles.cardTarget}>75% target</Text>
-        </View>
-        <Text style={styles.aiPctValue} testID="ai-pct-value">
-          {data ? `${data.aiPctLow}%–${data.aiPctHigh}%` : '—%–—%'}
-        </Text>
-        <View style={styles.progressContainer}>
-          <AIProgressBar value={aiMid} targetLine={AI_TARGET_PCT} color="#00FF88" />
-        </View>
-        <Text style={styles.cardSubtext}>
-          {data ? `${data.taggedSlots} tagged slots · ${data.workdaysElapsed} days tracked` : ''}
-        </Text>
-      </View>
+      {/* AI Usage Card — FR1, FR2, FR4 */}
+      <Card>
+        <SectionLabel>AI USAGE</SectionLabel>
 
-      {/* BrainLift Card */}
-      <View style={styles.card} testID="brainlift-card">
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardLabel}>BRAINLIFT</Text>
-          <Text style={styles.cardTarget}>5h / week target</Text>
-        </View>
-        <Text style={styles.brainliftValue} testID="brainlift-value">
-          {data ? `${data.brainliftHours.toFixed(1)}h / ${BRAINLIFT_TARGET_HOURS}h` : '—h / 5h'}
-        </Text>
-        <View style={styles.progressContainer}>
-          <AIProgressBar value={blProgress} color="#F5C842" />
-        </View>
-      </View>
+        {showSkeleton ? (
+          <View testID="skeleton-ring" className="items-center mt-3">
+            <SkeletonLoader width={RING_SIZE} height={RING_SIZE} rounded />
+          </View>
+        ) : (
+          <View className="items-center mt-3">
+            {/* Ring container: AIRingChart with MetricValue overlay */}
+            <View
+              testID="ai-ring-container"
+              style={{ position: 'relative', width: RING_SIZE, height: RING_SIZE }}
+            >
+              <AIRingChart
+                aiPercent={aiPercent}
+                brainliftPercent={brainliftPercent}
+                size={RING_SIZE}
+              />
+              {/* MetricValue overlay: centered absolutely over the ring */}
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <MetricValue
+                  value={aiPercent}
+                  unit="%"
+                  precision={0}
+                  colorClass="text-cyan"
+                  sizeClass="text-4xl"
+                />
+              </View>
+            </View>
 
-      {/* Daily Breakdown */}
-      {data && data.dailyBreakdown.length > 0 && (
-        <View style={styles.card} testID="daily-breakdown">
+            {/* Delta badge — FR4 */}
+            {delta !== null && (
+              <View
+                testID="delta-badge"
+                className="bg-surfaceElevated rounded-full px-2 py-0.5 mt-2"
+              >
+                <Text
+                  className={`text-xs font-semibold${
+                    delta > 0
+                      ? ' text-success'
+                      : delta < 0
+                      ? ' text-error'
+                      : ' text-textSecondary'
+                  }`}
+                >
+                  {delta === 0
+                    ? '+0.0%'
+                    : delta > 0
+                    ? `+${delta.toFixed(1)}%`
+                    : `${delta.toFixed(1)}%`}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {showSkeleton && (
+          <View testID="skeleton-metrics" className="mt-3 gap-2">
+            <SkeletonLoader height={40} />
+            <SkeletonLoader height={32} />
+          </View>
+        )}
+
+        {/* AI% target note */}
+        {!showSkeleton && (
+          <Text className="text-xs text-textTertiary text-center mt-2">75% target</Text>
+        )}
+      </Card>
+
+      {/* BrainLift Card — FR2, FR3 */}
+      <Card>
+        <SectionLabel>BRAINLIFT</SectionLabel>
+
+        {showSkeleton ? (
+          <View className="gap-2 mt-2">
+            <SkeletonLoader height={32} />
+            <SkeletonLoader height={6} />
+          </View>
+        ) : (
+          <>
+            {/* BrainLift hours MetricValue row */}
+            <View className="flex-row items-baseline gap-1 mt-2">
+              <MetricValue
+                value={brainliftHours}
+                unit="h"
+                precision={1}
+                colorClass="text-violet"
+                sizeClass="text-3xl"
+              />
+              <Text className="text-sm text-textSecondary">/ 5h target</Text>
+            </View>
+
+            {/* BrainLift progress bar */}
+            <ProgressBar
+              progress={brainliftHours / BRAINLIFT_TARGET}
+              colorClass="bg-violet"
+              height={6}
+              className="mt-2"
+            />
+
+            {/* Subtext */}
+            <Text className="text-sm text-textSecondary mt-1">
+              {brainliftHours.toFixed(1)}h / {BRAINLIFT_TARGET}h target
+            </Text>
+          </>
+        )}
+      </Card>
+
+      {/* Daily Breakdown Card — FR5 */}
+      {(data && data.dailyBreakdown.length > 0) && (
+        <Card testID="daily-breakdown">
           {/* Column headers */}
-          <View style={styles.breakdownHeader}>
-            <Text style={[styles.breakdownHeaderCell, { flex: 1 }]}>Day</Text>
-            <Text style={[styles.breakdownHeaderCell, styles.metricHeader]}>AI%</Text>
-            <Text style={[styles.breakdownHeaderCell, styles.metricHeader]}>BrainLift</Text>
+          <View className="flex-row pb-1.5 border-b border-border mb-1">
+            <Text className="flex-1 text-xs text-textTertiary uppercase tracking-wider">Day</Text>
+            <Text className="w-[70px] text-right text-xs text-textTertiary uppercase tracking-wider">AI%</Text>
+            <Text className="w-[70px] text-right text-xs text-textTertiary uppercase tracking-wider">BrainLift</Text>
           </View>
           {data.dailyBreakdown.map((day) => (
             <DailyAIRow key={day.date} item={day} />
           ))}
-        </View>
+        </Card>
       )}
 
-      {/* Legend */}
-      <View style={styles.card} testID="legend">
-        <Text style={styles.legendTitle}>How it's calculated</Text>
-        <Text style={styles.legendItem}>
-          <Text style={styles.legendTag}>AI%</Text>
+      {/* Skeleton for daily breakdown — FR6 */}
+      {showSkeleton && (
+        <Card>
+          <View testID="skeleton-breakdown" className="gap-2">
+            <SkeletonLoader height={20} />
+            <SkeletonLoader height={20} />
+            <SkeletonLoader height={20} />
+          </View>
+        </Card>
+      )}
+
+      {/* Legend Card */}
+      <Card>
+        <Text className="text-sm font-semibold text-textPrimary mb-1">How it&apos;s calculated</Text>
+        <Text className="text-sm text-textSecondary leading-5">
+          <Text className="text-cyan font-semibold">AI%</Text>
           {'  '}Slots tagged ai_usage or second_brain ÷ tagged slots × 100
         </Text>
-        <Text style={styles.legendItem}>
-          <Text style={styles.legendTag}>BrainLift</Text>
+        <Text className="text-sm text-textSecondary leading-5 mt-1">
+          <Text className="text-violet font-semibold">BrainLift</Text>
           {'  '}Slots tagged second_brain × 10 min
         </Text>
-        <Text style={styles.legendNote}>
+        <Text className="text-xs text-textTertiary mt-2">
           ±2% display range accounts for measurement variation.
         </Text>
-      </View>
+      </Card>
 
       {/* Last fetched timestamp */}
       {lastFetchedAt && (
-        <Text style={styles.lastFetched} testID="last-fetched">
+        <Text className="text-xs text-textTertiary text-center mt-1" testID="last-fetched">
           Updated {new Date(lastFetchedAt).toLocaleTimeString()}
         </Text>
       )}
+
+      {/* TODO: TrendSparkline — deferred to future analytics spec (weeklyHistory not yet in useAIData) */}
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  content: {
-    padding: 16,
-    paddingTop: 56,
-    gap: 12,
-  },
-  centered: {
-    flex: 1,
-    backgroundColor: '#000000',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    gap: 12,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  card: {
-    backgroundColor: '#1C1C1E',
-    borderRadius: 12,
-    padding: 16,
-    gap: 8,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  cardLabel: {
-    fontSize: 12,
-    color: '#8E8E93',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  cardTarget: {
-    fontSize: 12,
-    color: '#8E8E93',
-  },
-  aiPctValue: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: '#00FF88',
-  },
-  brainliftValue: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: '#F5C842',
-  },
-  progressContainer: {
-    marginVertical: 4,
-  },
-  cardSubtext: {
-    fontSize: 12,
-    color: '#636366',
-    marginTop: 2,
-  },
-  breakdownHeader: {
-    flexDirection: 'row',
-    paddingBottom: 6,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#3A3A3C',
-    marginBottom: 4,
-  },
-  breakdownHeaderCell: {
-    fontSize: 11,
-    color: '#636366',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  metricHeader: {
-    width: 70,
-    textAlign: 'right',
-  },
-  legendTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#EBEBF5',
-    marginBottom: 4,
-  },
-  legendItem: {
-    fontSize: 13,
-    color: '#8E8E93',
-    lineHeight: 20,
-  },
-  legendTag: {
-    color: '#00FF88',
-    fontWeight: '600',
-  },
-  legendNote: {
-    fontSize: 12,
-    color: '#636366',
-    marginTop: 4,
-  },
-  lastFetched: {
-    fontSize: 12,
-    color: '#636366',
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    textAlign: 'center',
-  },
-  errorSubText: {
-    fontSize: 14,
-    color: '#8E8E93',
-    textAlign: 'center',
-  },
-  emptyText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    textAlign: 'center',
-  },
-  actionButton: {
-    backgroundColor: '#00FF88',
-    borderRadius: 10,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    marginTop: 8,
-  },
-  actionButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#000000',
-  },
-});
