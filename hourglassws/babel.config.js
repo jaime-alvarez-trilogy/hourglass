@@ -5,10 +5,8 @@ module.exports = function (api) {
   api.cache.using(() => String(isTest));
 
   return {
-    presets: ['babel-preset-expo'],
-    // nativewind/babel returns { plugins: [null, ...] } in the jest/node environment,
-    // which crashes babel validation. Exclude it during test runs.
-    // NativeWind className transforms are not needed in tests — source-file analysis is used.
-    plugins: isTest ? [] : ['nativewind/babel'],
+    // nativewind/babel returns { plugins: [...] } — a preset-shaped object, not a plugin.
+    // Must go in presets. Excluded in test env where it returns invalid null entries.
+    presets: isTest ? ['babel-preset-expo'] : ['babel-preset-expo', 'nativewind/babel'],
   };
 };

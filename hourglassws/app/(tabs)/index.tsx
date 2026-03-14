@@ -15,7 +15,6 @@ import {
 import { useRouter } from 'expo-router';
 import { useConfig } from '@/src/hooks/useConfig';
 import { useHoursData } from '@/src/hooks/useHoursData';
-import NativeWindSmoke from '@/src/components/NativeWindSmoke';
 import { StatCard } from '@/src/components/StatCard';
 import { DailyBarChart } from '@/src/components/DailyBarChart';
 import { UrgencyBanner } from '@/src/components/UrgencyBanner';
@@ -77,9 +76,6 @@ export default function HoursDashboard() {
         />
       }
     >
-      {/* NativeWind smoke test — TEMPORARY: remove after verifying in Expo Go */}
-      <NativeWindSmoke />
-
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>

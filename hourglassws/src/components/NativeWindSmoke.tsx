@@ -8,7 +8,7 @@ import { View, Text } from 'react-native';
 
 export default function NativeWindSmoke(): JSX.Element {
   return (
-    <View className="bg-background flex-1 items-center justify-center">
+    <View style={{ height: 120, backgroundColor: 'red', alignItems: 'center', justifyContent: 'center' }}>
       <View className="bg-surface rounded-2xl p-5 border border-border">
         <Text className="text-gold font-display text-3xl">42.5</Text>
         <Text className="text-textSecondary font-sans text-sm">Hours This Week</Text>
