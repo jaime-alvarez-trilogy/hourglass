@@ -82,4 +82,4 @@ hex colors, no `StyleSheet.create()`, no raw `Animated` API.
 
 | Date | Spec | Description |
 |------|------|-------------|
-| 2026-03-14 | [00-env-setup](specs/00-env-setup/spec.md) | Add gitignore entry + .env.example template |
+| 2026-03-14 | [00-env-setup](specs/00-env-setup/spec.md) | Add gitignore entry + .env.example template — **Complete** |
