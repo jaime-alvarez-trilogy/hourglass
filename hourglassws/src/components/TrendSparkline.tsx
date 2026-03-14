@@ -16,7 +16,7 @@
  */
 
 import React, { useEffect, useMemo } from 'react';
-import { Canvas, Path, Circle } from '@shopify/react-native-skia';
+import { Canvas, Path, Circle, Line, vec } from '@shopify/react-native-skia';
 import { useSharedValue, withTiming } from 'react-native-reanimated';
 import { colors } from '@/src/lib/colors';
 import { timingChartFill } from '@/src/lib/reanimated-presets';
@@ -29,6 +29,17 @@ export interface TrendSparklineProps {
   color?: string;
   /** Line stroke width. Default: 2 */
   strokeWidth?: number;
+  /**
+   * Optional ceiling value for the Y-axis scale.
+   * If provided and >= all data values, the chart scales to this max instead of
+   * data max — so bars/lines never touch the top unless data reaches maxValue.
+   */
+  maxValue?: number;
+  /**
+   * Show a faint horizontal guide line at the top of the chart (y=2),
+   * representing the maxValue reference. Default: false.
+   */
+  showGuide?: boolean;
 }
 
 const PADDING_FRACTION = 0.1; // 10% top/bottom margin
@@ -80,48 +91,62 @@ export default function TrendSparkline({
   height,
   color = colors.gold,
   strokeWidth = 2,
+  maxValue,
+  showGuide = false,
 }: TrendSparklineProps) {
   const clipProgress = useSharedValue(0);
+  // Resolve effective height — never 0 (avoids invisible canvas before onLayout fires)
+  const h = height > 0 ? height : 52;
 
   useEffect(() => {
     clipProgress.value = withTiming(1, timingChartFill);
   }, []);
 
-  // Recompute path when data changes
+  // Recompute path when data or dimensions change
   const { pathStr, min, max, hasData, isSinglePoint } = useMemo(() => {
     if (data.length === 0) {
       return { pathStr: '', min: 0, max: 0, hasData: false, isSinglePoint: false };
     }
     const minVal = Math.min(...data);
-    const maxVal = Math.max(...data);
+    const dataMax = Math.max(...data);
+    // If maxValue is provided and >= all data, use it as the axis ceiling
+    const maxVal = maxValue !== undefined && maxValue >= dataMax ? maxValue : dataMax;
     if (data.length === 1) {
       return { pathStr: '', min: minVal, max: maxVal, hasData: true, isSinglePoint: true };
     }
     return {
-      pathStr: buildPath(data, width, height, minVal, maxVal),
+      pathStr: buildPath(data, width, h, minVal, maxVal),
       min: minVal,
       max: maxVal,
       hasData: true,
       isSinglePoint: false,
     };
-  }, [data, width, height]);
+  }, [data, width, h, maxValue]);
 
-  if (!hasData || width === 0 || height === 0) {
+  if (!hasData || width === 0) {
     return null;
   }
 
+  const guideY = 2;
+
   if (isSinglePoint) {
     const cx = width / 2;
-    const cy = toY(data[0], min, max, height);
+    const cy = toY(data[0], min, max, h);
     return (
-      <Canvas style={{ width, height }}>
+      <Canvas style={{ width, height: h }}>
+        {showGuide && (
+          <Line p1={vec(0, guideY)} p2={vec(width, guideY)} color={colors.border} strokeWidth={1} />
+        )}
         <Circle cx={cx} cy={cy} r={strokeWidth * 2} color={color} />
       </Canvas>
     );
   }
 
   return (
-    <Canvas style={{ width, height }}>
+    <Canvas style={{ width, height: h }}>
+      {showGuide && (
+        <Line p1={vec(0, guideY)} p2={vec(width, guideY)} color={colors.border} strokeWidth={1} />
+      )}
       <Path
         path={pathStr}
         color={color}

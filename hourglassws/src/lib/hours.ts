@@ -196,8 +196,9 @@ export function calculateHours(
   const todayHours = todayEntry ? todayEntry.hours : 0;
 
   // Build daily entries with isToday flag
+  // Normalize date: API returns full ISO datetime ("2026-03-09T00:00:00.000Z"), slice to YYYY-MM-DD
   const daily: DailyEntry[] = stats.map((s) => ({
-    date: s.date,
+    date: s.date.slice(0, 10),
     hours: s.hours,
     isToday: s.date.startsWith(todayLocal),
   }));

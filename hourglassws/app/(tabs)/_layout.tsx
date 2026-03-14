@@ -3,8 +3,12 @@ import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useConfig } from '@/src/hooks/useConfig';
 
 export default function TabLayout() {
+  const { config } = useConfig();
+  const showApprovals = config?.isManager === true || config?.showApprovals === true;
+
   return (
     <Tabs
       screenOptions={{
@@ -27,10 +31,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="overview"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Overview',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.bar.fill" color={color} />,
         }}
       />
       <Tabs.Screen
@@ -45,7 +49,13 @@ export default function TabLayout() {
         options={{
           title: 'Approvals',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="checkmark.circle.fill" color={color} />,
+          tabBarButton: showApprovals ? HapticTab : () => null,
         }}
+      />
+      {/* Hide the old explore tab from navigation */}
+      <Tabs.Screen
+        name="explore"
+        options={{ href: null }}
       />
     </Tabs>
   );

@@ -232,12 +232,12 @@ export default function HoursDashboard() {
           ) : (
             <View
               style={{ height: 120 }}
-              onLayout={e => setChartDims(e.nativeEvent.layout)}
+              onLayout={e => setChartDims({ width: e.nativeEvent.layout.width, height: 120 })}
             >
               <WeeklyBarChart
                 data={dailyChartData}
                 width={chartDims.width}
-                height={chartDims.height}
+                height={120}
                 maxHours={Math.max(8, weeklyLimit / 5)}
               />
             </View>
@@ -281,10 +281,10 @@ export default function HoursDashboard() {
               <Text className="text-textSecondary text-sm font-sans mt-1">
                 Today: ${Math.round(data?.todayEarnings ?? 0).toLocaleString()}
               </Text>
-              {/* 4-week trend sparkline */}
+              {/* 4-week trend sparkline — scaled to max possible earnings */}
               <View
                 style={{ height: 60 }}
-                onLayout={e => setSparklineDims(e.nativeEvent.layout)}
+                onLayout={e => setSparklineDims({ width: e.nativeEvent.layout.width, height: 60 })}
                 className="mt-3"
               >
                 <TrendSparkline
@@ -292,6 +292,8 @@ export default function HoursDashboard() {
                   width={sparklineDims.width}
                   height={sparklineDims.height}
                   color={colors.gold}
+                  maxValue={(config?.hourlyRate ?? 0) * (config?.weeklyLimit ?? 40)}
+                  showGuide
                 />
               </View>
             </>

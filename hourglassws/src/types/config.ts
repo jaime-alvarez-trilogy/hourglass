@@ -19,6 +19,7 @@ export interface CrossoverConfig {
   assignmentId: string;   // assignment.id — for work diary API
   lastRoleCheck: string;  // ISO timestamp, refreshed weekly Monday
   debugMode: boolean;
+  showApprovals?: boolean; // dev toggle — show Approvals tab regardless of isManager
   setupComplete: boolean;
   setupDate: string;      // ISO timestamp
 }
