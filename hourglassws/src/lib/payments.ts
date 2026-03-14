@@ -5,9 +5,12 @@
 // when called with a date range (from/to spanning multiple weeks).
 
 export interface Payment {
-  amount: number; // Total payment amount for the period
-  from: string;   // YYYY-MM-DD UTC Monday (week start)
-  to: string;     // YYYY-MM-DD UTC Sunday (week end)
+  amount: number;           // Total payment amount for the period
+  periodStartDate: string;  // YYYY-MM-DD Monday (week start)
+  periodEndDate: string;    // YYYY-MM-DD Sunday (week end)
+  paidHours: number;
+  workedHours: number;
+  status: string;           // "CURRENT" | "PENDING" | "PAID" etc.
 }
 
 /**
@@ -30,7 +33,8 @@ export function getWeeklyEarningsTrend(
   // Group and sum by `from` date (week key)
   const weekMap = new Map<string, number>();
   for (const p of payments) {
-    weekMap.set(p.from, (weekMap.get(p.from) ?? 0) + p.amount);
+    const key = p.periodStartDate;
+    weekMap.set(key, (weekMap.get(key) ?? 0) + p.amount);
   }
 
   // Sort weeks chronologically (ISO date strings sort correctly lexicographically)

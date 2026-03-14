@@ -124,10 +124,11 @@ export function useEarningsHistory(
   useEffect(() => {
     if (!payments) return;
 
-    // Build week map from API response
+    // Build week map keyed by periodStartDate (YYYY-MM-DD)
     const weeks: Record<string, number> = {};
     for (const p of payments) {
-      const weekFrom = p.from.slice(0, 10); // normalize ISO datetime → YYYY-MM-DD
+      if (!p.periodStartDate) continue;
+      const weekFrom = p.periodStartDate.slice(0, 10);
       weeks[weekFrom] = (weeks[weekFrom] ?? 0) + p.amount;
     }
 
