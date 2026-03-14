@@ -54,3 +54,46 @@ export function computePanelState(
   if (pacingRatio >= PACING_BEHIND_THRESHOLD) return 'behind';
   return 'critical';
 }
+
+/**
+ * Returns the number of work days elapsed in the current week (Mon–Fri).
+ *
+ * Uses local timezone (getDay / getHours / getMinutes / getSeconds).
+ *
+ * Returns 0–5:
+ *   0 — Monday at exactly 00:00:00 (week just started, no day has elapsed yet)
+ *   1 — Monday (any time after midnight)
+ *   2 — Tuesday
+ *   3 — Wednesday
+ *   4 — Thursday
+ *   5 — Friday, Saturday, or Sunday (weekend clamped to 5)
+ *
+ * @param now  Optional Date to use (defaults to new Date()).
+ */
+export function computeDaysElapsed(now?: Date): number {
+  const d = now ?? new Date();
+  const day = d.getDay(); // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+
+  // Weekend — clamp to 5
+  if (day === 0 || day === 6) return 5;
+
+  // Friday through Saturday already handled above; day is now 1–5 (Mon–Fri)
+  // Friday
+  if (day === 5) return 5;
+
+  // Thursday
+  if (day === 4) return 4;
+
+  // Wednesday
+  if (day === 3) return 3;
+
+  // Tuesday
+  if (day === 2) return 2;
+
+  // Monday (day === 1)
+  // Special edge: Monday at exactly midnight → 0 (week hasn't started)
+  if (d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0) {
+    return 0;
+  }
+  return 1;
+}
