@@ -25,13 +25,37 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn() }),
 }));
 
-// SafeAreaView passthrough
+// SafeAreaView passthrough (must be top-level, not in beforeEach)
 jest.mock('react-native-safe-area-context', () => {
-  const React = require('react');
+  const mockReact = require('react');
   return {
     SafeAreaView: ({ children, ...props }: any) =>
-      React.createElement('View', props, children),
+      mockReact.createElement('View', props, children),
     useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  };
+});
+
+// expo-linear-gradient passthrough (used by PanelGradient)
+jest.mock('expo-linear-gradient', () => {
+  const mockReact = require('react');
+  return {
+    LinearGradient: ({ children }: any) =>
+      mockReact.createElement(mockReact.Fragment, null, children),
+  };
+});
+
+// MetricValue uses Animated.createAnimatedComponent(TextInput).
+// react-native-web's TextInput runs DOM-dependent effects in jest-expo/node.
+// Stub it out to avoid AggregateError when MetricValue renders.
+jest.mock('react-native-web/dist/exports/TextInput/index.js', () => {
+  const mockR = require('react');
+  const mockRN = jest.requireActual('react-native-web');
+  return {
+    __esModule: true,
+    default: ({ defaultValue, value, ...props }: any) =>
+      mockR.createElement(mockRN.View, props,
+        mockR.createElement(mockRN.Text, null, defaultValue ?? value ?? '')
+      ),
   };
 });
 
@@ -40,6 +64,7 @@ jest.mock('react-native-safe-area-context', () => {
 import { useHoursData } from '@/src/hooks/useHoursData';
 import { usePaymentHistory } from '@/src/hooks/usePaymentHistory';
 import { useConfig } from '@/src/hooks/useConfig';
+import HoursDashboard from '../index';
 
 // ─── Test data ────────────────────────────────────────────────────────────────
 
@@ -79,29 +104,31 @@ const MOCK_HOURS_DATA = {
   deadline: new Date('2026-03-15T23:59:59Z'),
 };
 
-function mockHooks(overrides: {
-  hoursData?: Partial<ReturnType<typeof useHoursData>>;
+// Helper: set up all three mocks at once
+function setupMocks(opts: {
+  data?: typeof MOCK_HOURS_DATA | null;
+  isLoading?: boolean;
+  isStale?: boolean;
+  cachedAt?: string | null;
+  error?: string | null;
   config?: typeof MOCK_CONFIG | null;
   paymentHistory?: any[] | null;
-}) {
+} = {}) {
   (useHoursData as jest.Mock).mockReturnValue({
-    data: MOCK_HOURS_DATA,
-    isLoading: false,
-    isStale: false,
-    cachedAt: null,
-    error: null,
+    data: opts.data !== undefined ? opts.data : MOCK_HOURS_DATA,
+    isLoading: opts.isLoading ?? false,
+    isStale: opts.isStale ?? false,
+    cachedAt: opts.cachedAt ?? null,
+    error: opts.error ?? null,
     refetch: jest.fn(),
-    ...(overrides.hoursData ?? {}),
   });
-
   (useConfig as jest.Mock).mockReturnValue({
-    config: overrides.config !== undefined ? overrides.config : MOCK_CONFIG,
+    config: opts.config !== undefined ? opts.config : MOCK_CONFIG,
     isLoading: false,
     refetch: jest.fn(),
   });
-
   (usePaymentHistory as jest.Mock).mockReturnValue({
-    data: overrides.paymentHistory !== undefined ? overrides.paymentHistory : [],
+    data: opts.paymentHistory !== undefined ? opts.paymentHistory : [],
     isLoading: false,
   });
 }
@@ -160,11 +187,8 @@ describe('HoursDashboard — source design tokens (FR3–FR6)', () => {
     expect(source).toContain('getWeeklyEarningsTrend');
   });
 
-  it('SC6.1 — no ActivityIndicator replacing full layout', () => {
-    // ActivityIndicator is allowed only if used alongside the main layout,
-    // but must not be used as the sole loading-state return.
-    // Check that the component never returns just an ActivityIndicator spinner.
-    // The source should not have a standalone early-return with ActivityIndicator.
+  it('SC6.1 — no ActivityIndicator full-screen early-return', () => {
+    // Source must not have an early return that only shows ActivityIndicator
     expect(code).not.toMatch(/return\s*\(?\s*<.*ActivityIndicator/);
   });
 
@@ -177,256 +201,99 @@ describe('HoursDashboard — source design tokens (FR3–FR6)', () => {
 
 describe('HoursDashboard — render: loading state (FR6)', () => {
   beforeEach(() => {
-    mockHooks({
-      hoursData: { data: null, isLoading: true },
-    });
+    setupMocks({ data: null, isLoading: true });
   });
 
   it('SC6.2 — renders without crash when isLoading=true and data=null', () => {
-    const HoursDashboard = require('../index').default;
     expect(() => {
-      act(() => {
-        create(React.createElement(HoursDashboard));
-      });
+      act(() => { create(React.createElement(HoursDashboard)); });
     }).not.toThrow();
   });
 
-  it('SC6.3 — renders SkeletonLoader elements when isLoading=true', () => {
-    const HoursDashboard = require('../index').default;
+  it('SC6.3 — renders the 3-zone layout (not a null/spinner)', () => {
     let tree: any;
-    act(() => {
-      tree = create(React.createElement(HoursDashboard));
-    });
-    const json = JSON.stringify(tree.toJSON());
-    // SkeletonLoader renders Animated.View — check structure is present
-    expect(json).not.toBeNull();
-    // The output should NOT be null (screen renders, not a full-page spinner)
+    act(() => { tree = create(React.createElement(HoursDashboard)); });
     expect(tree.toJSON()).not.toBeNull();
   });
 });
 
 describe('HoursDashboard — render: error state (FR6)', () => {
   beforeEach(() => {
-    mockHooks({
-      hoursData: {
-        data: null,
-        isLoading: false,
-        error: 'Network request failed',
-      },
-    });
+    setupMocks({ data: null, isLoading: false, error: 'Network request failed' });
   });
 
   it('SC6.4 — renders without crash when error !== null and data=null', () => {
-    const HoursDashboard = require('../index').default;
     expect(() => {
-      act(() => {
-        create(React.createElement(HoursDashboard));
-      });
+      act(() => { create(React.createElement(HoursDashboard)); });
     }).not.toThrow();
   });
 
-  it('SC6.5 — error banner testID="error-banner" present when error && !data', () => {
-    const HoursDashboard = require('../index').default;
+  it('SC6.5 — error banner testID="error-banner" present', () => {
     let tree: any;
-    act(() => {
-      tree = create(React.createElement(HoursDashboard));
-    });
-    const json = JSON.stringify(tree.toJSON());
-    expect(json).toContain('"error-banner"');
+    act(() => { tree = create(React.createElement(HoursDashboard)); });
+    expect(JSON.stringify(tree.toJSON())).toContain('"error-banner"');
   });
 
   it('SC6.6 — retry button testID="retry-button" present', () => {
-    const HoursDashboard = require('../index').default;
     let tree: any;
-    act(() => {
-      tree = create(React.createElement(HoursDashboard));
-    });
-    const json = JSON.stringify(tree.toJSON());
-    expect(json).toContain('"retry-button"');
+    act(() => { tree = create(React.createElement(HoursDashboard)); });
+    expect(JSON.stringify(tree.toJSON())).toContain('"retry-button"');
   });
 });
 
 describe('HoursDashboard — render: data loaded state (FR3, FR4, FR5)', () => {
   beforeEach(() => {
-    jest.resetModules();
-    jest.mock('@/src/hooks/useHoursData');
-    jest.mock('@/src/hooks/usePaymentHistory');
-    jest.mock('@/src/hooks/useConfig');
-    jest.mock('expo-router', () => ({
-      useRouter: () => ({ push: jest.fn() }),
-    }));
-    jest.mock('react-native-safe-area-context', () => {
-      const React = require('react');
-      return {
-        SafeAreaView: ({ children, ...props }: any) =>
-          React.createElement('View', props, children),
-        useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-      };
-    });
-
-    const { useHoursData } = require('@/src/hooks/useHoursData');
-    const { useConfig } = require('@/src/hooks/useConfig');
-    const { usePaymentHistory } = require('@/src/hooks/usePaymentHistory');
-
-    (useHoursData as jest.Mock).mockReturnValue({
-      data: MOCK_HOURS_DATA,
-      isLoading: false,
-      isStale: false,
-      cachedAt: null,
-      error: null,
-      refetch: jest.fn(),
-    });
-    (useConfig as jest.Mock).mockReturnValue({
-      config: MOCK_CONFIG,
-      isLoading: false,
-      refetch: jest.fn(),
-    });
-    (usePaymentHistory as jest.Mock).mockReturnValue({
-      data: [],
-      isLoading: false,
-    });
+    setupMocks();
   });
 
   it('SC3.6 — renders without crash with full data', () => {
-    const HoursDashboard = require('../index').default;
     expect(() => {
-      act(() => {
-        create(React.createElement(HoursDashboard));
-      });
+      act(() => { create(React.createElement(HoursDashboard)); });
     }).not.toThrow();
   });
 
   it('SC3.7 — settings button testID="settings-button" present', () => {
-    const HoursDashboard = require('../index').default;
     let tree: any;
-    act(() => {
-      tree = create(React.createElement(HoursDashboard));
-    });
-    const json = JSON.stringify(tree.toJSON());
-    expect(json).toContain('"settings-button"');
+    act(() => { tree = create(React.createElement(HoursDashboard)); });
+    expect(JSON.stringify(tree.toJSON())).toContain('"settings-button"');
   });
 
   it('SC3.8 — state badge testID="state-badge" present', () => {
-    const HoursDashboard = require('../index').default;
     let tree: any;
-    act(() => {
-      tree = create(React.createElement(HoursDashboard));
-    });
-    const json = JSON.stringify(tree.toJSON());
-    expect(json).toContain('"state-badge"');
+    act(() => { tree = create(React.createElement(HoursDashboard)); });
+    expect(JSON.stringify(tree.toJSON())).toContain('"state-badge"');
   });
 
   it('SC3.9 — QA badge absent when config.useQA=false', () => {
-    const HoursDashboard = require('../index').default;
     let tree: any;
-    act(() => {
-      tree = create(React.createElement(HoursDashboard));
-    });
-    const json = JSON.stringify(tree.toJSON());
-    expect(json).not.toContain('"qa-badge"');
+    act(() => { tree = create(React.createElement(HoursDashboard)); });
+    expect(JSON.stringify(tree.toJSON())).not.toContain('"qa-badge"');
   });
 });
 
 describe('HoursDashboard — render: QA badge (FR3)', () => {
   beforeEach(() => {
-    jest.resetModules();
-    jest.mock('@/src/hooks/useHoursData');
-    jest.mock('@/src/hooks/usePaymentHistory');
-    jest.mock('@/src/hooks/useConfig');
-    jest.mock('expo-router', () => ({
-      useRouter: () => ({ push: jest.fn() }),
-    }));
-    jest.mock('react-native-safe-area-context', () => {
-      const React = require('react');
-      return {
-        SafeAreaView: ({ children, ...props }: any) =>
-          React.createElement('View', props, children),
-        useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-      };
-    });
-
-    const { useHoursData } = require('@/src/hooks/useHoursData');
-    const { useConfig } = require('@/src/hooks/useConfig');
-    const { usePaymentHistory } = require('@/src/hooks/usePaymentHistory');
-
-    (useHoursData as jest.Mock).mockReturnValue({
-      data: MOCK_HOURS_DATA,
-      isLoading: false,
-      isStale: false,
-      cachedAt: null,
-      error: null,
-      refetch: jest.fn(),
-    });
-    (useConfig as jest.Mock).mockReturnValue({
-      config: { ...MOCK_CONFIG, useQA: true },
-      isLoading: false,
-      refetch: jest.fn(),
-    });
-    (usePaymentHistory as jest.Mock).mockReturnValue({
-      data: [],
-      isLoading: false,
-    });
+    setupMocks({ config: { ...MOCK_CONFIG, useQA: true } });
   });
 
   it('SC3.10 — QA badge testID="qa-badge" present when config.useQA=true', () => {
-    const HoursDashboard = require('../index').default;
     let tree: any;
-    act(() => {
-      tree = create(React.createElement(HoursDashboard));
-    });
-    const json = JSON.stringify(tree.toJSON());
-    expect(json).toContain('"qa-badge"');
+    act(() => { tree = create(React.createElement(HoursDashboard)); });
+    expect(JSON.stringify(tree.toJSON())).toContain('"qa-badge"');
   });
 });
 
 describe('HoursDashboard — render: stale cache state (FR6)', () => {
   beforeEach(() => {
-    jest.resetModules();
-    jest.mock('@/src/hooks/useHoursData');
-    jest.mock('@/src/hooks/usePaymentHistory');
-    jest.mock('@/src/hooks/useConfig');
-    jest.mock('expo-router', () => ({
-      useRouter: () => ({ push: jest.fn() }),
-    }));
-    jest.mock('react-native-safe-area-context', () => {
-      const React = require('react');
-      return {
-        SafeAreaView: ({ children, ...props }: any) =>
-          React.createElement('View', props, children),
-        useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-      };
-    });
-
-    const { useHoursData } = require('@/src/hooks/useHoursData');
-    const { useConfig } = require('@/src/hooks/useConfig');
-    const { usePaymentHistory } = require('@/src/hooks/usePaymentHistory');
-
-    (useHoursData as jest.Mock).mockReturnValue({
-      data: MOCK_HOURS_DATA,
-      isLoading: false,
+    setupMocks({
       isStale: true,
       cachedAt: '2026-03-14T09:30:00.000Z',
-      error: null,
-      refetch: jest.fn(),
-    });
-    (useConfig as jest.Mock).mockReturnValue({
-      config: MOCK_CONFIG,
-      isLoading: false,
-      refetch: jest.fn(),
-    });
-    (usePaymentHistory as jest.Mock).mockReturnValue({
-      data: [],
-      isLoading: false,
     });
   });
 
   it('SC6.7 — stale cache label present when isStale=true', () => {
-    const HoursDashboard = require('../index').default;
     let tree: any;
-    act(() => {
-      tree = create(React.createElement(HoursDashboard));
-    });
-    const json = JSON.stringify(tree.toJSON());
-    expect(json).toContain('Cached:');
+    act(() => { tree = create(React.createElement(HoursDashboard)); });
+    expect(JSON.stringify(tree.toJSON())).toContain('Cached:');
   });
 });
