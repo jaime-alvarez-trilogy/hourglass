@@ -89,5 +89,5 @@ hex colors, no `StyleSheet.create()`, no raw `Animated` API.
 | 2026-03-14 | [04-skia-charts](specs/04-skia-charts/spec.md) | WeeklyBarChart, TrendSparkline, AIRingChart, ProgressBar + colors.ts — Skia chart library with Reanimated v4 animations — **Complete** |
 | 2026-03-14 | [05-hours-dashboard](specs/05-hours-dashboard/spec.md) | Full rebuild of index.tsx — 3-zone layout with PanelGradient, MetricValue, WeeklyBarChart, TrendSparkline + computeDaysElapsed and getWeeklyEarningsTrend utilities — **Spec Ready** |
 | 2026-03-14 | [06-ai-tab](specs/06-ai-tab/spec.md) | Rebuild ai.tsx — AIRingChart two-ring hero, MetricValue count-up, BrainLift ProgressBar, delta badge with AsyncStorage, DailyAIRow className migration |
-| 2026-03-14 | [07-approvals-tab](specs/07-approvals-tab/spec.md) | Rebuild approvals.tsx + ApprovalCard + RejectionSheet — NativeWind tokens, PanResponder gestures retained, skeleton loaders, type badges — **Spec Ready** |
+| 2026-03-14 | [07-approvals-tab](specs/07-approvals-tab/spec.md) | Rebuild approvals.tsx + ApprovalCard + RejectionSheet — NativeWind tokens, PanResponder gestures retained, skeleton loaders, type badges — **Complete** |
 | 2026-03-14 | [08-auth-screens](specs/08-auth-screens/spec.md) | Rebuild welcome/credentials/verifying/setup/success — NativeWind tokens, springBouncy entrances, no StyleSheet — **Complete** |
