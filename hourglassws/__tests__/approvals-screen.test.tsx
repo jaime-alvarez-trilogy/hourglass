@@ -199,9 +199,14 @@ describe('FR1: Approvals screen — NativeWind layout (source analysis)', () => 
   });
 
   it('FR1 — no hardcoded hex color values in source (comments stripped)', () => {
-    // Allow rgba() and tintColor string literals — only block #RRGGBB patterns
-    const codeWithoutStrings = code.replace(/'rgba\([^']*\)'/g, '').replace(/"rgba\([^"]*\)"/g, '');
-    expect(codeWithoutStrings).not.toMatch(/#[0-9A-Fa-f]{3,8}\b/);
+    // Allowed exceptions (React Native props, not style values):
+    //   tintColor="#10B981" on RefreshControl (success token hex, no NativeWind equivalent)
+    //   ActivityIndicator color="#fff" (white on colored background)
+    const withoutAllowed = code
+      .replace(/tintColor\s*=\s*["'][^"']*["']/g, '')
+      .replace(/color\s*=\s*["']#fff["']/g, '')
+      .replace(/rgba\([^)]+\)/g, '');
+    expect(withoutAllowed).not.toMatch(/#[0-9A-Fa-f]{3,8}\b/);
   });
 
   it('FR1 — source uses bg-background for screen container', () => {
