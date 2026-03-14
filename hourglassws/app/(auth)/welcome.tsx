@@ -1,29 +1,48 @@
 // FR2: Welcome screen — splash + Get Started CTA
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useEffect } from 'react';
+import { View, Text, TouchableOpacity } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { springBouncy } from '@/src/lib/reanimated-presets';
 
 export default function WelcomeScreen() {
   const router = useRouter();
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Hourglass</Text>
-        <Text style={styles.subtitle}>Crossover Time Tracker</Text>
-      </View>
+  // Panel entrance: slide up from 40px + fade in
+  const translateY = useSharedValue(40);
+  const opacity = useSharedValue(0);
 
-      <TouchableOpacity style={styles.cta} onPress={() => router.push('/(auth)/credentials')}>
-        <Text style={styles.ctaText}>Get Started</Text>
-      </TouchableOpacity>
-    </View>
+  useEffect(() => {
+    translateY.value = withSpring(0, springBouncy);
+    opacity.value = withSpring(1, springBouncy);
+  }, []);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <SafeAreaView className="flex-1 bg-background">
+      <View className="flex-1 px-4 justify-between py-8">
+        {/* Hero panel — animated entrance */}
+        <Animated.View style={animStyle} className="flex-1 items-center justify-center gap-4">
+          <Text className="font-display-bold text-4xl text-textPrimary">Hourglass</Text>
+          <Text className="font-body text-base text-textSecondary text-center">
+            Crossover Time Tracker
+          </Text>
+        </Animated.View>
+
+        {/* CTA */}
+        <TouchableOpacity
+          className="bg-gold rounded-xl py-4 px-8 items-center mb-4"
+          onPress={() => router.push('/(auth)/credentials')}
+          activeOpacity={0.85}
+        >
+          <Text className="font-sans-semibold text-base text-background">Get Started</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D1117', justifyContent: 'space-between', padding: 32 },
-  header: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 36, fontWeight: '700', color: '#FFFFFF' },
-  subtitle: { fontSize: 16, color: '#8B949E', marginTop: 8 },
-  cta: { backgroundColor: '#00FF88', borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginBottom: 16 },
-  ctaText: { fontSize: 17, fontWeight: '700', color: '#0D1117' },
-});
