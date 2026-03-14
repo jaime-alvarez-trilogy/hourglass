@@ -1,6 +1,10 @@
 // FR7, FR8 (04-ai-brainlift): useAIData hook
 // Reads AI cache from AsyncStorage (instant display), background-fetches stale days,
 // aggregates weekly AI% and BrainLift metrics.
+//
+// FR4 (06-ai-tab): Extended to cache previousWeekAIPercent in AsyncStorage.
+// On mount, reads previous week's AI% for the delta badge.
+// On each successful fetch on Monday, writes the midpoint AI% as the new previous week value.
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -22,6 +26,9 @@ import type { TagData, AIWeekData } from '../lib/ai';
 type AIRawCache = Record<string, TagData | string>;
 
 const CACHE_KEY = 'ai_cache';
+
+/** AsyncStorage key for week-over-week AI% comparison (FR4 06-ai-tab). */
+const PREV_WEEK_KEY = 'previousWeekAIPercent';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -83,6 +90,8 @@ export interface UseAIDataResult {
   lastFetchedAt: string | null;
   error: string | null;
   refetch: () => void;
+  /** Cached AI% from the previous week — used for delta badge. undefined if not yet cached. */
+  previousWeekPercent?: number;
 }
 
 export function useAIData(): UseAIDataResult {
@@ -91,7 +100,20 @@ export function useAIData(): UseAIDataResult {
   const [isLoading, setIsLoading] = useState(false);
   const [lastFetchedAt, setLastFetchedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [previousWeekPercent, setPreviousWeekPercent] = useState<number | undefined>(undefined);
   const isFetchingRef = useRef(false);
+
+  // FR4 (06-ai-tab): Load cached previous week AI% on mount for delta badge.
+  // Silently ignores AsyncStorage failures — badge simply stays hidden.
+  useEffect(() => {
+    AsyncStorage.getItem(PREV_WEEK_KEY)
+      .then((val) => {
+        if (val !== null) {
+          setPreviousWeekPercent(Number(val));
+        }
+      })
+      .catch(() => {}); // silent failure
+  }, []);
 
   const fetchData = useCallback(async (forceRefetchToday = false) => {
     if (!config) return;
@@ -176,6 +198,15 @@ export function useAIData(): UseAIDataResult {
       setData(freshData);
       setLastFetchedAt(newLastFetchedAt);
       setIsLoading(false);
+
+      // FR4 (06-ai-tab): On Monday, persist current week's midpoint AI% as the
+      // previous week value so next week's delta badge has a reference point.
+      const isMonday = new Date().getDay() === 1;
+      if (isMonday) {
+        const midpoint = (freshData.aiPctLow + freshData.aiPctHigh) / 2;
+        AsyncStorage.setItem(PREV_WEEK_KEY, String(midpoint)).catch(() => {});
+        setPreviousWeekPercent(midpoint);
+      }
     } catch (err) {
       setIsLoading(false);
       if (err instanceof AuthError) {
@@ -204,5 +235,5 @@ export function useAIData(): UseAIDataResult {
     void fetchData(true);
   }, [fetchData]);
 
-  return { data, isLoading, lastFetchedAt, error, refetch };
+  return { data, isLoading, lastFetchedAt, error, refetch, previousWeekPercent };
 }
