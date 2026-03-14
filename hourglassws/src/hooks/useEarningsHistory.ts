@@ -1,19 +1,16 @@
 /**
  * useEarningsHistory — persistent 12-week earnings trend
  *
- * Strategy:
- *   1. On mount, load AsyncStorage cache → render immediately (instant display)
- *   2. If cache is missing or stale (current week entry >1h old), fetch from API
- *   3. Merge API response into cache:
- *        - Past weeks are finalized — once stored they're kept forever
- *        - Current week overwrites the cached value (payments trickle in through the week)
- *   4. Save merged cache back to AsyncStorage
+ * Fetch: TanStack Query (proven, handles retry/dedup/stale).
+ * Cache: AsyncStorage — loads on mount for instant display, saves on success.
  *
- * Returns number[] of length NUM_WEEKS, oldest first. Missing weeks = 0.
+ * Past weeks are finalized so they're stored permanently.
+ * Current week re-fetches when TanStack considers it stale (1h staleTime).
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useQuery } from '@tanstack/react-query';
 import { useConfig } from './useConfig';
 import { loadCredentials } from '../store/config';
 import { getAuthToken, apiGet } from '../api/client';
@@ -22,19 +19,7 @@ import type { Payment } from '../lib/payments';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CACHE_KEY = 'earnings_history_v1';
-const NUM_WEEKS = 12;
-const CURRENT_WEEK_STALE_MS = 60 * 60 * 1000; // 1 hour
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface EarningsHistoryCache {
-  /** weekFrom (YYYY-MM-DD) → earnings amount for that week */
-  weeks: Record<string, number>;
-  /** ISO timestamp of last API fetch */
-  lastFetchedAt: string;
-  /** weekFrom of the current week at time of last fetch (used to detect week rollover) */
-  currentWeekFrom: string;
-}
+export const EARNINGS_HISTORY_WEEKS = 12;
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -62,126 +47,116 @@ function getCurrentUTCSunday(): string {
   return new Date(ms).toISOString().slice(0, 10);
 }
 
-/** Build a sorted array of NUM_WEEKS Monday dates (oldest first). */
-function buildWeekKeys(): string[] {
+/** Sorted list of Monday dates for the last N weeks, oldest first. */
+function buildWeekKeys(numWeeks: number): string[] {
   const keys: string[] = [];
-  for (let i = NUM_WEEKS - 1; i >= 0; i--) {
+  for (let i = numWeeks - 1; i >= 0; i--) {
     keys.push(getUTCMondayNWeeksAgo(i));
   }
   return keys;
 }
 
-/** Convert a week map into a number[] of length NUM_WEEKS (oldest first). */
-function mapToTrend(weeks: Record<string, number>): number[] {
-  return buildWeekKeys().map(k => weeks[k] ?? 0);
+/** Convert a week→amount map into a number[] of length numWeeks (oldest first). */
+function mapToTrend(weeks: Record<string, number>, numWeeks: number): number[] {
+  return buildWeekKeys(numWeeks).map(k => weeks[k] ?? 0);
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export interface UseEarningsHistoryResult {
-  /** Weekly earnings, oldest first, length = NUM_WEEKS. Missing weeks = 0. */
   trend: number[];
   isLoading: boolean;
 }
 
-export function useEarningsHistory(): UseEarningsHistoryResult {
+export function useEarningsHistory(
+  numWeeks: number = EARNINGS_HISTORY_WEEKS,
+): UseEarningsHistoryResult {
   const { config } = useConfig();
-  const [trend, setTrend] = useState<number[]>(new Array(NUM_WEEKS).fill(0));
-  const [isLoading, setIsLoading] = useState(true);
-  const isFetchingRef = useRef(false);
 
-  const refresh = useCallback(async (cachedWeeks: Record<string, number>) => {
-    if (!config || isFetchingRef.current) return;
-    isFetchingRef.current = true;
+  // Persisted trend loaded from AsyncStorage (instant display on mount)
+  const [persistedTrend, setPersistedTrend] = useState<number[] | null>(null);
 
-    try {
-      const creds = await loadCredentials();
-      if (!creds) return;
-      const token = await getAuthToken(creds.username, creds.password, config.useQA);
-
-      const from = getUTCMondayNWeeksAgo(NUM_WEEKS - 1);
-      const to = getCurrentUTCSunday();
-
-      const result = await apiGet<Payment[]>(
-        '/api/v3/users/current/payments',
-        { from, to },
-        token,
-        config.useQA,
-      );
-
-      if (!Array.isArray(result)) return;
-
-      // Merge: API data wins for all returned weeks (current week may have updated)
-      const merged = { ...cachedWeeks };
-      for (const p of result) {
-        // Normalize from date to YYYY-MM-DD (API may return ISO datetime)
-        const weekFrom = p.from.slice(0, 10);
-        merged[weekFrom] = (merged[weekFrom] ?? 0) + p.amount;
-      }
-
-      const newTrend = mapToTrend(merged);
-      setTrend(newTrend);
-
-      const newCache: EarningsHistoryCache = {
-        weeks: merged,
-        lastFetchedAt: new Date().toISOString(),
-        currentWeekFrom: getUTCMondayNWeeksAgo(0),
-      };
-      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(newCache));
-    } catch {
-      // Non-fatal — sparkline keeps showing cached data
-    } finally {
-      isFetchingRef.current = false;
-      setIsLoading(false);
-    }
-  }, [config]);
-
+  // Load AsyncStorage cache on mount
   useEffect(() => {
-    if (!config) return;
-
-    let cancelled = false;
-
-    async function load() {
-      // Step 1: load cache instantly
-      let cachedWeeks: Record<string, number> = {};
-      let needsFetch = true;
-
-      try {
-        const raw = await AsyncStorage.getItem(CACHE_KEY);
-        if (raw) {
-          const cache = JSON.parse(raw) as EarningsHistoryCache;
-          cachedWeeks = cache.weeks ?? {};
-
-          const currentWeekFrom = getUTCMondayNWeeksAgo(0);
-          const lastFetched = new Date(cache.lastFetchedAt).getTime();
-          const age = Date.now() - lastFetched;
-
-          // Only re-fetch if: cache is old (>1h) OR we've rolled into a new week
-          needsFetch = age > CURRENT_WEEK_STALE_MS || cache.currentWeekFrom !== currentWeekFrom;
+    AsyncStorage.getItem(CACHE_KEY)
+      .then(raw => {
+        if (!raw) return;
+        try {
+          const cached = JSON.parse(raw) as Record<string, number>;
+          setPersistedTrend(mapToTrend(cached, numWeeks));
+        } catch {
+          // corrupt cache — ignore
         }
+      })
+      .catch(() => {});
+  }, []);
+
+  const from = getUTCMondayNWeeksAgo(numWeeks - 1);
+  const to = getCurrentUTCSunday();
+
+  // TanStack Query — same proven pattern as usePaymentHistory
+  const { data: payments, isLoading } = useQuery<Payment[] | null, Error>({
+    queryKey: ['earningsHistory', from, to, config?.userId],
+    queryFn: async () => {
+      if (!config) return null;
+      const creds = await loadCredentials();
+      if (!creds) throw new Error('No credentials');
+      const token = await getAuthToken(creds.username, creds.password, config.useQA);
+      try {
+        const result = await apiGet<Payment[]>(
+          '/api/v3/users/current/payments',
+          { from, to },
+          token,
+          config.useQA,
+        );
+        if (Array.isArray(result)) return result;
       } catch {
-        needsFetch = true;
+        // Non-fatal — use persisted cache
       }
+      return null;
+    },
+    enabled: !!config,
+    staleTime: 60 * 60 * 1000, // 1 hour
+    retry: 1,
+  });
 
-      if (cancelled) return;
+  // Merge API response into persistent cache and save
+  useEffect(() => {
+    if (!payments) return;
 
-      // Show cached data immediately
-      if (Object.keys(cachedWeeks).length > 0) {
-        setTrend(mapToTrend(cachedWeeks));
-        setIsLoading(false);
-      }
-
-      // Step 2: refresh from API if needed
-      if (needsFetch) {
-        await refresh(cachedWeeks);
-      } else {
-        setIsLoading(false);
-      }
+    // Build week map from API response
+    const weeks: Record<string, number> = {};
+    for (const p of payments) {
+      const weekFrom = p.from.slice(0, 10); // normalize ISO datetime → YYYY-MM-DD
+      weeks[weekFrom] = (weeks[weekFrom] ?? 0) + p.amount;
     }
 
-    void load();
-    return () => { cancelled = true; };
-  }, [config?.userId]);
+    // Merge with existing persisted data (keep weeks not in this API response)
+    AsyncStorage.getItem(CACHE_KEY)
+      .then(raw => {
+        const existing: Record<string, number> = raw ? JSON.parse(raw) : {};
+        const merged = { ...existing, ...weeks }; // API data wins for overlapping weeks
+        setPersistedTrend(mapToTrend(merged, numWeeks));
+        return AsyncStorage.setItem(CACHE_KEY, JSON.stringify(merged));
+      })
+      .catch(() => {
+        // If read fails, just use the API data directly
+        setPersistedTrend(mapToTrend(weeks, numWeeks));
+      });
+  }, [payments]);
 
-  return { trend, isLoading };
+  // Prefer live API data; fall back to persisted cache while loading
+  const trend: number[] = (() => {
+    if (payments) {
+      // Use persistedTrend which was just updated from merged payments
+      return persistedTrend ?? mapToTrend({}, numWeeks);
+    }
+    if (persistedTrend) return persistedTrend;
+    return new Array(numWeeks).fill(0);
+  })();
+
+  return {
+    trend,
+    isLoading: isLoading && !persistedTrend,
+  };
 }
