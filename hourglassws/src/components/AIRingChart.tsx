@@ -19,8 +19,8 @@
 
 import React, { useEffect } from 'react';
 import { View } from 'react-native';
-import { Canvas, Path, useDerivedValue } from '@shopify/react-native-skia';
-import { useSharedValue, withTiming } from 'react-native-reanimated';
+import { Canvas, Path } from '@shopify/react-native-skia';
+import { useSharedValue, withTiming, useDerivedValue } from 'react-native-reanimated';
 import { colors } from '@/src/lib/colors';
 import { timingChartFill } from '@/src/lib/reanimated-presets';
 

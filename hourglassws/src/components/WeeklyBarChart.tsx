@@ -17,11 +17,12 @@
  */
 
 import React, { useEffect } from 'react';
-import { Canvas, Rect, useDerivedValue } from '@shopify/react-native-skia';
+import { Canvas, Rect } from '@shopify/react-native-skia';
 import {
   useSharedValue,
   withTiming,
   withDelay,
+  useDerivedValue,
 } from 'react-native-reanimated';
 import { colors } from '@/src/lib/colors';
 import { timingChartFill } from '@/src/lib/reanimated-presets';

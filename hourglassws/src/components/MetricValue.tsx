@@ -6,20 +6,21 @@
 //   Use tabular-nums for all animated counters.
 //   Count-up uses timingChartFill — data settling on truth, not spring.
 //
-// Pattern: useSharedValue(0) → withTiming(value, timingChartFill) → useAnimatedProps
-//          on Animated.createAnimatedComponent(TextInput) with value prop.
+// New Architecture (Fabric) note:
+//   useAnimatedProps on TextInput.value does not work on Fabric (Reanimated v4).
+//   Instead: useSharedValue + withTiming drives the animation, then
+//   useAnimatedReaction + runOnJS bridges the UI-thread value to React state.
 // No StyleSheet.create — NativeWind className only.
 
-import React, { useEffect } from 'react';
-import { TextInput } from 'react-native';
-import Animated, {
+import React, { useEffect, useState, useCallback } from 'react';
+import { Text } from 'react-native';
+import {
   useSharedValue,
-  useAnimatedProps,
+  useAnimatedReaction,
   withTiming,
+  runOnJS,
 } from 'react-native-reanimated';
 import { timingChartFill } from '@/src/lib/reanimated-presets';
-
-const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
 interface MetricValueProps {
   /** Target numeric value — animates from 0 on mount */
@@ -36,36 +37,35 @@ interface MetricValueProps {
 
 export default function MetricValue({
   value,
-  unit,
+  unit = '',
   precision = 1,
   colorClass = 'text-textPrimary',
   sizeClass = 'text-4xl',
 }: MetricValueProps): JSX.Element {
   const displayValue = useSharedValue(0);
+  const [text, setText] = useState(`${(0).toFixed(precision)}${unit}`);
+
+  const updateText = useCallback((v: number) => {
+    setText(`${v.toFixed(precision)}${unit}`);
+  }, [precision, unit]);
 
   useEffect(() => {
     displayValue.value = withTiming(value, timingChartFill);
   }, [value]);
 
-  const animatedProps = useAnimatedProps(() => ({
-    value: `${displayValue.value.toFixed(precision)}${unit ?? ''}`,
-  } as any));
-
-  const inputClass = `font-display ${sizeClass} ${colorClass}`;
+  useAnimatedReaction(
+    () => displayValue.value,
+    (v) => {
+      runOnJS(updateText)(v);
+    },
+  );
 
   return (
-    <Animated.View style={{ animation: 'fadeIn 300ms ease-out' }}>
-      <AnimatedTextInput
-        className={inputClass}
-        // BRAND_GUIDELINES.md: use tabular-nums on all animated counters so numbers
-        // don't shift width as they change during the count-up animation.
-        style={{ fontVariant: ['tabular-nums'] }}
-        animatedProps={animatedProps}
-        editable={false}
-        caretHidden
-        selectTextOnFocus={false}
-        defaultValue={`${(0).toFixed(precision)}${unit ?? ''}`}
-      />
-    </Animated.View>
+    <Text
+      className={`font-display ${sizeClass} ${colorClass}`}
+      style={{ fontVariant: ['tabular-nums'] }}
+    >
+      {text}
+    </Text>
   );
 }
