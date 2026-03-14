@@ -110,7 +110,7 @@ export default function TrendSparkline({
   }, [data, width, height]);
 
   if (!hasData || width === 0 || height === 0) {
-    return <Canvas style={{ width, height }} />;
+    return null;
   }
 
   if (isSinglePoint) {

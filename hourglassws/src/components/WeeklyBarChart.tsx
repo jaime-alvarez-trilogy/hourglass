@@ -90,7 +90,7 @@ export default function WeeklyBarChart({
   height,
 }: WeeklyBarChartProps) {
   if (data.length === 0 || width === 0 || height === 0) {
-    return <Canvas style={{ width, height }} />;
+    return null;
   }
 
   const resolvedMax =
