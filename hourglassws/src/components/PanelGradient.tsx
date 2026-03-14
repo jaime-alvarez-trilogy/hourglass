@@ -15,9 +15,14 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
+  withSequence,
+  withTiming,
 } from 'react-native-reanimated';
 import { springPremium } from '@/src/lib/reanimated-presets';
 import type { PanelState } from '@/src/lib/panelState';
+
+// Extracted constant to avoid inline style object recreation on every render.
+const GRADIENT_FILL_STYLE = { flex: 1 } as const;
 
 export const PANEL_GRADIENTS: Record<
   PanelState,
@@ -71,7 +76,16 @@ export default function PanelGradient({
   const opacity = useSharedValue(0);
 
   useEffect(() => {
-    opacity.value = withSpring(1, springPremium);
+    // On mount: fade in from 0 → 1 with springPremium (entrance animation).
+    // On state change: brief dip to 0.75 → back to 1 so the gradient swap is visible.
+    if (opacity.value === 0) {
+      opacity.value = withSpring(1, springPremium);
+    } else {
+      opacity.value = withSequence(
+        withTiming(0.75, { duration: 120 }),
+        withSpring(1, springPremium),
+      );
+    }
   }, [state]);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -88,7 +102,7 @@ export default function PanelGradient({
         colors={gradient.colors as any}
         start={gradient.start as any}
         end={gradient.end as any}
-        style={{ flex: 1 }}
+        style={GRADIENT_FILL_STYLE}
       >
         {children}
       </LinearGradient>

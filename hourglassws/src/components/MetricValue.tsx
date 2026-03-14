@@ -57,6 +57,9 @@ export default function MetricValue({
     <Animated.View style={{ animation: 'fadeIn 300ms ease-out' }}>
       <AnimatedTextInput
         className={inputClass}
+        // BRAND_GUIDELINES.md: use tabular-nums on all animated counters so numbers
+        // don't shift width as they change during the count-up animation.
+        style={{ fontVariant: ['tabular-nums'] }}
         animatedProps={animatedProps}
         editable={false}
         caretHidden
