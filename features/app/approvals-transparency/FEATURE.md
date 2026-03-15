@@ -15,10 +15,17 @@
 ## Files Touched
 
 ### Hooks
-- `src/hooks/useMyRequests.ts` (new)
+- `src/hooks/useMyRequests.ts` (new — created in 01-my-requests-data)
 
 ### Types
-- `src/types/requests.ts` (new)
+- `src/types/requests.ts` (new — created in 01-my-requests-data)
+
+### Lib
+- `src/lib/requestsUtils.ts` (new — extractRejectionReason + groupSlotsIntoEntries)
+
+### Tests
+- `src/lib/__tests__/requestsUtils.test.ts` (new)
+- `src/hooks/__tests__/useMyRequests.test.ts` (new)
 
 ### Screens
 - `app/(tabs)/approvals.tsx` (modify — role-aware view)
@@ -111,5 +118,5 @@ approvals.tsx
 
 | Date | Spec | Description |
 |------|------|-------------|
-| 2026-03-15 | [01-my-requests-data](specs/01-my-requests-data/spec.md) | useMyRequests hook + ManualRequestEntry types |
+| 2026-03-15 | [01-my-requests-data](specs/01-my-requests-data/spec.md) | useMyRequests hook + ManualRequestEntry types — **Complete** |
 | 2026-03-15 | [02-approvals-tab-redesign](specs/02-approvals-tab-redesign/spec-research.md) | Role-aware tab UI, always-visible, contributor + manager views |
