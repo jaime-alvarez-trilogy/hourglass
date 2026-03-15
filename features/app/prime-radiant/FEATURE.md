@@ -146,5 +146,5 @@ lower(end) = aiSlots / (taggedSlots + slotsRemaining)                      // no
 | Date | Spec | Description |
 |------|------|-------------|
 | 2026-03-15 | [01-cone-math](specs/01-cone-math/spec.md) | computeAICone() function, types, unit tests — **Complete** |
-| 2026-03-15 | [02-cone-chart](specs/02-cone-chart/spec.md) | AIConeChart Skia component, full + compact variants, animation |
+| 2026-03-15 | [02-cone-chart](specs/02-cone-chart/spec.md) | AIConeChart Skia component, full + compact variants, animation — **Complete** |
 | 2026-03-15 | [03-ai-tab-integration](specs/03-ai-tab-integration/spec-research.md) | Wire AIConeChart into AI tab + home tab compact card |
