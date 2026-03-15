@@ -25,6 +25,7 @@ jest.mock('../../api/workDiary', () => ({
 
 import { loadConfig, loadCredentials } from '../../store/config';
 import { fetchWorkDiary } from '../../api/workDiary';
+import { AuthError, NetworkError } from '../../api/errors';
 
 const mockLoadConfig = loadConfig as jest.MockedFunction<typeof loadConfig>;
 const mockLoadCredentials = loadCredentials as jest.MockedFunction<typeof loadCredentials>;
@@ -253,16 +254,12 @@ describe('useMyRequests — buildMyRequestsQueryFn (query logic)', () => {
       mockLoadConfig.mockResolvedValue(CONFIG as any);
       mockLoadCredentials.mockResolvedValue(CREDENTIALS);
 
-      const authErr = new Error('Unauthorized') as any;
-      authErr.status = 401;
-      authErr.isAuthError = true;
-      mockFetchWorkDiary.mockRejectedValue(authErr);
+      mockFetchWorkDiary.mockRejectedValue(new AuthError(401));
 
-      // Simulate all days failing with auth error
-      const queryFn = buildMyRequestsQueryFn('2026-03-09'); // Monday only
+      // Monday only — all days fail → auth error bubbles up
+      const queryFn = buildMyRequestsQueryFn('2026-03-09');
       const result = await queryFn();
 
-      // All days fail → auth error bubbles up
       expect(result.error).toBe('auth');
       expect(result.entries).toEqual([]);
     });
@@ -271,9 +268,7 @@ describe('useMyRequests — buildMyRequestsQueryFn (query logic)', () => {
       mockLoadConfig.mockResolvedValue(CONFIG as any);
       mockLoadCredentials.mockResolvedValue(CREDENTIALS);
 
-      const netErr = new Error('Network failed') as any;
-      netErr.isNetworkError = true;
-      mockFetchWorkDiary.mockRejectedValue(netErr);
+      mockFetchWorkDiary.mockRejectedValue(new NetworkError('Connection refused'));
 
       const queryFn = buildMyRequestsQueryFn('2026-03-09'); // Monday only
       const result = await queryFn();
