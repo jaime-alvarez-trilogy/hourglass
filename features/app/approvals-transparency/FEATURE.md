@@ -26,12 +26,18 @@
 ### Tests
 - `src/lib/__tests__/requestsUtils.test.ts` (new)
 - `src/hooks/__tests__/useMyRequests.test.ts` (new)
+- `src/components/__tests__/MyRequestCard.test.tsx` (new — created in 02-approvals-tab-redesign)
+- `app/(tabs)/__tests__/approvals.test.tsx` (new — created in 02-approvals-tab-redesign)
+- `app/(tabs)/__tests__/layout.test.tsx` (new — created in 02-approvals-tab-redesign)
+
+### Components
+- `src/components/MyRequestCard.tsx` (new — created in 02-approvals-tab-redesign)
 
 ### Screens
-- `app/(tabs)/approvals.tsx` (modify — role-aware view)
+- `app/(tabs)/approvals.tsx` (modify — role-aware view, complete in 02-approvals-tab-redesign)
 
 ### Navigation
-- `app/(tabs)/_layout.tsx` (modify — show tab for all users)
+- `app/(tabs)/_layout.tsx` (modify — show tab for all users, complete in 02-approvals-tab-redesign)
 
 ## Table of Contents
 
@@ -119,4 +125,4 @@ approvals.tsx
 | Date | Spec | Description |
 |------|------|-------------|
 | 2026-03-15 | [01-my-requests-data](specs/01-my-requests-data/spec.md) | useMyRequests hook + ManualRequestEntry types — **Complete** |
-| 2026-03-15 | [02-approvals-tab-redesign](specs/02-approvals-tab-redesign/spec.md) | Role-aware tab UI, always-visible, contributor + manager views |
+| 2026-03-15 | [02-approvals-tab-redesign](specs/02-approvals-tab-redesign/spec.md) | Role-aware tab UI, always-visible, contributor + manager views — **Complete** |
