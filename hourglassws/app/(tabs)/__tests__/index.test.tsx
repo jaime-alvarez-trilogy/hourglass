@@ -370,8 +370,8 @@ describe('HoursDashboard — FR4 (01-overtime-display): source structure', () =>
     expect(source).toMatch(/overtime\s*:\s*['"]OVERTIME['"]/);
   });
 
-  it('FR4.2 — STATE_COLORS includes overtime key', () => {
-    expect(source).toMatch(/overtime\s*:\s*['"]text-\[#FFF8E7\]['"]/);
+  it('FR4.2 — STATE_COLORS includes overtime key with overtimeWhiteGold color token', () => {
+    expect(source).toMatch(/overtime\s*:\s*['"]text-overtimeWhiteGold['"]/);
   });
 
   it('FR4.3 — source has conditional branch for panelState === overtime', () => {

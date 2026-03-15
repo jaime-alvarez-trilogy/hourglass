@@ -110,7 +110,10 @@ describe('TrendSparkline — FR3: Cap Label', () => {
 
   it('SC3.7 — cap label font size is 10sp (matching AIConeChart axis label pattern)', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    expect(source).toMatch(/fontSize\s*:\s*10/);
+    // Either literal `fontSize: 10` or a constant `CAP_LABEL_FONT_SIZE = 10` with `fontSize: CAP_LABEL_FONT_SIZE`
+    const hasLiteralFontSize = /fontSize\s*:\s*10/.test(source);
+    const hasConstantTen = /CAP_LABEL_FONT_SIZE\s*=\s*10/.test(source);
+    expect(hasLiteralFontSize || hasConstantTen).toBe(true);
   });
 
   it('SC3.8 — capLabel without showGuide: component renders without crash', () => {

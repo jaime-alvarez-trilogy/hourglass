@@ -160,8 +160,11 @@ describe('WeeklyBarChart — FR1: Watermark Label', () => {
 
   it('SC1.10 — font size is in 48-56sp range for watermark texture effect', () => {
     const source = fs.readFileSync(BAR_CHART_FILE, 'utf8');
-    // matchFont with fontSize 48-56
-    expect(source).toMatch(/fontSize\s*:\s*(4[89]|5[0-6])/);
+    // matchFont with fontSize 48-56 — may be a literal or a constant declaration
+    // Either `fontSize: 52` or `WATERMARK_FONT_SIZE = 52` with `fontSize: WATERMARK_FONT_SIZE`
+    const hasLiteralFontSize = /fontSize\s*:\s*(4[89]|5[0-6])/.test(source);
+    const hasConstantInRange = /WATERMARK_FONT_SIZE\s*=\s*(4[89]|5[0-6])/.test(source);
+    expect(hasLiteralFontSize || hasConstantInRange).toBe(true);
   });
 
   it('SC1.11 — component renders successfully with watermarkLabel provided', () => {
