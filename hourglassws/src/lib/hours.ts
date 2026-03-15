@@ -1,5 +1,6 @@
 // FR1: Business logic — calculateHours, date utilities
 // Pure functions with no side effects. Fully testable.
+// getWeekLabels added for 07-overview-sync FR2.
 
 export type UrgencyLevel = 'none' | 'low' | 'high' | 'critical' | 'expired';
 
@@ -253,3 +254,5 @@ export function calculateHours(
     deadline,
   };
 }
+
+// getWeekLabels is defined above (added by 05-earnings-scrub, reused by 07-overview-sync)
