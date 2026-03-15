@@ -539,7 +539,7 @@ const legendStyles = StyleSheet.create({
   },
   label: {
     fontSize: 10,
-    color: '#6B7280', // textMuted equivalent — avoid colors import cycle
+    color: colors.textMuted,
   },
 });
 
