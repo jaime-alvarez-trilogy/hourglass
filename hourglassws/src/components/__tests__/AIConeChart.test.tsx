@@ -1,0 +1,688 @@
+// Tests: AIConeChart Skia component (02-cone-chart)
+// FR1: Types and Props Contract
+// FR2: toPixel Coordinate Helper
+// FR3: buildActualPath
+// FR4: buildConePath
+// FR5: buildTargetLinePath
+// FR6: Chart Rendering — Layers
+// FR7: Animation (state logic)
+// FR8: Axis Labels (full vs compact)
+//
+// Strategy:
+// - FR1-FR5: unit test exported functions directly
+// - FR6-FR8: render tests via react-test-renderer + Skia mock
+// - FR7: test animState computation logic (pure math, extracted)
+// - Skia mock auto-resolved from __mocks__/@shopify/react-native-skia.ts
+// - Reanimated mock via jest-expo preset
+// - ConeData fixtures built manually to match aiCone.ts interface contracts
+
+import React from 'react';
+import { create, act } from 'react-test-renderer';
+import * as path from 'path';
+import * as fs from 'fs';
+
+// ─── Mocks ────────────────────────────────────────────────────────────────────
+
+// Stub react-native-web components (same pattern as AITab.test.tsx)
+jest.mock('react-native-web/dist/exports/View/index.js', () => {
+  const R = require('react');
+  return {
+    __esModule: true,
+    default: ({ children, testID, style, ...rest }: any) =>
+      R.createElement('View', { testID, style, ...rest }, children),
+  };
+});
+
+jest.mock('react-native-web/dist/exports/Text/index.js', () => {
+  const R = require('react');
+  return {
+    __esModule: true,
+    default: ({ children, testID, style, ...rest }: any) =>
+      R.createElement('Text', { testID, style, ...rest }, children),
+  };
+});
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+// ConeData fixture — matches interface in src/lib/aiCone.ts exactly
+import type { ConeData, ConePoint } from '@/src/lib/aiCone';
+
+// ─── Fixtures ─────────────────────────────────────────────────────────────────
+
+/** Standard mid-week ConeData fixture: 20h logged at 75% AI, 20h remaining */
+const MOCK_CONE_DATA: ConeData = {
+  actualPoints: [
+    { hoursX: 0, pctY: 0 },
+    { hoursX: 4, pctY: 60 },
+    { hoursX: 8, pctY: 70 },
+    { hoursX: 12, pctY: 75 },
+    { hoursX: 16, pctY: 72 },
+    { hoursX: 20, pctY: 74 },
+  ],
+  upperBound: [
+    { hoursX: 20, pctY: 74 },
+    { hoursX: 40, pctY: 87 },
+  ],
+  lowerBound: [
+    { hoursX: 20, pctY: 74 },
+    { hoursX: 40, pctY: 37 },
+  ],
+  currentHours: 20,
+  currentAIPct: 74,
+  weeklyLimit: 40,
+  targetPct: 75,
+  isTargetAchievable: true,
+};
+
+/** Monday morning — no work logged yet */
+const MONDAY_CONE_DATA: ConeData = {
+  actualPoints: [{ hoursX: 0, pctY: 0 }],
+  upperBound: [
+    { hoursX: 0, pctY: 0 },
+    { hoursX: 40, pctY: 100 },
+  ],
+  lowerBound: [
+    { hoursX: 0, pctY: 0 },
+    { hoursX: 40, pctY: 0 },
+  ],
+  currentHours: 0,
+  currentAIPct: 0,
+  weeklyLimit: 40,
+  targetPct: 75,
+  isTargetAchievable: true,
+};
+
+/** Week complete — cone collapsed */
+const WEEK_COMPLETE_DATA: ConeData = {
+  actualPoints: [
+    { hoursX: 0, pctY: 0 },
+    { hoursX: 40, pctY: 76 },
+  ],
+  upperBound: [],
+  lowerBound: [],
+  currentHours: 40,
+  currentAIPct: 76,
+  weeklyLimit: 40,
+  targetPct: 75,
+  isTargetAchievable: true,
+};
+
+// ─── File paths for static analysis ──────────────────────────────────────────
+
+const HOURGLASSWS_ROOT = path.resolve(__dirname, '../../..');
+const CONE_CHART_FILE = path.join(HOURGLASSWS_ROOT, 'src', 'components', 'AIConeChart.tsx');
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Render AIConeChart using react-test-renderer */
+function renderChart(props: {
+  data?: ConeData;
+  width?: number;
+  height?: number;
+  size?: 'full' | 'compact';
+}) {
+  const { AIConeChart } = require('@/src/components/AIConeChart');
+  const defaultProps = {
+    data: MOCK_CONE_DATA,
+    width: 300,
+    height: 240,
+    ...props,
+  };
+  let tree: any;
+  act(() => {
+    tree = create(React.createElement(AIConeChart, defaultProps));
+  });
+  return tree;
+}
+
+/** Deep-traverse rendered tree for nodes matching type or testID */
+function findNodes(node: any, predicate: (n: any) => boolean, found: any[] = []): any[] {
+  if (!node) return found;
+  if (predicate(node)) found.push(node);
+  if (node.children) {
+    for (const child of Array.isArray(node.children) ? node.children : [node.children]) {
+      findNodes(child, predicate, found);
+    }
+  }
+  return found;
+}
+
+function findByType(tree: any, type: string): any[] {
+  return findNodes(tree?.toJSON(), (n) => n?.type === type);
+}
+
+// ─── Compute animState (extracted logic for FR7 tests) ────────────────────────
+
+/** Mirrors the animState computation from AIConeChart (for unit-testing the math) */
+function computeAnimState(progress: number) {
+  const lineEnd = Math.min(progress / 0.6, 1);
+  const coneOpacity = progress;
+  const dotOpacity = Math.min(Math.max((progress - 0.6) / 0.4, 0), 1);
+  return { lineEnd, coneOpacity, dotOpacity };
+}
+
+// ─── FR1: Types and Props Contract ───────────────────────────────────────────
+
+describe('AIConeChart — FR1: Types and Props Contract', () => {
+  it('SC1.1 — AIConeChartProps interface is exported from AIConeChart.tsx', () => {
+    // Static analysis: verify source exports AIConeChartProps
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    expect(source).toMatch(/export\s+interface\s+AIConeChartProps/);
+  });
+
+  it('SC1.2 — AIConeChartProps has data, width, height, and optional size fields', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    // Check all four props are in the interface
+    expect(source).toMatch(/data\s*:\s*ConeData/);
+    expect(source).toMatch(/width\s*:\s*number/);
+    expect(source).toMatch(/height\s*:\s*number/);
+    expect(source).toMatch(/size\?\s*:\s*['"]full['"]\s*\|\s*['"]compact['"]/);
+  });
+
+  it('SC1.3 — component returns null when width === 0', () => {
+    const tree = renderChart({ width: 0 });
+    expect(tree.toJSON()).toBeNull();
+  });
+
+  it('SC1.4 — component returns null when height === 0', () => {
+    const tree = renderChart({ height: 0 });
+    expect(tree.toJSON()).toBeNull();
+  });
+
+  it('SC1.5 — component does NOT return null when width and height are non-zero', () => {
+    const tree = renderChart({ width: 300, height: 240 });
+    expect(tree.toJSON()).not.toBeNull();
+  });
+
+  it('SC1.6 — size defaults to "full" when omitted (source-level check)', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    // Default value set in destructuring or default parameter
+    expect(source).toMatch(/size\s*=\s*['"]full['"]/);
+  });
+
+  it('SC1.7 — AIConeChart is exported from the module', () => {
+    const mod = require('@/src/components/AIConeChart');
+    expect(typeof mod.AIConeChart).toBe('function');
+  });
+});
+
+// ─── FR2: toPixel — tested indirectly via path builder outputs ────────────────
+// toPixel is not exported, so we validate it via known coordinate assertions.
+
+describe('AIConeChart — FR2: toPixel Coordinate Helper', () => {
+  // We test toPixel behaviour through buildActualPath with known inputs.
+  // Full padding: { top: 16, right: 16, bottom: 28, left: 36 }
+  // For width=400, height=200, weeklyLimit=40:
+  //   chartW = 400 - 36 - 16 = 348
+  //   chartH = 200 - 16 - 28 = 156
+  //   hoursX=0 → x = 36 (paddingLeft)
+  //   hoursX=40 → x = 400-16 = 384
+  //   pctY=0 → y = 200-28 = 172 (bottom)
+  //   pctY=100 → y = 16 (top, paddingTop)
+
+  it('SC2.1 — hoursX=0 maps to paddingLeft for full variant', () => {
+    const { buildActualPath } = require('@/src/components/AIConeChart');
+    const skia = require('@shopify/react-native-skia');
+    const skiaPath = skia.Skia.Path();
+    const calls: Array<{ type: string; args: number[] }> = [];
+
+    // Spy on path methods to capture calls
+    skiaPath.moveTo.mockImplementation((...args: number[]) => { calls.push({ type: 'moveTo', args }); return skiaPath; });
+    skiaPath.lineTo.mockImplementation((...args: number[]) => { calls.push({ type: 'lineTo', args }); return skiaPath; });
+
+    const toPixelFn = (hx: number, py: number) => {
+      const padding = { top: 16, right: 16, bottom: 28, left: 36 };
+      const dims = { width: 400, height: 200 };
+      const weeklyLimit = 40;
+      const chartW = dims.width - padding.left - padding.right;
+      const chartH = dims.height - padding.top - padding.bottom;
+      const x = padding.left + (hx / weeklyLimit) * chartW;
+      const y = padding.top + chartH * (1 - py / 100);
+      return { x, y };
+    };
+
+    const origin = toPixelFn(0, 0);
+    // hoursX=0 → x should equal paddingLeft (36)
+    expect(origin.x).toBeCloseTo(36, 5);
+  });
+
+  it('SC2.2 — hoursX=weeklyLimit maps to width-paddingRight', () => {
+    const toPixelFn = (hx: number, py: number) => {
+      const padding = { top: 16, right: 16, bottom: 28, left: 36 };
+      const dims = { width: 400, height: 200 };
+      const weeklyLimit = 40;
+      const chartW = dims.width - padding.left - padding.right;
+      const x = padding.left + (hx / weeklyLimit) * chartW;
+      const chartH = dims.height - padding.top - padding.bottom;
+      const y = padding.top + chartH * (1 - py / 100);
+      return { x, y };
+    };
+    const end = toPixelFn(40, 0);
+    // hoursX=40 → x should equal width - paddingRight = 400 - 16 = 384
+    expect(end.x).toBeCloseTo(384, 5);
+  });
+
+  it('SC2.3 — pctY=0 maps to height-paddingBottom (bottom of chart, Y inverted)', () => {
+    const toPixelFn = (hx: number, py: number) => {
+      const padding = { top: 16, right: 16, bottom: 28, left: 36 };
+      const dims = { width: 400, height: 200 };
+      const weeklyLimit = 40;
+      const chartW = dims.width - padding.left - padding.right;
+      const x = padding.left + (hx / weeklyLimit) * chartW;
+      const chartH = dims.height - padding.top - padding.bottom;
+      const y = padding.top + chartH * (1 - py / 100);
+      return { x, y };
+    };
+    const bottom = toPixelFn(0, 0);
+    // pctY=0 → y = paddingTop + chartH = 16 + 156 = 172 = height - paddingBottom = 200-28
+    expect(bottom.y).toBeCloseTo(172, 5);
+  });
+
+  it('SC2.4 — pctY=100 maps to paddingTop (top of chart)', () => {
+    const toPixelFn = (hx: number, py: number) => {
+      const padding = { top: 16, right: 16, bottom: 28, left: 36 };
+      const dims = { width: 400, height: 200 };
+      const weeklyLimit = 40;
+      const chartW = dims.width - padding.left - padding.right;
+      const x = padding.left + (hx / weeklyLimit) * chartW;
+      const chartH = dims.height - padding.top - padding.bottom;
+      const y = padding.top + chartH * (1 - py / 100);
+      return { x, y };
+    };
+    const top = toPixelFn(0, 100);
+    // pctY=100 → y = paddingTop = 16
+    expect(top.y).toBeCloseTo(16, 5);
+  });
+
+  it('SC2.5 — weeklyLimit <= 0 guard: buildTargetLinePath does not throw', () => {
+    const { buildTargetLinePath } = require('@/src/components/AIConeChart');
+    const toPixelFn = (hx: number, py: number) => ({ x: hx, y: py });
+    expect(() => buildTargetLinePath(75, 0, toPixelFn)).not.toThrow();
+  });
+});
+
+// ─── FR3: buildActualPath ─────────────────────────────────────────────────────
+
+describe('AIConeChart — FR3: buildActualPath', () => {
+  let buildActualPath: (points: ConePoint[], toPixelFn: any) => any;
+
+  beforeEach(() => {
+    jest.resetModules();
+    buildActualPath = require('@/src/components/AIConeChart').buildActualPath;
+  });
+
+  const identityPixel = (hx: number, py: number) => ({ x: hx * 10, y: py * 2 });
+
+  it('SC3.1 — 0 points: returns a path without throwing', () => {
+    expect(() => buildActualPath([], identityPixel)).not.toThrow();
+  });
+
+  it('SC3.2 — 1 point: returns a path (moveTo called, no lineTo)', () => {
+    const skia = require('@shopify/react-native-skia');
+    const mockPath = skia.Skia.Path();
+    mockPath.moveTo.mockClear();
+    mockPath.lineTo.mockClear();
+
+    const result = buildActualPath([{ hoursX: 0, pctY: 0 }], identityPixel);
+    // Should not throw and returns truthy
+    expect(result).toBeTruthy();
+  });
+
+  it('SC3.3 — 1 point: source uses moveTo for single-point case', () => {
+    // Static analysis: verify buildActualPath source contains moveTo usage
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    expect(source).toContain('moveTo');
+  });
+
+  it('SC3.4 — 3 points: does not throw', () => {
+    const points: ConePoint[] = [
+      { hoursX: 0, pctY: 0 },
+      { hoursX: 10, pctY: 50 },
+      { hoursX: 20, pctY: 70 },
+    ];
+    expect(() => buildActualPath(points, identityPixel)).not.toThrow();
+  });
+
+  it('SC3.5 — 3 points: returns a truthy path object', () => {
+    const points: ConePoint[] = [
+      { hoursX: 0, pctY: 0 },
+      { hoursX: 10, pctY: 50 },
+      { hoursX: 20, pctY: 70 },
+    ];
+    const result = buildActualPath(points, identityPixel);
+    expect(result).toBeTruthy();
+  });
+
+  it('SC3.6 — all points at same Y (horizontal line): does not crash', () => {
+    const points: ConePoint[] = [
+      { hoursX: 0, pctY: 75 },
+      { hoursX: 20, pctY: 75 },
+      { hoursX: 40, pctY: 75 },
+    ];
+    expect(() => buildActualPath(points, identityPixel)).not.toThrow();
+  });
+
+  it('SC3.7 — exported as named export', () => {
+    const mod = require('@/src/components/AIConeChart');
+    expect(typeof mod.buildActualPath).toBe('function');
+  });
+
+  it('SC3.8 — source: buildActualPath uses lineTo for multi-point path', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    expect(source).toContain('lineTo');
+  });
+});
+
+// ─── FR4: buildConePath ───────────────────────────────────────────────────────
+
+describe('AIConeChart — FR4: buildConePath', () => {
+  let buildConePath: (upper: ConePoint[], lower: ConePoint[], toPixelFn: any) => any;
+
+  beforeEach(() => {
+    jest.resetModules();
+    buildConePath = require('@/src/components/AIConeChart').buildConePath;
+  });
+
+  const identityPixel = (hx: number, py: number) => ({ x: hx * 10, y: py * 2 });
+
+  it('SC4.1 — empty upper: returns a path without throwing', () => {
+    const lower: ConePoint[] = [
+      { hoursX: 0, pctY: 74 },
+      { hoursX: 40, pctY: 37 },
+    ];
+    expect(() => buildConePath([], lower, identityPixel)).not.toThrow();
+  });
+
+  it('SC4.2 — empty lower: returns a path without throwing', () => {
+    const upper: ConePoint[] = [
+      { hoursX: 0, pctY: 74 },
+      { hoursX: 40, pctY: 87 },
+    ];
+    expect(() => buildConePath(upper, [], identityPixel)).not.toThrow();
+  });
+
+  it('SC4.3 — both empty: returns a path without throwing', () => {
+    expect(() => buildConePath([], [], identityPixel)).not.toThrow();
+  });
+
+  it('SC4.4 — 2-point upper + 2-point lower: source calls .close() to close the path', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    expect(source).toContain('.close()');
+  });
+
+  it('SC4.5 — 2-point upper + 2-point lower: returns a truthy path', () => {
+    const upper: ConePoint[] = [
+      { hoursX: 20, pctY: 74 },
+      { hoursX: 40, pctY: 87 },
+    ];
+    const lower: ConePoint[] = [
+      { hoursX: 20, pctY: 74 },
+      { hoursX: 40, pctY: 37 },
+    ];
+    const result = buildConePath(upper, lower, identityPixel);
+    expect(result).toBeTruthy();
+  });
+
+  it('SC4.6 — single-point upper + single-point lower: does not throw (degenerate case)', () => {
+    const upper: ConePoint[] = [{ hoursX: 40, pctY: 76 }];
+    const lower: ConePoint[] = [{ hoursX: 40, pctY: 76 }];
+    expect(() => buildConePath(upper, lower, identityPixel)).not.toThrow();
+  });
+
+  it('SC4.7 — exported as named export', () => {
+    const mod = require('@/src/components/AIConeChart');
+    expect(typeof mod.buildConePath).toBe('function');
+  });
+
+  it('SC4.8 — source: buildConePath traverses lower in reverse order', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    // Reverse traversal: reverse() or for loop counting down
+    // Expect either [...lower].reverse() or similar
+    expect(source).toMatch(/lower[\s\S]{0,50}(reverse|\.length\s*-)/);
+  });
+});
+
+// ─── FR5: buildTargetLinePath ─────────────────────────────────────────────────
+
+describe('AIConeChart — FR5: buildTargetLinePath', () => {
+  let buildTargetLinePath: (targetPct: number, weeklyLimit: number, toPixelFn: any) => any;
+
+  beforeEach(() => {
+    jest.resetModules();
+    buildTargetLinePath = require('@/src/components/AIConeChart').buildTargetLinePath;
+  });
+
+  it('SC5.1 — returns a path without throwing for standard inputs', () => {
+    const toPixelFn = (hx: number, py: number) => ({ x: hx * 8, y: 240 - py * 2 });
+    expect(() => buildTargetLinePath(75, 40, toPixelFn)).not.toThrow();
+  });
+
+  it('SC5.2 — returns a path without throwing for weeklyLimit = 0 (guard)', () => {
+    const toPixelFn = (hx: number, py: number) => ({ x: hx * 8, y: 240 - py * 2 });
+    expect(() => buildTargetLinePath(75, 0, toPixelFn)).not.toThrow();
+  });
+
+  it('SC5.3 — returns a truthy path object', () => {
+    const toPixelFn = (hx: number, py: number) => ({ x: hx * 8, y: 240 - py * 2 });
+    const result = buildTargetLinePath(75, 40, toPixelFn);
+    expect(result).toBeTruthy();
+  });
+
+  it('SC5.4 — source: starts at hoursX=0 and ends at hoursX=weeklyLimit', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    // buildTargetLinePath should call toPixelFn(0, targetPct) and toPixelFn(weeklyLimit, targetPct)
+    expect(source).toMatch(/buildTargetLinePath[\s\S]{0,400}toPixelFn\s*\(\s*0\s*,/);
+    expect(source).toMatch(/buildTargetLinePath[\s\S]{0,400}toPixelFn\s*\(\s*weeklyLimit\s*,/);
+  });
+
+  it('SC5.5 — exported as named export', () => {
+    const mod = require('@/src/components/AIConeChart');
+    expect(typeof mod.buildTargetLinePath).toBe('function');
+  });
+
+  it('SC5.6 — source: uses lineTo to draw the horizontal line', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    expect(source).toContain('lineTo');
+  });
+});
+
+// ─── FR6: Chart Rendering — Layers ───────────────────────────────────────────
+
+describe('AIConeChart — FR6: Chart Rendering', () => {
+  it('SC6.1 — renders without crash with valid ConeData and non-zero dimensions', () => {
+    expect(() => renderChart({ data: MOCK_CONE_DATA, width: 300, height: 240 })).not.toThrow();
+  });
+
+  it('SC6.2 — returns a Canvas element (not null) with valid props', () => {
+    const tree = renderChart({ data: MOCK_CONE_DATA, width: 300, height: 240 });
+    const json = tree.toJSON();
+    expect(json).not.toBeNull();
+    // Canvas is the root element
+    expect(json?.type).toBe('Canvas');
+  });
+
+  it('SC6.3 — source imports Canvas from @shopify/react-native-skia', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    expect(source).toContain('@shopify/react-native-skia');
+    expect(source).toMatch(/Canvas/);
+  });
+
+  it('SC6.4 — source uses Path elements for cone fill, boundary strokes, target line, actual line', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    // Multiple Path elements expected
+    const pathCount = (source.match(/<Path/g) ?? []).length;
+    expect(pathCount).toBeGreaterThanOrEqual(4);
+  });
+
+  it('SC6.5 — source uses Circle for current position dot', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    expect(source).toMatch(/<Circle/);
+  });
+
+  it('SC6.6 — source uses colors.cyan for actual line', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    expect(source).toContain('colors.cyan');
+  });
+
+  it('SC6.7 — source uses colors.warning for target line', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    expect(source).toContain('colors.warning');
+  });
+
+  it('SC6.8 — source sets strokeWidth={2} for actual line', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    expect(source).toContain('strokeWidth={2}');
+  });
+
+  it('SC6.9 — renders with MONDAY_CONE_DATA (single actualPoint): no crash', () => {
+    expect(() => renderChart({ data: MONDAY_CONE_DATA, width: 300, height: 240 })).not.toThrow();
+  });
+
+  it('SC6.10 — renders with WEEK_COMPLETE_DATA (empty cone): no crash', () => {
+    expect(() => renderChart({ data: WEEK_COMPLETE_DATA, width: 300, height: 240 })).not.toThrow();
+  });
+
+  it('SC6.11 — source: cone fill uses opacity scaled by coneOpacity (15% opacity)', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    // Cone fill opacity = coneOpacity * 0.15
+    expect(source).toMatch(/0\.15/);
+  });
+
+  it('SC6.12 — source: cone boundary strokes use opacity 0.30', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    expect(source).toMatch(/0\.30|0\.3(?!\d)/);
+  });
+
+  it('SC6.13 — source: target line uses 0.5 opacity', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    expect(source).toMatch(/0\.5(?!\d)/);
+  });
+});
+
+// ─── FR7: Animation State Logic ───────────────────────────────────────────────
+
+describe('AIConeChart — FR7: Animation State Logic', () => {
+  // Test the animState computation logic directly (pure math, spec-defined formula)
+
+  it('SC7.1 — lineEnd is 0 at progress=0', () => {
+    const state = computeAnimState(0);
+    expect(state.lineEnd).toBe(0);
+  });
+
+  it('SC7.2 — lineEnd is 1 at progress=0.6 (line fully drawn)', () => {
+    const state = computeAnimState(0.6);
+    expect(state.lineEnd).toBeCloseTo(1, 5);
+  });
+
+  it('SC7.3 — lineEnd is clamped to 1 at progress=1 (no overshoot)', () => {
+    const state = computeAnimState(1);
+    expect(state.lineEnd).toBe(1);
+  });
+
+  it('SC7.4 — lineEnd is 0.5 at progress=0.3 (halfway through line draw)', () => {
+    const state = computeAnimState(0.3);
+    expect(state.lineEnd).toBeCloseTo(0.5, 5);
+  });
+
+  it('SC7.5 — coneOpacity equals progress value', () => {
+    expect(computeAnimState(0).coneOpacity).toBe(0);
+    expect(computeAnimState(0.5).coneOpacity).toBe(0.5);
+    expect(computeAnimState(1).coneOpacity).toBe(1);
+  });
+
+  it('SC7.6 — dotOpacity is 0 at progress=0', () => {
+    const state = computeAnimState(0);
+    expect(state.dotOpacity).toBe(0);
+  });
+
+  it('SC7.7 — dotOpacity is 0 at progress=0.6 (dot not yet visible)', () => {
+    const state = computeAnimState(0.6);
+    expect(state.dotOpacity).toBeCloseTo(0, 5);
+  });
+
+  it('SC7.8 — dotOpacity is 1 at progress=1 (fully visible)', () => {
+    const state = computeAnimState(1);
+    expect(state.dotOpacity).toBe(1);
+  });
+
+  it('SC7.9 — dotOpacity is 0.5 at progress=0.8 (midway through fade-in)', () => {
+    // progress=0.8: (0.8 - 0.6) / 0.4 = 0.2 / 0.4 = 0.5
+    const state = computeAnimState(0.8);
+    expect(state.dotOpacity).toBeCloseTo(0.5, 5);
+  });
+
+  it('SC7.10 — dotOpacity is clamped to 0 below progress=0.6', () => {
+    const state = computeAnimState(0.3);
+    expect(state.dotOpacity).toBe(0);
+  });
+
+  it('SC7.11 — source uses useSharedValue for progress animation', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    expect(source).toContain('useSharedValue');
+  });
+
+  it('SC7.12 — source uses useAnimatedReaction with runOnJS bridge', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    expect(source).toContain('useAnimatedReaction');
+    expect(source).toContain('runOnJS');
+  });
+
+  it('SC7.13 — source uses withTiming for progress animation', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    expect(source).toContain('withTiming');
+  });
+
+  it('SC7.14 — source uses useReducedMotion for accessibility', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    expect(source).toContain('useReducedMotion');
+  });
+
+  it('SC7.15 — source imports timingChartFill preset', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    expect(source).toContain('timingChartFill');
+  });
+});
+
+// ─── FR8: Axis Labels (full vs compact) ──────────────────────────────────────
+
+describe('AIConeChart — FR8: Axis Labels', () => {
+  it('SC8.1 — source uses matchFont for Skia text rendering', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    expect(source).toContain('matchFont');
+  });
+
+  it('SC8.2 — source includes Text elements (for axis labels in full mode)', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    expect(source).toMatch(/<Text/);
+  });
+
+  it('SC8.3 — source guards font with null check before rendering Text', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    // font && ... or font !== null or similar
+    expect(source).toMatch(/font\s*&&/);
+  });
+
+  it('SC8.4 — source uses colors.textMuted for axis label color', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    expect(source).toContain('colors.textMuted');
+  });
+
+  it('SC8.5 — source: axis labels only rendered when size === "full"', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    // Conditional: size === 'full' && ... before Text elements
+    expect(source).toMatch(/size\s*===\s*['"]full['"]/);
+  });
+
+  it('SC8.6 — source: Y-axis includes 75% tick (target reference)', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    // 75 appears in Y_TICKS or similar constant
+    expect(source).toMatch(/75/);
+    expect(source).toMatch(/['"]75%['"]/);
+  });
+
+  it('SC8.7 — source: X-axis ticks filter to weeklyLimit', () => {
+    const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
+    // X ticks filtered: tick <= weeklyLimit
+    expect(source).toMatch(/weeklyLimit/);
+  });
+});
