@@ -50,7 +50,7 @@ The Hourglass app has rich chart visualizations but they are static — you can 
 | [03-scrub-engine](specs/03-scrub-engine/spec.md) | `useScrubGesture` hook + shared Skia cursor pattern | 04, 05, 07 | — | M |
 | 04-ai-scrub | AIConeChart scrub + AI tab hero value sync | — | 03 | M |
 | 05-earnings-scrub | TrendSparkline scrub + home earnings hero sync | — | 03 | M |
-| 06-overview-history | Weekly AI%/BrainLift/hours snapshot persistence | 07 | — | M |
+| [06-overview-history](specs/06-overview-history/spec.md) | Weekly AI%/BrainLift/hours snapshot persistence | 07 | — | M |
 | 07-overview-sync | Linked 4-chart overview + 4W/12W toggle | — | 03, 06 | L |
 
 ---
