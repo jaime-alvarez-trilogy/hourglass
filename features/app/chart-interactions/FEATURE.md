@@ -37,9 +37,13 @@ The Hourglass app has rich chart visualizations but they are static — you can 
 
 ## Changelog (Specs)
 
+| Date | Spec | Description |
+|------|------|-------------|
+| 2026-03-15 | [01-overtime-display](specs/01-overtime-display/spec.md) | Add overtime PanelState, white-gold bar coloring, and hero overtime display |
+
 | Spec | Description | Blocks | Blocked By | Complexity |
 |------|-------------|--------|------------|------------|
-| 01-overtime-display | Hero panel overtime mode + bar chart color shift | — | — | S |
+| [01-overtime-display](specs/01-overtime-display/spec.md) | Hero panel overtime mode + bar chart color shift | — | — | S |
 | [02-watermarks](specs/02-watermarks/spec.md) | Faint hours watermark + chart edge labels / legend | — | — | S |
 | [03-scrub-engine](specs/03-scrub-engine/spec.md) | `useScrubGesture` hook + shared Skia cursor pattern | 04, 05, 07 | — | M |
 | 04-ai-scrub | AIConeChart scrub + AI tab hero value sync | — | 03 | M |
