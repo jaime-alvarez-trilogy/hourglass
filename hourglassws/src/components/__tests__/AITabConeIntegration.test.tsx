@@ -216,16 +216,13 @@ function defaultHookResults() {
   });
 }
 
+// ─── Screen import (after all mocks are declared) ─────────────────────────────
+
+import AIScreen from '@/app/(tabs)/ai';
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function renderAIScreen(): any {
-  let AIScreen: any;
-  jest.isolateModules(() => {
-    AIScreen = require('@/app/(tabs)/ai').default;
-  });
-  if (!AIScreen) {
-    AIScreen = require('@/app/(tabs)/ai').default;
-  }
   let tree: any;
   act(() => {
     tree = create(React.createElement(AIScreen));

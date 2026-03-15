@@ -120,6 +120,53 @@ jest.mock('@/src/hooks/useAIData', () => ({
   useAIData: (...args: any[]) => mockUseAIData(...args),
 }));
 
+// useConfig — added by 03-ai-tab-integration (ai.tsx now calls useConfig for weeklyLimit)
+jest.mock('@/src/hooks/useConfig', () => ({
+  useConfig: () => ({
+    config: { weeklyLimit: 40, useQA: false, hourlyRate: 25, userId: 'u1', setupComplete: true },
+    isLoading: false,
+    refetch: jest.fn(),
+  }),
+}));
+
+// useFocusKey — added by 03-ai-tab-integration (ai.tsx now calls useFocusKey for chartKey)
+// Also mock @react-navigation/native to avoid NavigationContainer requirement
+jest.mock('@/src/hooks/useFocusKey', () => ({
+  useFocusKey: () => 0,
+}));
+
+jest.mock('@react-navigation/native', () => ({
+  useIsFocused: () => true,
+  useNavigation: () => ({ navigate: jest.fn(), replace: jest.fn(), push: jest.fn() }),
+  useRoute: () => ({ params: {} }),
+}));
+
+// AIConeChart — stub without Skia (03-ai-tab-integration adds cone chart to ai.tsx)
+jest.mock('@/src/components/AIConeChart', () => {
+  const mockR = require('react');
+  return {
+    __esModule: true,
+    default: ({ data, width, height, size, ...props }: any) =>
+      mockR.createElement('AIConeChart', { data, width, height, size, ...props }),
+    AIConeChart: ({ data, width, height, size, ...props }: any) =>
+      mockR.createElement('AIConeChart', { data, width, height, size, ...props }),
+  };
+});
+
+// computeAICone — stub (03-ai-tab-integration; ai.tsx now calls computeAICone)
+jest.mock('@/src/lib/aiCone', () => ({
+  computeAICone: () => ({
+    actualPoints: [{ hoursX: 0, pctY: 0 }],
+    upperBound: [],
+    lowerBound: [],
+    currentHours: 0,
+    currentAIPct: 0,
+    weeklyLimit: 40,
+    targetPct: 75,
+    isTargetAchievable: true,
+  }),
+}));
+
 // ─── Fixture data ─────────────────────────────────────────────────────────────
 
 const DEFAULT_DATA = {
@@ -160,16 +207,15 @@ const HOURGLASSWS_ROOT = path.resolve(__dirname, '../../..');
 const AI_TAB_PATH = path.join(HOURGLASSWS_ROOT, 'app', '(tabs)', 'ai.tsx');
 const DAILY_AI_ROW_PATH = path.join(HOURGLASSWS_ROOT, 'src', 'components', 'DailyAIRow.tsx');
 
+// ─── Screen import ────────────────────────────────────────────────────────────
+// Direct import required — jest.isolateModules causes React module mismatch
+// when ai.tsx uses useState/useMemo/useConfig/useFocusKey (added in 03-ai-tab-integration).
+
+import AIScreen from '@/app/(tabs)/ai';
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function renderAIScreen(): any {
-  let AIScreen: any;
-  jest.isolateModules(() => {
-    AIScreen = require('@/app/(tabs)/ai').default;
-  });
-  if (!AIScreen) {
-    AIScreen = require('@/app/(tabs)/ai').default;
-  }
   let tree: any;
   act(() => {
     tree = create(React.createElement(AIScreen));
