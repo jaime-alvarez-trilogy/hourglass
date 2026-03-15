@@ -3,12 +3,13 @@
 // 3-zone layout:
 //   Zone 1 — Hero Panel (PanelGradient, MetricValue, StateBadge, sub-metrics)
 //   Zone 2 — Weekly Chart (Card, WeeklyBarChart, day labels)
+//   Zone 2.5 — AI Trajectory compact card (AIConeChart, FR2 03-ai-tab-integration)
 //   Zone 3 — Earnings (Card, MetricValue, TrendSparkline)
 //   Footer  — UrgencyBanner (shown when urgency >= low)
 //
 // No StyleSheet. No hardcoded hex values.
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -21,8 +22,10 @@ import { useRouter } from 'expo-router';
 import { useConfig } from '@/src/hooks/useConfig';
 import { useHoursData } from '@/src/hooks/useHoursData';
 import { useEarningsHistory } from '@/src/hooks/useEarningsHistory';
+import { useAIData } from '@/src/hooks/useAIData';
 import { useFocusKey } from '@/src/hooks/useFocusKey';
 import { computePanelState, computeDaysElapsed } from '@/src/lib/panelState';
+import { computeAICone } from '@/src/lib/aiCone';
 import { getUrgencyLevel } from '@/src/lib/hours';
 import { colors } from '@/src/lib/colors';
 import FadeInScreen from '@/src/components/FadeInScreen';
@@ -30,6 +33,7 @@ import PanelGradient from '@/src/components/PanelGradient';
 import MetricValue from '@/src/components/MetricValue';
 import WeeklyBarChart from '@/src/components/WeeklyBarChart';
 import TrendSparkline from '@/src/components/TrendSparkline';
+import AIConeChart from '@/src/components/AIConeChart';
 import Card from '@/src/components/Card';
 import SectionLabel from '@/src/components/SectionLabel';
 import SkeletonLoader from '@/src/components/SkeletonLoader';
@@ -121,13 +125,21 @@ export default function HoursDashboard() {
   const { data, isLoading, isStale, cachedAt, error, refetch } = useHoursData();
   const { trend: earningsHistoryTrend } = useEarningsHistory();
 
-  // Layout dimensions for chart and sparkline (measured via onLayout)
+  // Layout dimensions for chart, sparkline, and compact cone (measured via onLayout)
   const [chartDims, setChartDims] = useState({ width: 0, height: 0 });
   const [sparklineDims, setSparklineDims] = useState({ width: 0, height: 0 });
+  const [compactConeDims, setCompactConeDims] = useState({ width: 0, height: 100 });
 
   const chartKey = useFocusKey();
 
   const weeklyLimit = config?.weeklyLimit ?? 40;
+
+  // AI Trajectory compact card (FR2 03-ai-tab-integration)
+  const { data: aiData } = useAIData();
+  const coneData = useMemo(
+    () => (aiData ? computeAICone(aiData.dailyBreakdown, weeklyLimit) : null),
+    [aiData, weeklyLimit],
+  );
   const daysElapsed = computeDaysElapsed();
   const panelState = computePanelState(data?.total ?? 0, weeklyLimit, daysElapsed);
   const urgencyLevel = data ? getUrgencyLevel(data.timeRemaining) : 'none';
@@ -260,6 +272,25 @@ export default function HoursDashboard() {
             ))}
           </View>
         </Card>
+
+        {/* ── Zone 2.5: AI Trajectory compact card (FR2 03-ai-tab-integration) ── */}
+        {coneData && (
+          <Card>
+            <SectionLabel className="mb-2">AI TRAJECTORY</SectionLabel>
+            <View
+              style={{ height: 100 }}
+              onLayout={e => setCompactConeDims({ width: e.nativeEvent.layout.width, height: 100 })}
+            >
+              <AIConeChart
+                key={chartKey}
+                data={coneData}
+                width={compactConeDims.width}
+                height={100}
+                size="compact"
+              />
+            </View>
+          </Card>
+        )}
 
         {/* ── Zone 3: Earnings ─────────────────────────────────────────── */}
         <Card>
