@@ -42,6 +42,7 @@ The Hourglass app has rich chart visualizations but they are static — you can 
 | 2026-03-15 | [01-overtime-display](specs/01-overtime-display/spec.md) | Add overtime PanelState, white-gold bar coloring, and hero overtime display — **Complete** |
 | 2026-03-15 | [06-overview-history](specs/06-overview-history/spec.md) | WeeklySnapshot persistence layer — weekly_history_v2 store, mergeWeeklySnapshot, useWeeklyHistory hook |
 | 2026-03-15 | [03-scrub-engine](specs/03-scrub-engine/spec.md) | useScrubGesture hook + nearestIndex worklet + ScrubCursor utility — complete, 40 tests passing |
+| 2026-03-15 | [04-ai-scrub](specs/04-ai-scrub/spec.md) | AIConeChart scrub gesture + onScrubChange prop + AI tab hero MetricValue sync |
 
 | Spec | Description | Blocks | Blocked By | Complexity |
 |------|-------------|--------|------------|------------|
