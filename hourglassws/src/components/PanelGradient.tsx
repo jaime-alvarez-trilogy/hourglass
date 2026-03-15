@@ -58,6 +58,12 @@ export const PANEL_GRADIENTS: Record<
     start: { x: 0, y: 0 },
     end: { x: 0, y: 1 },
   },
+  // warm white-gold #FFF8E7 at 35% opacity — extraordinary achievement
+  overtime: {
+    colors: ['#FFF8E759', 'transparent'],
+    start: { x: 0, y: 0 },
+    end: { x: 0, y: 1 },
+  },
 };
 
 interface PanelGradientProps {
