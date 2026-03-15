@@ -19,8 +19,18 @@ module.exports = {
   Fill: (_props: any) => null,
   RoundedRect: (_props: any) => null,
 
+  // Geometry helpers
+  vec: (x: number, y: number) => ({ x, y }),
+
   // matchFont — returns a mock font object (non-null) for test predictability
-  matchFont: jest.fn((_descriptor: any) => ({ size: 10 })),
+  // measureText returns a fixed width so positioning calculations don't crash in tests
+  matchFont: jest.fn((_descriptor: any) => ({
+    size: _descriptor?.fontSize ?? 10,
+    measureText: jest.fn((_text: string) => ({
+      width: 50,
+      height: _descriptor?.fontSize ?? 10,
+    })),
+  })),
 
   // Reanimated-Skia bridge — synchronous in test environment
   useDerivedValue: (fn: () => any) => ({ value: fn() }),
