@@ -98,13 +98,12 @@ export function computeCone(
     lowerFinal = Math.min(100, Math.max(0, (aiSlots / denominator) * 100));
   }
 
-  const origin: ConePoint = { hoursX: currentHours, pctY: currentAIPct };
   const upperEnd: ConePoint = { hoursX: weeklyLimit, pctY: upperFinal };
   const lowerEnd: ConePoint = { hoursX: weeklyLimit, pctY: lowerFinal };
 
   return {
-    upper: [origin, upperEnd],
-    lower: [origin, lowerEnd],
+    upper: [{ hoursX: currentHours, pctY: currentAIPct }, upperEnd],
+    lower: [{ hoursX: currentHours, pctY: currentAIPct }, lowerEnd],
   };
 }
 
