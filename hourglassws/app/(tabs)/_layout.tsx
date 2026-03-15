@@ -1,14 +1,14 @@
+// FR1 (02-approvals-tab-redesign): Always-visible Requests tab — no role gate.
+// Removed: showApprovals conditional, useConfig import, tabBarButton role check.
+// Tab title changed from "Approvals" to "Requests".
+
 import { Tabs } from 'expo-router';
 import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useConfig } from '@/src/hooks/useConfig';
 
 export default function TabLayout() {
-  const { config } = useConfig();
-  const showApprovals = config?.isManager === true || config?.showApprovals === true;
-
   return (
     <Tabs
       screenOptions={{
@@ -47,9 +47,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="approvals"
         options={{
-          title: 'Approvals',
+          title: 'Requests',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="checkmark.circle.fill" color={color} />,
-          tabBarButton: showApprovals ? HapticTab : () => null,
         }}
       />
       {/* Hide the old explore tab from navigation */}
