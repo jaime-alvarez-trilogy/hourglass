@@ -232,7 +232,7 @@ export function AIConeChart({
   // ── Pre-compute all frame paths ──────────────────────────────────────────
   // At frame i: show line up to hourlyPoints[i], cone from hourlyPoints[i].
   // O(N) path building — N ≤ ~45 for a 40-hour week, fast enough.
-  const { linePaths, conePaths, upperEdgePaths, lowerEdgePaths, projectedPaths, targetPath, dotPixel, toPixelFn } =
+  const { linePaths, conePaths, upperEdgePaths, lowerEdgePaths, projectedPaths, targetPath, dotPixel, toPixelFn, pixelXs } =
     useMemo(() => {
       const padding = size === 'full' ? PADDING_FULL : PADDING_COMPACT;
       const fn: ToPixelFn = (hx, py) =>
