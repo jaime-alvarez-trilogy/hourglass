@@ -22,8 +22,9 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View } from 'react-native';
 import { Canvas, Path, Circle, Line, vec, matchFont, Text, Paint, BlurMask } from '@shopify/react-native-skia';
-import { useSharedValue, withTiming, useAnimatedReaction, runOnJS } from 'react-native-reanimated';
+import Animated, { useSharedValue, withTiming, useAnimatedReaction, useAnimatedStyle, runOnJS } from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { colors } from '@/src/lib/colors';
 import { timingChartFill } from '@/src/lib/reanimated-presets';
@@ -156,15 +157,18 @@ export default function TrendSparkline({
     clipProgress.value = withTiming(1, timingChartFill);
   }, []);
 
-  // Bridge clipProgress to plain React state so RNSkia never reads a SharedValue
-  // via JSI from the JS thread. Passing a SharedValue directly to <Path end={}>
-  // causes WorkletRuntime::executeSync to deadlock when other Reanimated worklets
-  // (e.g. useAnimatedProps in AIArcHero) hold the worklet mutex simultaneously.
-  const [clipEnd, setClipEnd] = useState(0);
-  useAnimatedReaction(
-    () => clipProgress.value,
-    (v) => { runOnJS(setClipEnd)(v); },
-  );
+  // Animate the clip via an Animated.View wrapper (overflow:hidden + animated width)
+  // instead of Path.end driven by per-frame runOnJS state updates.
+  //
+  // Previously: useAnimatedReaction + runOnJS(setClipEnd) bridged the SharedValue to
+  // React state. That fires at 60fps × 4 sparklines = 240 JS-thread state updates/sec,
+  // flooding the Hermes microtask queue with allocations that trigger young-gen GC
+  // during Reanimated's JSI Value window — causing stale forwarding pointers / crash.
+  //
+  // Now: useAnimatedStyle runs entirely on the Reanimated UI thread. Zero JS per frame.
+  const clipStyle = useAnimatedStyle(() => ({
+    width: clipProgress.value * width,
+  }));
 
   // Recompute path when data or dimensions change
   const { pathStr, min, max, hasData, isSinglePoint } = useMemo(() => {
@@ -277,86 +281,96 @@ export default function TrendSparkline({
     const cx = width / 2;
     const cy = toY(data[0], min, max, h);
     return (
+      // GestureDetector wraps the full-size View so gesture area is always width×h.
+      // Animated.View clips the Canvas with overflow:hidden as clipProgress grows 0→1.
+      // This avoids per-frame runOnJS state updates that cause Hermes GC pressure.
       <GestureDetector gesture={scrubGesture}>
-        <Canvas style={{ width, height: h }}>
-          {showGuide && (
-            <Line p1={vec(0, guideY)} p2={vec(width, guideY)} color={colors.border} strokeWidth={1} />
-          )}
-          {showGuide && capLabel && capFont && (
-            <Text
-              x={capLabelX}
-              y={capLabelY}
-              text={capLabel}
-              font={capFont}
-              color={colors.textMuted}
-              opacity={0.35}
-            />
-          )}
-          <Circle cx={cx} cy={cy} r={strokeWidth * 2} color={color} />
-          {cursor && (
-            <>
-              <Path
-                path={cursor.linePath}
-                color={colors.textMuted}
-                style="stroke"
-                strokeWidth={1}
-                opacity={0.5}
-              />
-              <Circle cx={cursor.dotX} cy={cursor.dotY} r={cursor.dotRadius} color={color} />
-            </>
-          )}
-        </Canvas>
+        <View style={{ width, height: h }}>
+          <Animated.View style={[{ overflow: 'hidden', height: h }, clipStyle]}>
+            <Canvas style={{ width, height: h }}>
+              {showGuide && (
+                <Line p1={vec(0, guideY)} p2={vec(width, guideY)} color={colors.border} strokeWidth={1} />
+              )}
+              {showGuide && capLabel && capFont && (
+                <Text
+                  x={capLabelX}
+                  y={capLabelY}
+                  text={capLabel}
+                  font={capFont}
+                  color={colors.textMuted}
+                  opacity={0.35}
+                />
+              )}
+              <Circle cx={cx} cy={cy} r={strokeWidth * 2} color={color} />
+              {cursor && (
+                <>
+                  <Path
+                    path={cursor.linePath}
+                    color={colors.textMuted}
+                    style="stroke"
+                    strokeWidth={1}
+                    opacity={0.5}
+                  />
+                  <Circle cx={cursor.dotX} cy={cursor.dotY} r={cursor.dotRadius} color={color} />
+                </>
+              )}
+            </Canvas>
+          </Animated.View>
+        </View>
       </GestureDetector>
     );
   }
 
   return (
     <GestureDetector gesture={scrubGesture}>
-      <Canvas style={{ width, height: h }}>
-        {showGuide && (
-          <Line p1={vec(0, guideY)} p2={vec(width, guideY)} color={colors.border} strokeWidth={1} />
-        )}
-        {showGuide && capLabel && capFont && (
-          <Text
-            x={capLabelX}
-            y={capLabelY}
-            text={capLabel}
-            font={capFont}
-            color={colors.textMuted}
-            opacity={0.35}
-          />
-        )}
-        <Path
-          path={pathStr}
-          color={color}
-          style="stroke"
-          strokeWidth={strokeWidth}
-          strokeCap="round"
-          strokeJoin="round"
-          end={clipEnd}
-        >
-          {/* Layer 1: outer glow — wide, very soft */}
-          <Paint color={color + '40'} style="stroke" strokeWidth={14} strokeCap="round">
-            <BlurMask blur={12} style="solid" />
-          </Paint>
-          {/* Layer 2: mid glow — tighter bloom */}
-          <Paint color={color + '80'} style="stroke" strokeWidth={7} strokeCap="round">
-            <BlurMask blur={4} style="solid" />
-          </Paint>
-        </Path>
-        {cursor && (
-          <>
+      <View style={{ width, height: h }}>
+        <Animated.View style={[{ overflow: 'hidden', height: h }, clipStyle]}>
+          <Canvas style={{ width, height: h }}>
+            {showGuide && (
+              <Line p1={vec(0, guideY)} p2={vec(width, guideY)} color={colors.border} strokeWidth={1} />
+            )}
+            {showGuide && capLabel && capFont && (
+              <Text
+                x={capLabelX}
+                y={capLabelY}
+                text={capLabel}
+                font={capFont}
+                color={colors.textMuted}
+                opacity={0.35}
+              />
+            )}
             <Path
-              path={cursor.linePath}
-              color={colors.textMuted}
+              path={pathStr}
+              color={color}
               style="stroke"
-              strokeWidth={1}
-              opacity={0.5}
-            />
-            <Circle cx={cursor.dotX} cy={cursor.dotY} r={cursor.dotRadius} color={color} />
-          </>
-        )}
-      </Canvas>
+              strokeWidth={strokeWidth}
+              strokeCap="round"
+              strokeJoin="round"
+            >
+              {/* Layer 1: outer glow — wide, very soft */}
+              <Paint color={color + '40'} style="stroke" strokeWidth={14} strokeCap="round">
+                <BlurMask blur={12} style="solid" />
+              </Paint>
+              {/* Layer 2: mid glow — tighter bloom */}
+              <Paint color={color + '80'} style="stroke" strokeWidth={7} strokeCap="round">
+                <BlurMask blur={4} style="solid" />
+              </Paint>
+            </Path>
+            {cursor && (
+              <>
+                <Path
+                  path={cursor.linePath}
+                  color={colors.textMuted}
+                  style="stroke"
+                  strokeWidth={1}
+                  opacity={0.5}
+                />
+                <Circle cx={cursor.dotX} cy={cursor.dotY} r={cursor.dotRadius} color={color} />
+              </>
+            )}
+          </Canvas>
+        </Animated.View>
+      </View>
     </GestureDetector>
   );
 }

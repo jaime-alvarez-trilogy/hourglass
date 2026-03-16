@@ -95,8 +95,10 @@ async function runBackfill(
   for (let n = 1; n <= BACKFILL_MAX; n++) {
     const monday = getMondayNWeeksAgo(n);
     const entry = historyMap.get(monday);
-    // Backfill if: no entry exists OR aiPct is 0 (not yet populated)
-    if (!entry || entry.aiPct === 0) {
+    // Always re-fetch the most recent completed week (n=1) — the week-transition flush
+    // may have written a stale/partial value from the AI cache.
+    // For older weeks, only fill if aiPct === 0 to avoid excessive API calls.
+    if (n === 1 || !entry || entry.aiPct === 0) {
       weeksToFill.push(monday);
     }
   }
@@ -173,13 +175,22 @@ export function useHistoryBackfill(): WeeklySnapshot[] | null {
     const refreshFromStorage = () =>
       loadWeeklyHistory().then(data => setSnapshots(data)).catch(() => {});
 
-    loadCredentials().then(creds => {
-      if (!creds) { refreshFromStorage(); return; }
-      return runBackfill(config.assignmentId, config.useQA, creds.username, creds.password)
-        .then(updated => { setSnapshots(updated); });
-    }).catch(() => {
-      refreshFromStorage(); // ensure overview always gets fresh storage state
-    });
+    // Delay backfill by 4 seconds to avoid competing with the initial animation burst
+    // (TrendSparkline mount animations, AIArcHero arc spring, AIConeChart withTiming).
+    // All those animations complete within ~1.5s; 4s gives ample clearance so the
+    // Hermes young-gen GC doesn't run during both animation worklet callbacks and
+    // Promise microtask resolution simultaneously.
+    const timer = setTimeout(() => {
+      loadCredentials().then(creds => {
+        if (!creds) { refreshFromStorage(); return; }
+        return runBackfill(config.assignmentId, config.useQA, creds.username, creds.password)
+          .then(updated => { setSnapshots(updated); });
+      }).catch(() => {
+        refreshFromStorage(); // ensure overview always gets fresh storage state
+      });
+    }, 4000);
+
+    return () => clearTimeout(timer);
   }, [config?.assignmentId]);
 
   return snapshots;
