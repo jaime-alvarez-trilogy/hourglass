@@ -81,3 +81,4 @@ The UX Gauntlet (3/7 models, avg ~5/10) identified a consistent pattern: **stron
 
 - 2026-03-15: Research complete. 5 specs decomposed.
 - 2026-03-15: [01-design-tokens](specs/01-design-tokens/spec.md) — **COMPLETE**. Palette v1.1 (eggplant), goldBright token added, cyan updated, tailwind synced, modal Switch/background violations tokenized. 29 tests passing.
+- 2026-03-15: [02-typography](specs/02-typography/spec.md) — Spec ready. Inter consolidation, font alias remapping, tabular-nums for metric components, class violation fixes (text-error, text-textTertiary).
