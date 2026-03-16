@@ -111,10 +111,10 @@ describe('FR3: Class violations fixed', () => {
   let sourceFiles: string[];
 
   beforeAll(() => {
-    // Collect all .ts/.tsx files under app/ and src/
+    // Collect all .ts/.tsx files under app/ and src/, excluding __tests__ directories
     sourceFiles = [
-      ...glob.sync('app/**/*.{ts,tsx}', { cwd: ROOT }),
-      ...glob.sync('src/**/*.{ts,tsx}', { cwd: ROOT }),
+      ...glob.sync('app/**/*.{ts,tsx}', { cwd: ROOT, ignore: ['app/__tests__/**'] }),
+      ...glob.sync('src/**/*.{ts,tsx}', { cwd: ROOT, ignore: ['src/**/__tests__/**'] }),
     ];
   });
 

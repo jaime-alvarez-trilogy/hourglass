@@ -81,7 +81,7 @@ function SubMetric({ label, value, unit }: { label: string; value: number; unit:
       <Text className="text-textSecondary font-sans text-xs uppercase tracking-widest mb-1">
         {label}
       </Text>
-      <Text className="text-textPrimary font-display text-lg">
+      <Text className="text-textPrimary font-display text-lg" style={{ fontVariant: ['tabular-nums'] }}>
         {value.toFixed(1)}{unit}
       </Text>
     </View>
@@ -143,7 +143,9 @@ export default function HoursDashboard() {
     [aiData, weeklyLimit],
   );
   const daysElapsed = computeDaysElapsed();
-  const panelState = computePanelState(data?.total ?? 0, weeklyLimit, daysElapsed);
+  const basePanelState = computePanelState(data?.total ?? 0, weeklyLimit, daysElapsed);
+  // Dev override: force overtime panel for UI testing
+  const panelState: PanelState = config?.devOvertimePreview ? 'overtime' : basePanelState;
   const urgencyLevel = data ? getUrgencyLevel(data.timeRemaining) : 'none';
 
   const earningsTrend = earningsHistoryTrend;
@@ -339,16 +341,25 @@ export default function HoursDashboard() {
           ) : (
             <>
               {/* Weekly earnings hero: "$" prefix + animated number */}
-              {/* During scrub: shows trend[scrubEarningsIndex]; at rest: live weeklyEarnings */}
+              {/* During scrub: plain Text avoids MetricValue re-animation on every frame */}
               <View className="flex-row items-baseline gap-1">
                 <Text className="text-gold font-display-bold text-3xl">$</Text>
-                <MetricValue
-                  value={displayEarnings}
-                  unit=""
-                  precision={0}
-                  sizeClass="text-3xl"
-                  colorClass="text-gold"
-                />
+                {scrubEarningsIndex !== null ? (
+                  <Text
+                    className="font-display text-3xl text-gold"
+                    style={{ fontVariant: ['tabular-nums'] }}
+                  >
+                    {Math.round(displayEarnings).toLocaleString()}
+                  </Text>
+                ) : (
+                  <MetricValue
+                    value={displayEarnings}
+                    unit=""
+                    precision={0}
+                    sizeClass="text-3xl"
+                    colorClass="text-gold"
+                  />
+                )}
               </View>
               <Text className="text-textSecondary text-sm font-sans mt-1">
                 {earningsSubLabel}

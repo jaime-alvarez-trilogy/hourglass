@@ -153,6 +153,33 @@ jest.mock('@/src/components/AIConeChart', () => {
   };
 });
 
+// useHistoryBackfill + useOverviewData — stub for AI trajectory card
+jest.mock('@/src/hooks/useHistoryBackfill', () => ({
+  useHistoryBackfill: () => null,
+}));
+
+jest.mock('@/src/hooks/useOverviewData', () => ({
+  useOverviewData: () => ({
+    data: {
+      earnings: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      hours: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      aiPct: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      brainliftHours: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      weekLabels: [],
+    },
+    isLoading: false,
+  }),
+}));
+
+jest.mock('@/src/components/TrendSparkline', () => {
+  const mockR = require('react');
+  return {
+    __esModule: true,
+    default: ({ data, width, height, color, ...props }: any) =>
+      mockR.createElement('TrendSparkline', { data, width, height, color, ...props }),
+  };
+});
+
 // computeAICone — stub (03-ai-tab-integration; ai.tsx now calls computeAICone)
 jest.mock('@/src/lib/aiCone', () => ({
   computeAICone: () => ({
@@ -485,9 +512,10 @@ describe('AITab — FR4: delta badge', () => {
     expect(source).toContain('text-success');
   });
 
-  it('SC4.9 — ai.tsx source uses text-error for negative delta', () => {
+  it('SC4.9 — ai.tsx source uses text-critical for negative delta', () => {
+    // Updated in 02-typography: text-error was an undefined class, replaced with text-critical
     const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
-    expect(source).toContain('text-error');
+    expect(source).toContain('text-critical');
   });
 });
 

@@ -95,7 +95,7 @@ export function ApprovalCard({ item, onApprove, onReject }: Props) {
 
         {/* Hours + description row */}
         <View className="flex-row items-center mb-2">
-          <Text className="text-textSecondary text-sm mr-2 min-w-[36px]">
+          <Text className="text-textSecondary text-sm mr-2 min-w-[36px]" style={{ fontVariant: ['tabular-nums'] }}>
             {item.hours}h
           </Text>
           <Text className="flex-1 text-textSecondary text-sm" numberOfLines={2}>
@@ -104,7 +104,7 @@ export function ApprovalCard({ item, onApprove, onReject }: Props) {
 
           {/* FR6: Overtime cost */}
           {overtimeItem && (
-            <Text className="text-success text-sm font-sans-semibold ml-2">
+            <Text className="text-success text-sm font-sans-semibold ml-2" style={{ fontVariant: ['tabular-nums'] }}>
               ${overtimeItem.cost.toFixed(2)}
             </Text>
           )}

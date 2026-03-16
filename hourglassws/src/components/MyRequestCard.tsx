@@ -81,7 +81,7 @@ export default function MyRequestCard({ entry }: MyRequestCardProps): JSX.Elemen
           <Text className="text-textSecondary text-xs font-sans-medium">
             {formatEntryDate(date)}
           </Text>
-          <Text className="text-textPrimary text-sm font-sans-semibold mt-0.5">
+          <Text className="text-textPrimary text-sm font-sans-semibold mt-0.5" style={{ fontVariant: ['tabular-nums'] }}>
             {formatDuration(durationMinutes)}
           </Text>
         </View>

@@ -46,31 +46,35 @@ module.exports = {
       },
 
       // -----------------------------------------------------------------------
-      // Font families
-      // Three-tier typographic system — never mix tiers casually.
-      // Reference: BRAND_GUIDELINES.md → Typography System
+      // Font families — v1.1 Inter-only
+      // Three-tier typographic system — hierarchy via weight + spacing only.
+      // Reference: BRAND_GUIDELINES.md → Typography System v1.1
       //
       // To use in className: font-display, font-sans, font-body
       // Fonts must be loaded via expo-font / @expo-google-fonts before use.
       // -----------------------------------------------------------------------
       fontFamily: {
-        // Tier 1 — Hero numbers, metric values, large headings
-        // Weight variants: font-display + font-bold/semibold/medium
-        'display':          ['SpaceGrotesk_400Regular'],
-        'display-medium':   ['SpaceGrotesk_500Medium'],
-        'display-semibold': ['SpaceGrotesk_600SemiBold'],
-        'display-bold':     ['SpaceGrotesk_700Bold'],
+        // ── v1.1 Inter-only type system ──────────────────────────────────────
+        // All tiers now use Inter. Hierarchy via weight + letter-spacing only.
+        // Reference: BRAND_GUIDELINES.md → Typography System v1.1
 
-        // Tier 2 — UI labels, navigation, buttons, form inputs
+        // Tier 1 — Hero numbers, metric values, large headings (Inter heavy)
+        'display':           ['Inter_700Bold'],
+        'display-medium':    ['Inter_500Medium'],
+        'display-semibold':  ['Inter_600SemiBold'],
+        'display-bold':      ['Inter_700Bold'],
+        'display-extrabold': ['Inter_800ExtraBold'], // v1.1 Display 800 for hero states
+
+        // Tier 2 — UI labels, navigation, buttons, form inputs (unchanged)
         'sans':         ['Inter_400Regular'],
         'sans-medium':  ['Inter_500Medium'],
         'sans-semibold':['Inter_600SemiBold'],
         'sans-bold':    ['Inter_700Bold'],
 
-        // Tier 3 — Descriptive text, AI insights, onboarding copy
-        'body':        ['PlusJakartaSans_400Regular'],
-        'body-light':  ['PlusJakartaSans_300Light'],
-        'body-medium': ['PlusJakartaSans_500Medium'],
+        // Tier 3 — Descriptive text, AI insights, onboarding copy (was Plus Jakarta Sans)
+        'body':        ['Inter_400Regular'],
+        'body-light':  ['Inter_300Light'],  // fallback: Inter_400Regular if 300 unavailable
+        'body-medium': ['Inter_500Medium'],
       },
 
       // -----------------------------------------------------------------------

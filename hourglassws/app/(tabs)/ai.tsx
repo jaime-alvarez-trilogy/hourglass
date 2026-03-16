@@ -19,6 +19,8 @@ import { useRouter } from 'expo-router';
 import { useAIData } from '@/src/hooks/useAIData';
 import { useConfig } from '@/src/hooks/useConfig';
 import { useFocusKey } from '@/src/hooks/useFocusKey';
+import { useHistoryBackfill } from '@/src/hooks/useHistoryBackfill';
+import { useOverviewData } from '@/src/hooks/useOverviewData';
 import AIRingChart from '@/src/components/AIRingChart';
 import AIConeChart from '@/src/components/AIConeChart';
 import type { AIScrubPoint } from '@/src/components/AIConeChart';
@@ -28,6 +30,7 @@ import Card from '@/src/components/Card';
 import SectionLabel from '@/src/components/SectionLabel';
 import ProgressBar from '@/src/components/ProgressBar';
 import SkeletonLoader from '@/src/components/SkeletonLoader';
+import TrendSparkline from '@/src/components/TrendSparkline';
 import { DailyAIRow } from '@/src/components/DailyAIRow';
 import { computeAICone } from '@/src/lib/aiCone';
 import { colors } from '@/src/lib/colors';
@@ -41,6 +44,32 @@ const BRAINLIFT_TARGET = 5;
 
 const CONTENT_STYLE = { padding: 16, paddingTop: 56, gap: 12 } as const;
 
+// ─── AI Trajectory helpers ────────────────────────────────────────────────────
+
+interface AITier {
+  label: string;
+  color: string;
+}
+
+function classifyAIPct(avg: number): AITier {
+  if (avg >= 75) return { label: 'AI Leader', color: colors.cyan };
+  if (avg >= 50) return { label: 'Consistent Progress', color: colors.success };
+  if (avg >= 30) return { label: 'Building Momentum', color: colors.gold };
+  return { label: 'Getting Started', color: colors.textMuted };
+}
+
+/** Compare first half vs second half of the series to detect trend direction. */
+function trendDirection(aiPct: number[]): 'up' | 'down' | 'flat' {
+  if (aiPct.length < 4) return 'flat';
+  const half = Math.floor(aiPct.length / 2);
+  const firstAvg = aiPct.slice(0, half).reduce((a, b) => a + b, 0) / half;
+  const secondAvg = aiPct.slice(-half).reduce((a, b) => a + b, 0) / half;
+  const diff = secondAvg - firstAvg;
+  if (diff > 2) return 'up';
+  if (diff < -2) return 'down';
+  return 'flat';
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function AIScreen() {
@@ -48,6 +77,23 @@ export default function AIScreen() {
   const { data, isLoading, lastFetchedAt, error, refetch, previousWeekPercent } = useAIData();
   const { config } = useConfig();
   const chartKey = useFocusKey();
+
+  // 12-week AI trajectory — backfill + history
+  const backfillSnapshots = useHistoryBackfill();
+  const { data: overviewData } = useOverviewData(12, backfillSnapshots);
+  const [trajectoryDims, setTrajectoryDims] = useState({ width: 0, height: 52 });
+
+  // Compute trajectory: use all 12 weeks but only average weeks with real data (> 0)
+  // Include current week (last entry) in sparkline, exclude from average (partial week)
+  const aiPctSeries = overviewData.aiPct; // full 12-week array including current week
+  const completedAIPct = aiPctSeries.slice(0, -1); // past completed weeks only
+  const nonZeroCompleted = completedAIPct.filter(v => v > 0);
+  const hasTrajectory = nonZeroCompleted.length >= 2;
+  const avgAIPct = nonZeroCompleted.length > 0
+    ? nonZeroCompleted.reduce((a, b) => a + b, 0) / nonZeroCompleted.length
+    : 0;
+  const tier = classifyAIPct(avgAIPct);
+  const trend = trendDirection(completedAIPct);
 
   // Prime Radiant cone dims — measured via onLayout; chart renders null until width > 0
   const [coneDims, setConeDims] = useState({ width: 0, height: 240 });
@@ -176,13 +222,23 @@ export default function AIScreen() {
                   justifyContent: 'center',
                 }}
               >
-                <MetricValue
-                  value={heroAIPct}
-                  unit="%"
-                  precision={1}
-                  colorClass="text-cyan"
-                  sizeClass="text-4xl"
-                />
+                {/* During scrub: plain Text avoids MetricValue re-animation on every frame */}
+                {scrubPoint !== null ? (
+                  <Text
+                    className="font-display text-4xl text-cyan"
+                    style={{ fontVariant: ['tabular-nums'] }}
+                  >
+                    {heroAIPct.toFixed(1)}%
+                  </Text>
+                ) : (
+                  <MetricValue
+                    value={heroAIPct}
+                    unit="%"
+                    precision={1}
+                    colorClass="text-cyan"
+                    sizeClass="text-4xl"
+                  />
+                )}
               </View>
             </View>
 
@@ -197,7 +253,7 @@ export default function AIScreen() {
                     delta > 0
                       ? ' text-success'
                       : delta < 0
-                      ? ' text-error'
+                      ? ' text-critical'
                       : ' text-textSecondary'
                   }`}
                 >
@@ -221,7 +277,7 @@ export default function AIScreen() {
 
         {/* AI% target note */}
         {!showSkeleton && (
-          <Text className="text-xs text-textTertiary text-center mt-2">75% target</Text>
+          <Text className="text-xs text-textMuted text-center mt-2">75% target</Text>
         )}
       </Card>
 
@@ -257,7 +313,7 @@ export default function AIScreen() {
             />
 
             {/* Subtext */}
-            <Text className="text-sm text-textSecondary mt-1">
+            <Text className="text-sm text-textSecondary mt-1" style={{ fontVariant: ['tabular-nums'] }}>
               {brainliftHours.toFixed(1)}h / {BRAINLIFT_TARGET}h target
             </Text>
           </>
@@ -291,9 +347,9 @@ export default function AIScreen() {
         <Card testID="daily-breakdown">
           {/* Column headers */}
           <View className="flex-row pb-1.5 border-b border-border mb-1">
-            <Text className="flex-1 text-xs text-textTertiary uppercase tracking-wider">Day</Text>
-            <Text className="w-[70px] text-right text-xs text-textTertiary uppercase tracking-wider">AI%</Text>
-            <Text className="w-[70px] text-right text-xs text-textTertiary uppercase tracking-wider">BrainLift</Text>
+            <Text className="flex-1 text-xs text-textMuted uppercase tracking-wider">Day</Text>
+            <Text className="w-[70px] text-right text-xs text-textMuted uppercase tracking-wider">AI%</Text>
+            <Text className="w-[70px] text-right text-xs text-textMuted uppercase tracking-wider">BrainLift</Text>
           </View>
           {data.dailyBreakdown.map((day) => (
             <DailyAIRow key={day.date} item={day} />
@@ -312,6 +368,66 @@ export default function AIScreen() {
         </Card>
       )}
 
+      {/* 12-Week AI Trajectory Card */}
+      {hasTrajectory && (
+        <Card>
+          <SectionLabel className="mb-2">12-WEEK TRAJECTORY</SectionLabel>
+
+          {/* Hero average + trend row */}
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <Text style={{ color: tier.color, fontSize: 28, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+              {Math.round(avgAIPct)}% avg
+            </Text>
+            <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+              {trend === 'up' ? '↑ Trending up' : trend === 'down' ? '↓ Trending down' : '→ Stable'}
+            </Text>
+          </View>
+
+          {/* Tier label */}
+          <Text style={{ color: tier.color, fontSize: 13, fontWeight: '600', marginTop: 2 }}>
+            {tier.label}
+          </Text>
+
+          {/* Sparkline */}
+          <View
+            style={{ height: 52 }}
+            onLayout={e => setTrajectoryDims({ width: e.nativeEvent.layout.width, height: 52 })}
+            className="mt-3"
+          >
+            <TrendSparkline
+              key={`trajectory-${chartKey}`}
+              data={aiPctSeries}
+              width={trajectoryDims.width}
+              height={trajectoryDims.height}
+              color={tier.color}
+              maxValue={100}
+              targetValue={75}
+              showGuide
+            />
+          </View>
+
+          {/* Tier legend */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+            {[
+              { label: 'AI Leader', range: '75%+', color: colors.cyan as string },
+              { label: 'Consistent Progress', range: '50–74%', color: colors.success as string },
+              { label: 'Building Momentum', range: '30–49%', color: colors.gold as string },
+              { label: 'Getting Started', range: '<30%', color: colors.textMuted as string },
+            ].map(t => {
+              const isActive = tier.label === t.label;
+              return (
+                <View key={t.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isActive ? t.color : colors.border }} />
+                  <Text style={{ color: isActive ? t.color : colors.textMuted, fontSize: 10, fontWeight: isActive ? '600' : '400' }}>
+                    {t.label} {t.range}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        </Card>
+      )}
+
       {/* Legend Card */}
       <Card>
         <Text className="text-sm font-semibold text-textPrimary mb-1">How it&apos;s calculated</Text>
@@ -323,14 +439,14 @@ export default function AIScreen() {
           <Text className="text-violet font-semibold">BrainLift</Text>
           {'  '}Slots tagged second_brain × 10 min
         </Text>
-        <Text className="text-xs text-textTertiary mt-2">
+        <Text className="text-xs text-textMuted mt-2">
           ±2% display range accounts for measurement variation.
         </Text>
       </Card>
 
       {/* Last fetched timestamp */}
       {lastFetchedAt && (
-        <Text className="text-xs text-textTertiary text-center mt-1" testID="last-fetched">
+        <Text className="text-xs text-textMuted text-center mt-1" testID="last-fetched">
           Updated {new Date(lastFetchedAt).toLocaleTimeString()}
         </Text>
       )}
