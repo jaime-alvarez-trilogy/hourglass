@@ -43,7 +43,7 @@ export default function FadeInScreen({ children }: FadeInScreenProps) {
       opacity.value = 0;
       translateY.value = 8;
     }
-  }, [isFocused]);
+  }, [isFocused, reducedMotion]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,

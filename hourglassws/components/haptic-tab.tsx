@@ -32,7 +32,7 @@ export function HapticTab(props: BottomTabBarButtonProps) {
         props.onPressOut?.(ev);
       }}
     >
-      <Animated.View style={animatedStyle}>
+      <Animated.View style={[{ flex: 1, alignItems: 'center', justifyContent: 'center' }, animatedStyle]}>
         {props.children}
       </Animated.View>
     </PlatformPressable>
