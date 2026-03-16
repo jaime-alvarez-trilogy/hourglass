@@ -324,12 +324,14 @@ describe('FR6: Type badges — source analysis', () => {
     source = fs.readFileSync(APPROVAL_CARD_FILE, 'utf8');
   });
 
-  it('FR6 — source uses bg-gold token for manual badge', () => {
-    expect(source).toContain('bg-gold');
+  it('FR6 — source uses bg-violet token for manual badge (01-color-semantics: gold → violet)', () => {
+    // Updated by 01-color-semantics: Manual badge is a category label (interactive accent),
+    // not a monetary value. Violet is the correct brand token.
+    expect(source).toContain('bg-violet/20');
   });
 
-  it('FR6 — source uses text-gold token for manual badge text', () => {
-    expect(source).toContain('text-gold');
+  it('FR6 — source uses text-violet token for manual badge text (01-color-semantics: gold → violet)', () => {
+    expect(source).toContain('text-violet');
   });
 
   it('FR6 — source uses bg-warning token for overtime badge', () => {
