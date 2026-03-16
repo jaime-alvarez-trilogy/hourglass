@@ -29,6 +29,7 @@ import { computePanelState, computeDaysElapsed } from '@/src/lib/panelState';
 import { computeAICone } from '@/src/lib/aiCone';
 import { getUrgencyLevel, getWeekLabels } from '@/src/lib/hours';
 import { colors } from '@/src/lib/colors';
+import AmbientBackground, { getAmbientColor } from '@/src/components/AmbientBackground';
 import FadeInScreen from '@/src/components/FadeInScreen';
 import { AnimatedPressable } from '@/src/components/AnimatedPressable';
 import PanelGradient from '@/src/components/PanelGradient';
@@ -186,6 +187,8 @@ export default function HoursDashboard() {
   return (
     <FadeInScreen>
     <SafeAreaView className="flex-1 bg-background">
+      {/* FR1 (02-home-hero-ambient): Fixed ambient backdrop — outside ScrollView, does not scroll */}
+      <AmbientBackground color={getAmbientColor({ type: 'panelState', state: panelState })} />
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ padding: 16, paddingTop: 8, gap: 12 }}

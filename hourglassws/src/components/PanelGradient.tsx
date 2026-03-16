@@ -17,7 +17,7 @@
 //   - BlurView (intensity 30) is first absolutely-positioned child, behind gradient
 
 import React, { useEffect } from 'react';
-import { Platform, StyleSheet, ViewStyle } from 'react-native';
+import { Platform, StyleSheet, View, ViewStyle } from 'react-native';
 import { BlurView } from 'expo-blur';
 import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import Animated, {
@@ -150,8 +150,10 @@ export default function PanelGradient({
 
   return (
     <Animated.View className={combined} style={[{ flex: 1 }, animatedStyle]}>
-      {/* Glass base layer — absolutely fills panel, behind gradient */}
-      <BlurView intensity={BLUR_INTENSITY_PANEL} tint="dark" style={StyleSheet.absoluteFill} />
+      {/* Glass base layer — wrapped in pointerEvents=none View so touches always pass through */}
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <BlurView intensity={BLUR_INTENSITY_PANEL} tint="systemChromeMaterialDark" style={{ flex: 1 }} />
+      </View>
       {/* SVG radial gradient — absolutely positioned behind children */}
       {gradientColors !== null && (
         <Svg
@@ -168,7 +170,7 @@ export default function PanelGradient({
               r="70%"
               gradientUnits="objectBoundingBox"
             >
-              <Stop offset="0%" stopColor={gradientColors.inner} stopOpacity={0.35} />
+              <Stop offset="0%" stopColor={gradientColors.inner} stopOpacity={0.50} />
               <Stop offset="100%" stopColor={gradientColors.outer} stopOpacity={0} />
             </RadialGradient>
           </Defs>
