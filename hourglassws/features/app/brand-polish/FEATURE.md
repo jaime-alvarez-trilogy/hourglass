@@ -80,3 +80,4 @@ The UX Gauntlet (3/7 models, avg ~5/10) identified a consistent pattern: **stron
 ## Changelog
 
 - 2026-03-15: Research complete. 5 specs decomposed.
+- 2026-03-15: [01-design-tokens](specs/01-design-tokens/spec.md) — spec and checklist created. Palette v1.1, goldBright, cyan update, tailwind sync, modal violations fixed.
