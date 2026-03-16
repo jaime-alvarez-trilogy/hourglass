@@ -110,7 +110,7 @@ async function runBackfill(
   try {
     token = await getAuthToken(username, password, useQA);
   } catch {
-    return null; // Auth failure — silently abort
+    return history; // Auth failure — return current history so overview still refreshes
   }
 
   let updated = [...history];
@@ -170,14 +170,15 @@ export function useHistoryBackfill(): WeeklySnapshot[] | null {
 
     hasRun.current = true;
 
+    const refreshFromStorage = () =>
+      loadWeeklyHistory().then(data => setSnapshots(data)).catch(() => {});
+
     loadCredentials().then(creds => {
-      if (!creds) return;
+      if (!creds) { refreshFromStorage(); return; }
       return runBackfill(config.assignmentId, config.useQA, creds.username, creds.password)
-        .then(updated => {
-          setSnapshots(updated);
-        });
+        .then(updated => { setSnapshots(updated); });
     }).catch(() => {
-      // Silent failure — overview shows whatever history was already loaded
+      refreshFromStorage(); // ensure overview always gets fresh storage state
     });
   }, [config?.assignmentId]);
 
