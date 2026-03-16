@@ -1,13 +1,22 @@
 import { View, Text, TouchableOpacity, Switch, StyleSheet, Alert, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { clearAll, loadConfig, saveConfig } from '@/src/store/config';
+import { clearAll, loadConfig, loadCredentials, saveConfig } from '@/src/store/config';
 import { useConfig } from '@/src/hooks/useConfig';
+import { colors } from '@/src/lib/colors';
 
 export default function ModalScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { config } = useConfig();
+  const [username, setUsername] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadCredentials().then((creds) => setUsername(creds?.username ?? null));
+  }, []);
+
+  const isMe = username === 'jalvarez0907@outlook.com';
 
   async function handleSignOut() {
     Alert.alert('Sign Out', 'This will clear your saved credentials and return to the login screen.', [
@@ -24,11 +33,21 @@ export default function ModalScreen() {
     ]);
   }
 
-  async function toggleShowApprovals(value: boolean) {
+  async function toggleDevManagerView(value: boolean) {
     if (!config) return;
-    const updated = { ...config, showApprovals: value };
+    const updated = { ...config, devManagerView: value };
     await saveConfig(updated);
     queryClient.setQueryData(['config'], updated);
+    queryClient.invalidateQueries({ queryKey: ['approvals'] });
+    queryClient.invalidateQueries({ queryKey: ['myRequests'] });
+  }
+
+  async function toggleDevOvertimePreview(value: boolean) {
+    if (!config) return;
+    const updated = { ...config, devOvertimePreview: value };
+    await saveConfig(updated);
+    queryClient.setQueryData(['config'], updated);
+    queryClient.invalidateQueries({ queryKey: ['hours'] });
   }
 
   return (
@@ -50,22 +69,36 @@ export default function ModalScreen() {
       )}
 
       {/* Dev options — always visible since this is a debug settings screen */}
-      {config && (
+      {config && isMe && (
         <View style={styles.devBox}>
           <Text style={styles.devTitle}>Dev Options</Text>
+          {!config.isManager && (
+            <>
+              <View style={styles.toggleRow}>
+                <Text style={styles.toggleLabel}>Manager Preview</Text>
+                <Switch
+                  value={config.devManagerView ?? false}
+                  onValueChange={toggleDevManagerView}
+                  trackColor={{ false: colors.border, true: colors.violet }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+              <Text style={styles.toggleHint}>
+                Shows the Team Requests queue with fake pending approvals + fake My Requests (pending, approved, rejected).
+              </Text>
+            </>
+          )}
           <View style={styles.toggleRow}>
-            <Text style={styles.toggleLabel}>Show Approvals Tab</Text>
+            <Text style={styles.toggleLabel}>Overtime Preview</Text>
             <Switch
-              value={config.showApprovals ?? false}
-              onValueChange={toggleShowApprovals}
-              trackColor={{ false: '#2A2A3D', true: '#E8C97A' }}
+              value={config.devOvertimePreview ?? false}
+              onValueChange={toggleDevOvertimePreview}
+              trackColor={{ false: colors.border, true: colors.violet }}
               thumbColor="#FFFFFF"
             />
           </View>
           <Text style={styles.toggleHint}>
-            {config.isManager
-              ? 'You are a manager — Approvals tab is always shown.'
-              : 'Enable to show the Approvals tab for testing (non-manager account).'}
+            Forces the home screen hero to show the Overtime panel state (for UI testing).
           </Text>
         </View>
       )}
@@ -80,7 +113,7 @@ export default function ModalScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D1117',
+    backgroundColor: colors.background,
     padding: 24,
     paddingTop: 40,
   },
