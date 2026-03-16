@@ -1,10 +1,10 @@
-// Tests: AI Tab screen (06-ai-tab)
-// FR1: AIRingChart integration
-// FR2: Hero metric section (MetricValue + SectionLabel)
-// FR3: BrainLift progress bar
-// FR4: Delta badge (week-over-week)
+// Tests: AI Tab screen (06-ai-tab + 04-ai-hero-arc)
+// FR1: AIRingChart integration [REPLACED by 04-ai-hero-arc — tests updated]
+// FR2: Hero metric section (SectionLabel; MetricValue moved to AIArcHero)
+// FR3: BrainLift progress bar [moved to AIArcHero — tests updated]
+// FR4: Delta badge (week-over-week) [moved to AIArcHero — tests updated]
 // FR5: DailyAIRow (className migration)
-// FR6: Loading/skeleton states
+// FR6: Loading/skeleton states [updated for AIArcHero skeleton]
 //
 // Strategy:
 // - Mock useAIData (module mock) returning controlled AIWeekData
@@ -105,12 +105,34 @@ jest.mock('@/src/components/ProgressBar', () => {
   };
 });
 
-jest.mock('@/src/components/AIRingChart', () => {
+// AIArcHero — stub for screen-level tests (unit tests in AIArcHero.test.tsx)
+jest.mock('@/src/components/AIArcHero', () => {
   const mockR = require('react');
   return {
     __esModule: true,
-    default: ({ aiPercent, brainliftPercent, size, ...props }: any) =>
-      mockR.createElement('AIRingChart', { aiPercent, brainliftPercent, size, ...props }),
+    default: ({ aiPct, brainliftHours, deltaPercent, ambientColor, ...props }: any) =>
+      mockR.createElement('AIArcHero', { aiPct, brainliftHours, deltaPercent, ambientColor, testID: 'ai-arc-hero', ...props }),
+    AI_TARGET_PCT: 75,
+    BRAINLIFT_TARGET_HOURS: 5,
+  };
+});
+
+// AmbientBackground — stub (unit tests in AmbientBackground.test.tsx)
+jest.mock('@/src/components/AmbientBackground', () => {
+  const mockR = require('react');
+  return {
+    __esModule: true,
+    default: ({ color, intensity, ...props }: any) =>
+      mockR.createElement('AmbientBackground', { color, intensity, ...props }),
+    getAmbientColor: (signal: any) => {
+      if (signal.type === 'aiPct') {
+        if (signal.pct >= 75) return '#A78BFA';
+        if (signal.pct >= 60) return '#00C2FF';
+        return '#F59E0B';
+      }
+      return null;
+    },
+    AMBIENT_COLORS: {},
   };
 });
 
@@ -293,9 +315,9 @@ function allText(tree: any): string {
   return findAllText(tree.toJSON()).join(' ');
 }
 
-// ─── FR1: AIRingChart Integration ────────────────────────────────────────────
+// ─── FR1: Hero integration (04-ai-hero-arc: AIArcHero replaces AIRingChart) ──
 
-describe('AITab — FR1: AIRingChart integration', () => {
+describe('AITab — FR1: AIArcHero integration (replaces AIRingChart)', () => {
   beforeEach(() => {
     mockUseAIData.mockReturnValue(DEFAULT_HOOK_RESULT);
   });
@@ -306,36 +328,36 @@ describe('AITab — FR1: AIRingChart integration', () => {
     }).not.toThrow();
   });
 
-  it('SC1.2 — ai-ring-container testID is present', () => {
+  it('SC1.2 — ai-arc-hero testID is present (AIArcHero renders as hero)', () => {
     const tree = renderAIScreen();
-    const container = findByTestId(tree, 'ai-ring-container');
-    expect(container).not.toBeNull();
+    const hero = findByTestId(tree, 'ai-arc-hero');
+    expect(hero).not.toBeNull();
   });
 
-  it('SC1.3 — ai.tsx source imports AIRingChart', () => {
+  it('SC1.3 — ai.tsx source imports AIArcHero (replaces AIRingChart)', () => {
     const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
-    expect(source).toMatch(/AIRingChart/);
+    expect(source).toContain('AIArcHero');
+    expect(source).not.toMatch(/import\s+AIRingChart/);
   });
 
-  it('SC1.4 — ai.tsx source defines RING_SIZE constant', () => {
+  it('SC1.4 — ai.tsx source does NOT define RING_SIZE (removed with AIRingChart)', () => {
     const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
-    expect(source).toMatch(/RING_SIZE\s*=\s*160/);
+    expect(source).not.toMatch(/RING_SIZE/);
   });
 
-  it('SC1.5 — ai.tsx source passes aiPercent to AIRingChart', () => {
+  it('SC1.5 — ai.tsx source passes aiPct to AIArcHero', () => {
     const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
-    // aiPercent prop passed to AIRingChart
-    expect(source).toMatch(/AIRingChart[\s\S]{0,200}aiPercent/);
+    expect(source).toMatch(/AIArcHero[\s\S]{0,400}aiPct/);
   });
 
-  it('SC1.6 — ai.tsx source passes brainliftPercent to AIRingChart', () => {
+  it('SC1.6 — ai.tsx source passes brainliftHours to AIArcHero', () => {
     const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
-    expect(source).toMatch(/AIRingChart[\s\S]{0,200}brainliftPercent/);
+    expect(source).toMatch(/AIArcHero[\s\S]{0,400}brainliftHours/);
   });
 
-  it('SC1.7 — ai.tsx source uses RING_SIZE as AIRingChart size prop', () => {
+  it('SC1.7 — ai.tsx source passes ambientColor to AIArcHero', () => {
     const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
-    expect(source).toMatch(/size\s*[=:]\s*[{(]?\s*RING_SIZE/);
+    expect(source).toMatch(/ambientColor=\{ambientColor\}/);
   });
 });
 
@@ -346,27 +368,35 @@ describe('AITab — FR2: hero metric section', () => {
     mockUseAIData.mockReturnValue(DEFAULT_HOOK_RESULT);
   });
 
-  it('SC2.1 — "AI USAGE" section label text present', () => {
+  it('SC2.1 — AIArcHero is rendered (contains AI USAGE + arc gauge)', () => {
+    // AI USAGE label is now inside AIArcHero component — verified in AIArcHero.test.tsx
+    // Screen-level test: confirm AIArcHero renders (which provides the AI USAGE label)
     const tree = renderAIScreen();
-    const text = allText(tree);
-    expect(text.toUpperCase()).toContain('AI USAGE');
+    const hero = findByTestId(tree, 'ai-arc-hero');
+    expect(hero).not.toBeNull();
   });
 
-  it('SC2.2 — "BRAINLIFT" section label text present', () => {
+  it('SC2.2 — BRAINLIFT metric in AIArcHero receives brainliftHours prop', () => {
+    // BRAINLIFT label is now inside AIArcHero — verified in AIArcHero.test.tsx
+    // Screen-level test: AIArcHero receives brainliftHours from screen
     const tree = renderAIScreen();
-    const text = allText(tree);
-    expect(text.toUpperCase()).toContain('BRAINLIFT');
+    const hero = findByTestId(tree, 'ai-arc-hero');
+    expect(hero).not.toBeNull();
+    expect(hero.props.brainliftHours).toBeDefined();
   });
 
-  it('SC2.3 — "/ 5h target" label present', () => {
+  it('SC2.3 — AIArcHero receives correct brainliftHours value from screen', () => {
+    // "5h" target label is now inside AIArcHero — verified in AIArcHero.test.tsx
+    // Screen-level test: correct value is passed as prop
     const tree = renderAIScreen();
-    const text = allText(tree);
-    expect(text).toContain('5h');
+    const hero = findByTestId(tree, 'ai-arc-hero');
+    expect(hero.props.brainliftHours).toBe(3.5);
   });
 
-  it('SC2.4 — ai.tsx source imports MetricValue', () => {
+  it('SC2.4 — ai.tsx source imports AIArcHero (hero + MetricValue now in AIArcHero)', () => {
     const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
-    expect(source).toMatch(/MetricValue/);
+    // MetricValue was moved into AIArcHero; ai.tsx now uses AIArcHero instead
+    expect(source).toContain('AIArcHero');
   });
 
   it('SC2.5 — ai.tsx source imports SectionLabel', () => {
@@ -401,39 +431,43 @@ describe('AITab — FR2: hero metric section', () => {
   });
 });
 
-// ─── FR3: BrainLift Progress Bar ──────────────────────────────────────────────
+// ─── FR3: BrainLift (now in AIArcHero) ───────────────────────────────────────
 
-describe('AITab — FR3: BrainLift progress bar', () => {
+describe('AITab — FR3: BrainLift (via AIArcHero)', () => {
   beforeEach(() => {
     mockUseAIData.mockReturnValue(DEFAULT_HOOK_RESULT);
   });
 
-  it('SC3.1 — ai.tsx source imports ProgressBar', () => {
-    const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
+  it('SC3.1 — AIArcHero.tsx source imports ProgressBar (BrainLift moved to AIArcHero)', () => {
+    const arcHeroPath = path.join(HOURGLASSWS_ROOT, 'src', 'components', 'AIArcHero.tsx');
+    const source = fs.readFileSync(arcHeroPath, 'utf8');
     expect(source).toMatch(/ProgressBar/);
   });
 
-  it('SC3.2 — ai.tsx source uses bg-violet colorClass for ProgressBar', () => {
-    const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
+  it('SC3.2 — AIArcHero.tsx source uses bg-violet colorClass for ProgressBar', () => {
+    const arcHeroPath = path.join(HOURGLASSWS_ROOT, 'src', 'components', 'AIArcHero.tsx');
+    const source = fs.readFileSync(arcHeroPath, 'utf8');
     expect(source).toContain('bg-violet');
   });
 
-  it('SC3.3 — ai.tsx source passes brainliftHours/5 (or BRAINLIFT_TARGET) as progress', () => {
-    const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
-    // Either uses literal /5 or a BRAINLIFT_TARGET constant
-    expect(source).toMatch(/brainliftHours\s*\/\s*(5|BRAINLIFT_TARGET)/);
+  it('SC3.3 — AIArcHero.tsx source clamps brainliftHours progress with Math.min(1, ...)', () => {
+    const arcHeroPath = path.join(HOURGLASSWS_ROOT, 'src', 'components', 'AIArcHero.tsx');
+    const source = fs.readFileSync(arcHeroPath, 'utf8');
+    expect(source).toMatch(/Math\.min\s*\(\s*1/);
   });
 
-  it('SC3.4 — ai.tsx source uses height={6} on BrainLift ProgressBar', () => {
-    const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
-    expect(source).toContain('height={6}');
+  it('SC3.4 — AIArcHero.tsx source uses height={5} on BrainLift ProgressBar', () => {
+    const arcHeroPath = path.join(HOURGLASSWS_ROOT, 'src', 'components', 'AIArcHero.tsx');
+    const source = fs.readFileSync(arcHeroPath, 'utf8');
+    expect(source).toContain('height={5}');
   });
 
-  it('SC3.5 — BrainLift hours value appears in rendered output', () => {
+  it('SC3.5 — AIArcHero renders with brainliftHours passed from screen', () => {
     const tree = renderAIScreen();
-    const text = allText(tree);
-    // brainliftHours = 3.5 → should see "3.5" somewhere
-    expect(text).toContain('3.5');
+    // AIArcHero mock receives brainliftHours=3.5; check prop on rendered AIArcHero
+    const hero = findByTestId(tree, 'ai-arc-hero');
+    expect(hero).not.toBeNull();
+    expect(hero.props.brainliftHours).toBe(3.5);
   });
 });
 
@@ -450,17 +484,20 @@ describe('AITab — FR4: delta badge', () => {
     expect(badge).toBeNull();
   });
 
-  it('SC4.2 — delta-badge IS rendered when previousWeekPercent is available', () => {
+  it('SC4.2 — AIArcHero receives non-null deltaPercent when previousWeekPercent is available', () => {
+    // Delta badge is now rendered inside AIArcHero — verified in AIArcHero.test.tsx
+    // Screen-level: correct deltaPercent prop passed to AIArcHero
     mockUseAIData.mockReturnValue({
       ...DEFAULT_HOOK_RESULT,
       previousWeekPercent: 72,
     });
     const tree = renderAIScreen();
-    const badge = findByTestId(tree, 'delta-badge');
-    expect(badge).not.toBeNull();
+    const hero = findByTestId(tree, 'ai-arc-hero');
+    expect(hero).not.toBeNull();
+    expect(hero.props.deltaPercent).not.toBeNull();
   });
 
-  it('SC4.3 — positive delta shows "+" prefix', () => {
+  it('SC4.3 — positive delta: AIArcHero receives positive deltaPercent', () => {
     // aiPercent = (73+77)/2 = 75; previousWeekPercent = 70; delta = +5.0
     mockUseAIData.mockReturnValue({
       ...DEFAULT_HOOK_RESULT,
@@ -468,12 +505,11 @@ describe('AITab — FR4: delta badge', () => {
       previousWeekPercent: 70,
     });
     const tree = renderAIScreen();
-    const text = allText(tree);
-    // Should contain a "+" prefixed delta
-    expect(text).toMatch(/\+\d+\.\d+%/);
+    const hero = findByTestId(tree, 'ai-arc-hero');
+    expect(hero.props.deltaPercent).toBeGreaterThan(0);
   });
 
-  it('SC4.4 — negative delta shows "-" prefix', () => {
+  it('SC4.4 — negative delta: AIArcHero receives negative deltaPercent', () => {
     // aiPercent = (73+77)/2 = 75; previousWeekPercent = 80; delta = -5.0
     mockUseAIData.mockReturnValue({
       ...DEFAULT_HOOK_RESULT,
@@ -481,11 +517,11 @@ describe('AITab — FR4: delta badge', () => {
       previousWeekPercent: 80,
     });
     const tree = renderAIScreen();
-    const text = allText(tree);
-    expect(text).toMatch(/-\d+\.\d+%/);
+    const hero = findByTestId(tree, 'ai-arc-hero');
+    expect(hero.props.deltaPercent).toBeLessThan(0);
   });
 
-  it('SC4.5 — zero delta shows "+0.0%" text', () => {
+  it('SC4.5 — zero delta: AIArcHero receives deltaPercent === 0', () => {
     // aiPercent = 75; previousWeekPercent = 75; delta = 0
     mockUseAIData.mockReturnValue({
       ...DEFAULT_HOOK_RESULT,
@@ -493,29 +529,33 @@ describe('AITab — FR4: delta badge', () => {
       previousWeekPercent: 75,
     });
     const tree = renderAIScreen();
-    const text = allText(tree);
-    expect(text).toContain('+0.0%');
+    const hero = findByTestId(tree, 'ai-arc-hero');
+    expect(hero.props.deltaPercent).toBe(0);
   });
 
-  it('SC4.6 — ai.tsx source uses bg-surfaceElevated on delta badge', () => {
-    const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
-    expect(source).toContain('bg-surfaceElevated');
+  it('SC4.6 — AIArcHero.tsx source uses surfaceElevated on delta badge', () => {
+    // Delta badge styling moved to AIArcHero
+    const arcHeroPath = path.join(HOURGLASSWS_ROOT, 'src', 'components', 'AIArcHero.tsx');
+    const source = fs.readFileSync(arcHeroPath, 'utf8');
+    expect(source).toContain('surfaceElevated');
   });
 
-  it('SC4.7 — ai.tsx source uses rounded-full on delta badge', () => {
-    const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
-    expect(source).toContain('rounded-full');
+  it('SC4.7 — AIArcHero.tsx source uses borderRadius on delta badge container', () => {
+    const arcHeroPath = path.join(HOURGLASSWS_ROOT, 'src', 'components', 'AIArcHero.tsx');
+    const source = fs.readFileSync(arcHeroPath, 'utf8');
+    expect(source).toMatch(/borderRadius/);
   });
 
-  it('SC4.8 — ai.tsx source uses text-success for positive delta', () => {
-    const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
-    expect(source).toContain('text-success');
+  it('SC4.8 — AIArcHero.tsx source uses colors.success for positive delta', () => {
+    const arcHeroPath = path.join(HOURGLASSWS_ROOT, 'src', 'components', 'AIArcHero.tsx');
+    const source = fs.readFileSync(arcHeroPath, 'utf8');
+    expect(source).toContain('colors.success');
   });
 
-  it('SC4.9 — ai.tsx source uses text-critical for negative delta', () => {
-    // Updated in 02-typography: text-error was an undefined class, replaced with text-critical
-    const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
-    expect(source).toContain('text-critical');
+  it('SC4.9 — AIArcHero.tsx source uses colors.critical for negative delta', () => {
+    const arcHeroPath = path.join(HOURGLASSWS_ROOT, 'src', 'components', 'AIArcHero.tsx');
+    const source = fs.readFileSync(arcHeroPath, 'utf8');
+    expect(source).toContain('colors.critical');
   });
 });
 
@@ -643,26 +683,28 @@ describe('AITab — FR5: DailyAIRow className migration', () => {
 // ─── FR6: Loading / Skeleton States ──────────────────────────────────────────
 
 describe('AITab — FR6: loading/skeleton states', () => {
-  it('SC6.1 — skeleton-ring shown when isLoading=true and data=null', () => {
+  it('SC6.1 — SkeletonLoader rendered for hero when isLoading=true and data=null', () => {
     mockUseAIData.mockReturnValue({
       ...DEFAULT_HOOK_RESULT,
       data: null,
       isLoading: true,
     });
     const tree = renderAIScreen();
-    const skeleton = findByTestId(tree, 'skeleton-ring');
-    expect(skeleton).not.toBeNull();
+    // With AIArcHero, skeleton is a SkeletonLoader component (width=180, height=180)
+    // ai-arc-hero testID should NOT be present (AIArcHero not rendered in skeleton path)
+    const hero = findByTestId(tree, 'ai-arc-hero');
+    expect(hero).toBeNull();
   });
 
-  it('SC6.2 — skeleton-metrics shown when isLoading=true and data=null', () => {
+  it('SC6.2 — AIArcHero is rendered (no skeleton) when data is available', () => {
     mockUseAIData.mockReturnValue({
       ...DEFAULT_HOOK_RESULT,
-      data: null,
-      isLoading: true,
+      data: DEFAULT_DATA,
+      isLoading: false,
     });
     const tree = renderAIScreen();
-    const skeleton = findByTestId(tree, 'skeleton-metrics');
-    expect(skeleton).not.toBeNull();
+    const hero = findByTestId(tree, 'ai-arc-hero');
+    expect(hero).not.toBeNull();
   });
 
   it('SC6.3 — skeleton-breakdown shown when isLoading=true and data=null', () => {

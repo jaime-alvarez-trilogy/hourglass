@@ -1,11 +1,9 @@
 // FR9 (04-ai-brainlift): AI & BrainLift screen — rebuilt for 06-ai-tab design system
-// FR1: AIRingChart integration (two-ring: AI% outer cyan, BrainLift% inner violet)
-// FR2: Hero metric section (MetricValue count-up, SectionLabel, NativeWind tokens)
-// FR3: BrainLift progress bar (ProgressBar bg-violet, /5h target subtext)
-// FR4: Delta badge (week-over-week AI% from AsyncStorage via useAIData)
 // FR5: DailyAIRow (className-only styling)
 // FR6: Loading/skeleton states (SkeletonLoader for ring, metrics, breakdown)
 // FR1 (03-ai-tab-integration): Prime Radiant card — AIConeChart full-size with re-animation
+// FR4 (04-ai-hero-arc): AmbientBackground wiring — full-screen ambient behind ScrollView
+// FR5 (04-ai-hero-arc): AIArcHero replaces two-card ring hero + standalone BrainLift card
 
 import React, { useMemo, useState } from 'react';
 import {
@@ -22,25 +20,19 @@ import { useFocusKey } from '@/src/hooks/useFocusKey';
 import { useStaggeredEntry } from '@/src/hooks/useStaggeredEntry';
 import { useHistoryBackfill } from '@/src/hooks/useHistoryBackfill';
 import { useOverviewData } from '@/src/hooks/useOverviewData';
-import AIRingChart from '@/src/components/AIRingChart';
 import AIConeChart from '@/src/components/AIConeChart';
 import type { AIScrubPoint } from '@/src/components/AIConeChart';
 import FadeInScreen from '@/src/components/FadeInScreen';
 import { AnimatedPressable } from '@/src/components/AnimatedPressable';
-import MetricValue from '@/src/components/MetricValue';
 import Card from '@/src/components/Card';
 import SectionLabel from '@/src/components/SectionLabel';
-import ProgressBar from '@/src/components/ProgressBar';
 import SkeletonLoader from '@/src/components/SkeletonLoader';
+import AIArcHero from '@/src/components/AIArcHero';
+import AmbientBackground, { getAmbientColor } from '@/src/components/AmbientBackground';
 import TrendSparkline from '@/src/components/TrendSparkline';
 import { DailyAIRow } from '@/src/components/DailyAIRow';
 import { computeAICone } from '@/src/lib/aiCone';
 import { colors } from '@/src/lib/colors';
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const RING_SIZE = 160;
-const BRAINLIFT_TARGET = 5;
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
@@ -79,7 +71,7 @@ export default function AIScreen() {
   const { data, isLoading, lastFetchedAt, error, refetch, previousWeekPercent } = useAIData();
   const { config } = useConfig();
   const chartKey = useFocusKey();
-  const { getEntryStyle } = useStaggeredEntry({ count: 6 });
+  const { getEntryStyle } = useStaggeredEntry({ count: 5 });
 
   // 12-week AI trajectory — backfill + history
   const backfillSnapshots = useHistoryBackfill();
@@ -101,7 +93,7 @@ export default function AIScreen() {
   // Prime Radiant cone dims — measured via onLayout; chart renders null until width > 0
   const [coneDims, setConeDims] = useState({ width: 0, height: 240 });
 
-  // Scrub state — when user drags AIConeChart, hero MetricValue shows scrubPoint.pctY
+  // Scrub state — when user drags AIConeChart, hero AIArcHero shows scrubPoint.pctY via heroAIPct
   const [scrubPoint, setScrubPoint] = useState<AIScrubPoint | null>(null);
 
   // Config-derived weekly limit (FR1 03-ai-tab-integration)
@@ -169,15 +161,21 @@ export default function AIScreen() {
   // Hero AI% — overridden by scrubPoint during scrub, otherwise live value
   const heroAIPct = scrubPoint !== null ? scrubPoint.pctY : aiPercent;
   const brainliftHours = data?.brainliftHours ?? 0;
-  const brainliftPercent = Math.min(100, (brainliftHours / BRAINLIFT_TARGET) * 100);
 
   // Week-over-week delta (FR4) — only computed when we have real data and a prior week reference
   const delta = (data && previousWeekPercent !== undefined) ? aiPercent - previousWeekPercent : null;
+
+  // Ambient color — drives AmbientBackground halo + AIArcHero fill arc
+  // getAmbientColor({ type: 'aiPct' }) always returns a non-null string (no idle case for aiPct)
+  const ambientColor = getAmbientColor({ type: 'aiPct', pct: Math.round(heroAIPct) }) as string;
 
   // Skeleton layout: shown only when isLoading=true AND no data yet
   const showSkeleton = isLoading && !data;
 
   return (
+    <View style={{ flex: 1 }}>
+      {/* FR4 (04-ai-hero-arc): Ambient layer — full-screen behind all content */}
+      <AmbientBackground color={ambientColor} />
     <FadeInScreen>
     <ScrollView
       className="flex-1 bg-background"
@@ -193,142 +191,22 @@ export default function AIScreen() {
       {/* Header */}
       <Text className="text-3xl font-bold text-textPrimary mb-1">AI &amp; BrainLift</Text>
 
-      {/* AI Usage Card — FR1, FR2, FR4 */}
+      {/* FR5 (04-ai-hero-arc): AIArcHero — replaces AIRingChart + standalone BrainLift card */}
       <Animated.View style={getEntryStyle(0)}>
-      <Card>
-        <SectionLabel>AI USAGE</SectionLabel>
-
         {showSkeleton ? (
-          <View testID="skeleton-ring" className="items-center mt-3">
-            <SkeletonLoader width={RING_SIZE} height={RING_SIZE} rounded />
-          </View>
+          <SkeletonLoader width={180} height={180} rounded />
         ) : (
-          <View className="items-center mt-3">
-            {/* Ring container: AIRingChart with MetricValue overlay */}
-            <View
-              testID="ai-ring-container"
-              style={{ position: 'relative', width: RING_SIZE, height: RING_SIZE }}
-            >
-              <AIRingChart
-                aiPercent={aiPercent}
-                brainliftPercent={brainliftPercent}
-                size={RING_SIZE}
-              />
-              {/* MetricValue overlay: centered absolutely over the ring */}
-              <View
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {/* During scrub: plain Text avoids MetricValue re-animation on every frame */}
-                {scrubPoint !== null ? (
-                  <Text
-                    className="font-display text-4xl text-cyan"
-                    style={{ fontVariant: ['tabular-nums'] }}
-                  >
-                    {heroAIPct.toFixed(1)}%
-                  </Text>
-                ) : (
-                  <MetricValue
-                    value={heroAIPct}
-                    unit="%"
-                    precision={1}
-                    colorClass="text-cyan"
-                    sizeClass="text-4xl"
-                  />
-                )}
-              </View>
-            </View>
-
-            {/* Delta badge — FR4 */}
-            {delta !== null && (
-              <View
-                testID="delta-badge"
-                className="bg-surfaceElevated rounded-full px-2 py-0.5 mt-2"
-              >
-                <Text
-                  className={`text-xs font-semibold${
-                    delta > 0
-                      ? ' text-success'
-                      : delta < 0
-                      ? ' text-critical'
-                      : ' text-textSecondary'
-                  }`}
-                >
-                  {delta === 0
-                    ? '+0.0%'
-                    : delta > 0
-                    ? `+${delta.toFixed(1)}%`
-                    : `${delta.toFixed(1)}%`}
-                </Text>
-              </View>
-            )}
-          </View>
+          <AIArcHero
+            aiPct={Math.round(heroAIPct)}
+            brainliftHours={brainliftHours}
+            deltaPercent={delta}
+            ambientColor={ambientColor}
+          />
         )}
-
-        {showSkeleton && (
-          <View testID="skeleton-metrics" className="mt-3 gap-2">
-            <SkeletonLoader height={40} />
-            <SkeletonLoader height={32} />
-          </View>
-        )}
-
-        {/* AI% target note */}
-        {!showSkeleton && (
-          <Text className="text-xs text-textMuted text-center mt-2">75% target</Text>
-        )}
-      </Card>
-      </Animated.View>
-
-      {/* BrainLift Card — FR2, FR3 */}
-      <Animated.View style={getEntryStyle(1)}>
-      <Card>
-        <SectionLabel>BRAINLIFT</SectionLabel>
-
-        {showSkeleton ? (
-          <View className="gap-2 mt-2">
-            <SkeletonLoader height={32} />
-            <SkeletonLoader height={6} />
-          </View>
-        ) : (
-          <>
-            {/* BrainLift hours MetricValue row */}
-            <View className="flex-row items-baseline gap-1 mt-2">
-              <MetricValue
-                value={brainliftHours}
-                unit="h"
-                precision={1}
-                colorClass="text-violet"
-                sizeClass="text-3xl"
-              />
-              <Text className="text-sm text-textSecondary">/ 5h target</Text>
-            </View>
-
-            {/* BrainLift progress bar */}
-            <ProgressBar
-              progress={brainliftHours / BRAINLIFT_TARGET}
-              colorClass="bg-violet"
-              height={6}
-              className="mt-2"
-            />
-
-            {/* Subtext */}
-            <Text className="text-sm text-textSecondary mt-1" style={{ fontVariant: ['tabular-nums'] }}>
-              {brainliftHours.toFixed(1)}h / {BRAINLIFT_TARGET}h target
-            </Text>
-          </>
-        )}
-      </Card>
       </Animated.View>
 
       {/* Prime Radiant Card — FR1 (03-ai-tab-integration) */}
-      <Animated.View style={getEntryStyle(2)}>
+      <Animated.View style={getEntryStyle(1)}>
       <Card>
         <SectionLabel className="mb-3">PRIME RADIANT</SectionLabel>
         {showSkeleton ? (
@@ -353,7 +231,7 @@ export default function AIScreen() {
 
       {/* Daily Breakdown Card — FR5 */}
       {(data && data.dailyBreakdown.length > 0) && (
-        <Animated.View style={getEntryStyle(3)}>
+        <Animated.View style={getEntryStyle(2)}>
         <Card testID="daily-breakdown">
           {/* Column headers */}
           <View className="flex-row pb-1.5 border-b border-border mb-1">
@@ -381,7 +259,7 @@ export default function AIScreen() {
 
       {/* 12-Week AI Trajectory Card */}
       {hasTrajectory && (
-        <Animated.View style={getEntryStyle(4)}>
+        <Animated.View style={getEntryStyle(3)}>
         <Card>
           <SectionLabel className="mb-2">12-WEEK TRAJECTORY</SectionLabel>
 
@@ -442,7 +320,7 @@ export default function AIScreen() {
       )}
 
       {/* Legend Card */}
-      <Animated.View style={getEntryStyle(5)}>
+      <Animated.View style={getEntryStyle(4)}>
       <Card>
         <Text className="text-sm font-semibold text-textPrimary mb-1">How it&apos;s calculated</Text>
         <Text className="text-sm text-textSecondary leading-5">
@@ -469,5 +347,6 @@ export default function AIScreen() {
       {/* TODO: TrendSparkline — deferred to future analytics spec (weeklyHistory not yet in useAIData) */}
     </ScrollView>
     </FadeInScreen>
+    </View>
   );
 }
