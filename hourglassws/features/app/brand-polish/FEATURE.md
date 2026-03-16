@@ -77,6 +77,8 @@ The UX Gauntlet (3/7 models, avg ~5/10) identified a consistent pattern: **stron
 | `src/components/FadeInScreen.tsx` | 03 |
 | `components/haptic-tab.tsx` | 03 |
 | `src/hooks/useStaggeredEntry.ts` | 04 (new) |
+| `src/components/TrendSparkline.tsx` | 07 |
+| `src/components/WeeklyBarChart.tsx` | 07 |
 
 ---
 
@@ -89,4 +91,4 @@ The UX Gauntlet (3/7 models, avg ~5/10) identified a consistent pattern: **stron
 - 2026-03-15: [03-touch-and-navigation](specs/03-touch-and-navigation/spec.md) — **COMPLETE**. AnimatedPressable (timingInstant+springSnappy), FadeInScreen translateY spring entrance, HapticTab scale pulse, ApprovalCard/modal button migration. 71 tests passing.
 - 2026-03-15: [04-card-entry-animations](specs/04-card-entry-animations/spec.md) — **COMPLETE**. useStaggeredEntry hook (springBouncy, 50ms stagger, maxStaggerIndex cap, reduceMotion safety), wired to all 4 tab screens. 65 tests passing.
 - 2026-03-16: [06-wiring-and-tokens](specs/06-wiring-and-tokens/spec.md) — **SPEC COMPLETE**. Post-gauntlet run-002 gaps: NoiseOverlay not wired, tab bar v1.0 hex, gold on toggle, MetricValue 700→800 weight, loading screen token cleanup.
-- 2026-03-16: [07-chart-line-polish](specs/07-chart-line-polish/spec.md) — **SPEC READY**. Sci-fi holographic chart lines: TrendSparkline 2.5px + BlurMaskFilter glow, WeeklyBarChart today-bar ambient glow.
+- 2026-03-16: [07-chart-line-polish](specs/07-chart-line-polish/spec.md) — **COMPLETE**. Sci-fi holographic chart lines: TrendSparkline 2.5px + BlurMaskFilter glow (blur=8, solid, 25% alpha), WeeklyBarChart today-bar ambient glow (blur=12, normal, 19% alpha). 15 new tests passing.
