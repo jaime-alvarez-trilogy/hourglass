@@ -114,6 +114,14 @@ Layer 3 — Glass Cards (scroll over Layer 1)
 - `hourglassws/app/(tabs)/__tests__/index.test.tsx` — **Modified** (FR1/FR3 ambient wiring tests)
 - `hourglassws/src/components/__tests__/PanelGradient.test.tsx` — **Modified** (FR2 gradient opacity test)
 
+### 03-overview-hero
+- `hourglassws/src/components/OverviewHeroCard.tsx` — **Created** (FR1, FR2: dual-metric hero card)
+- `hourglassws/src/components/__tests__/OverviewHeroCard.test.tsx` — **Created** (30 tests)
+- `hourglassws/src/lib/overviewUtils.ts` — **Created** (FR3: computeEarningsPace)
+- `hourglassws/src/lib/__tests__/overviewUtils.test.ts` — **Created** (12 tests)
+- `hourglassws/app/(tabs)/overview.tsx` — **Modified** (FR4/FR5: AmbientBackground wiring, OverviewHeroCard, toggle migration)
+- `hourglassws/app/(tabs)/__tests__/overview.test.tsx` — **Modified** (FR4/FR5 ambient + hero wiring tests, 18 new tests)
+
 ## Reference Files
 
 - Design tokens: `hourglassws/src/lib/colors.ts`, `tailwind.config.js`
