@@ -18,7 +18,6 @@ import { useAIData } from '@/src/hooks/useAIData';
 import { useConfig } from '@/src/hooks/useConfig';
 import { useFocusKey } from '@/src/hooks/useFocusKey';
 import { useStaggeredEntry } from '@/src/hooks/useStaggeredEntry';
-import { useHistoryBackfill } from '@/src/hooks/useHistoryBackfill';
 import { useOverviewData } from '@/src/hooks/useOverviewData';
 import AIConeChart from '@/src/components/AIConeChart';
 import type { AIScrubPoint } from '@/src/components/AIConeChart';
@@ -73,9 +72,8 @@ export default function AIScreen() {
   const chartKey = useFocusKey();
   const { getEntryStyle } = useStaggeredEntry({ count: 5 });
 
-  // 12-week AI trajectory — backfill + history
-  const backfillSnapshots = useHistoryBackfill();
-  const { data: overviewData } = useOverviewData(12, backfillSnapshots);
+  // 12-week AI trajectory — reads persisted history (backfill runs only in overview.tsx)
+  const { data: overviewData } = useOverviewData(12);
   const [trajectoryDims, setTrajectoryDims] = useState({ width: 0, height: 52 });
 
   // Compute trajectory: use all 12 weeks but only average weeks with real data (> 0)
