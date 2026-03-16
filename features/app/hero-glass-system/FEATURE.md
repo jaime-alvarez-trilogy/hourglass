@@ -96,6 +96,7 @@ Layer 3 — Glass Cards (scroll over Layer 1)
 | Date | Spec | Description |
 |------|------|-------------|
 | 2026-03-16 | [01-ambient-layer](specs/01-ambient-layer/spec.md) | AmbientBackground component, getAmbientColor mapping, Card opacity/intensity update |
+| 2026-03-16 | [02-home-hero-ambient](specs/02-home-hero-ambient/spec.md) | Wire AmbientBackground to Home screen, expand PanelGradient inner gradient opacity |
 
 ## Files Touched
 
