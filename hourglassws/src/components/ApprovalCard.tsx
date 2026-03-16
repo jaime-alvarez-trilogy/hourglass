@@ -9,10 +9,10 @@ import {
   View,
   Text,
   Animated,
-  TouchableOpacity,
   PanResponder,
 } from 'react-native'
 import type { ApprovalItem, ManualApprovalItem, OvertimeApprovalItem } from '../lib/approvals'
+import { AnimatedPressable } from './AnimatedPressable'
 
 interface Props {
   item: ApprovalItem
@@ -112,20 +112,20 @@ export function ApprovalCard({ item, onApprove, onReject }: Props) {
 
         {/* Quick action buttons (accessibility fallback for gesture) */}
         <View className="flex-row gap-2 mt-1">
-          <TouchableOpacity
+          <AnimatedPressable
             className="flex-1 py-1.5 rounded-xl bg-success/20 items-center"
             onPress={onApprove}
             accessibilityLabel={`Approve ${item.fullName}`}
           >
             <Text className="text-success text-sm font-sans-medium">Approve</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
+          </AnimatedPressable>
+          <AnimatedPressable
             className="flex-1 py-1.5 rounded-xl bg-destructive/20 items-center"
             onPress={onReject}
             accessibilityLabel={`Reject ${item.fullName}`}
           >
             <Text className="text-destructive text-sm font-sans-medium">Reject</Text>
-          </TouchableOpacity>
+          </AnimatedPressable>
         </View>
       </Animated.View>
     </View>

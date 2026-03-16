@@ -17,6 +17,13 @@ import * as path from 'path';
 
 const COMPONENT_FILE = path.resolve(__dirname, '../FadeInScreen.tsx');
 
+// Mock useIsFocused — FadeInScreen requires NavigationContainer which is not
+// available in unit test context. Mock returns true (focused) by default.
+jest.mock('@react-navigation/native', () => ({
+  ...jest.requireActual('@react-navigation/native'),
+  useIsFocused: jest.fn(() => true),
+}));
+
 // ─── Source file static checks ────────────────────────────────────────────────
 
 describe('FadeInScreen — FR2: source file checks', () => {

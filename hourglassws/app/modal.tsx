@@ -1,4 +1,14 @@
-import { View, Text, TouchableOpacity, Switch, StyleSheet, Alert, ScrollView } from 'react-native';
+// modal.tsx
+// FR3 (05-panel-glass-surfaces): BlurView dark glass surface
+//
+// Design system rule (BRAND_GUIDELINES.md v1.1 §Surface & Depth — Backdrop Blur):
+//   Modals use BlurView intensity=30, tint="dark" wrapping content.
+//   Inner View: surfaceElevated background at 0.85 opacity for legibility.
+//   Fallback (expo-blur unavailable): solid surfaceElevated background.
+
+import { View, Text, Switch, StyleSheet, Alert, ScrollView } from 'react-native';
+import { AnimatedPressable } from '@/src/components/AnimatedPressable';
+import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -51,69 +61,77 @@ export default function ModalScreen() {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Settings</Text>
+    <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill}>
+      <View style={styles.overlay}>
+        <ScrollView style={styles.container}>
+          <Text style={styles.title}>Settings</Text>
 
-      {config && (
-        <View style={styles.debugBox}>
-          <Text style={styles.debugTitle}>Config Debug</Text>
-          <Text style={styles.debugRow}>name: {config.fullName}</Text>
-          <Text style={styles.debugRow}>userId: {config.userId}</Text>
-          <Text style={styles.debugRow}>managerId: {config.managerId}</Text>
-          <Text style={styles.debugRow}>teamId: {config.primaryTeamId}</Text>
-          <Text style={styles.debugRow}>assignmentId: {config.assignmentId}</Text>
-          <Text style={styles.debugRow}>rate: ${config.hourlyRate}/hr</Text>
-          <Text style={styles.debugRow}>isManager: {String(config.isManager)}</Text>
-          <Text style={styles.debugRow}>env: {config.useQA ? 'QA' : 'Production'}</Text>
-        </View>
-      )}
+          {config && (
+            <View style={styles.debugBox}>
+              <Text style={styles.debugTitle}>Config Debug</Text>
+              <Text style={styles.debugRow}>name: {config.fullName}</Text>
+              <Text style={styles.debugRow}>userId: {config.userId}</Text>
+              <Text style={styles.debugRow}>managerId: {config.managerId}</Text>
+              <Text style={styles.debugRow}>teamId: {config.primaryTeamId}</Text>
+              <Text style={styles.debugRow}>assignmentId: {config.assignmentId}</Text>
+              <Text style={styles.debugRow}>rate: ${config.hourlyRate}/hr</Text>
+              <Text style={styles.debugRow}>isManager: {String(config.isManager)}</Text>
+              <Text style={styles.debugRow}>env: {config.useQA ? 'QA' : 'Production'}</Text>
+            </View>
+          )}
 
-      {/* Dev options — always visible since this is a debug settings screen */}
-      {config && isMe && (
-        <View style={styles.devBox}>
-          <Text style={styles.devTitle}>Dev Options</Text>
-          {!config.isManager && (
-            <>
+          {/* Dev options — always visible since this is a debug settings screen */}
+          {config && isMe && (
+            <View style={styles.devBox}>
+              <Text style={styles.devTitle}>Dev Options</Text>
+              {!config.isManager && (
+                <>
+                  <View style={styles.toggleRow}>
+                    <Text style={styles.toggleLabel}>Manager Preview</Text>
+                    <Switch
+                      value={config.devManagerView ?? false}
+                      onValueChange={toggleDevManagerView}
+                      trackColor={{ false: colors.border, true: colors.violet }}
+                      thumbColor="#FFFFFF"
+                    />
+                  </View>
+                  <Text style={styles.toggleHint}>
+                    Shows the Team Requests queue with fake pending approvals + fake My Requests (pending, approved, rejected).
+                  </Text>
+                </>
+              )}
               <View style={styles.toggleRow}>
-                <Text style={styles.toggleLabel}>Manager Preview</Text>
+                <Text style={styles.toggleLabel}>Overtime Preview</Text>
                 <Switch
-                  value={config.devManagerView ?? false}
-                  onValueChange={toggleDevManagerView}
+                  value={config.devOvertimePreview ?? false}
+                  onValueChange={toggleDevOvertimePreview}
                   trackColor={{ false: colors.border, true: colors.violet }}
                   thumbColor="#FFFFFF"
                 />
               </View>
               <Text style={styles.toggleHint}>
-                Shows the Team Requests queue with fake pending approvals + fake My Requests (pending, approved, rejected).
+                Forces the home screen hero to show the Overtime panel state (for UI testing).
               </Text>
-            </>
+            </View>
           )}
-          <View style={styles.toggleRow}>
-            <Text style={styles.toggleLabel}>Overtime Preview</Text>
-            <Switch
-              value={config.devOvertimePreview ?? false}
-              onValueChange={toggleDevOvertimePreview}
-              trackColor={{ false: colors.border, true: colors.violet }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-          <Text style={styles.toggleHint}>
-            Forces the home screen hero to show the Overtime panel state (for UI testing).
-          </Text>
-        </View>
-      )}
 
-      <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-        <Text style={styles.signOutText}>Sign Out</Text>
-      </TouchableOpacity>
-    </ScrollView>
+          <AnimatedPressable style={styles.signOutButton} onPress={handleSignOut}>
+            <Text style={styles.signOutText}>Sign Out</Text>
+          </AnimatedPressable>
+        </ScrollView>
+      </View>
+    </BlurView>
   );
 }
 
 const styles = StyleSheet.create({
+  // surfaceElevated overlay for legibility over blur
+  overlay: {
+    flex: 1,
+    backgroundColor: colors.surfaceElevated + 'D9', // D9 = 0.85 opacity in hex (217/255)
+  },
   container: {
     flex: 1,
-    backgroundColor: colors.background,
     padding: 24,
     paddingTop: 40,
   },

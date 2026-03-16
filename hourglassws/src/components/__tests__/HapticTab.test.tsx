@@ -16,7 +16,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // haptic-tab.tsx is at the project-root components/ folder
-const COMPONENT_FILE = path.resolve(__dirname, '../../../../components/haptic-tab.tsx');
+const COMPONENT_FILE = path.resolve(__dirname, '../../../components/haptic-tab.tsx');
 
 // ─── Source file static checks ────────────────────────────────────────────────
 
@@ -91,7 +91,7 @@ describe('HapticTab — FR3: runtime render', () => {
   });
 
   it('SC3.1 — HapticTab renders without crash given minimal props', () => {
-    const { HapticTab } = require('../../../../components/haptic-tab');
+    const { HapticTab } = require('../../../components/haptic-tab');
     expect(() => {
       act(() => {
         create(
@@ -113,7 +113,7 @@ describe('HapticTab — FR3: runtime render', () => {
   });
 
   it('SC3.5 — children are rendered in HapticTab output', () => {
-    const { HapticTab } = require('../../../../components/haptic-tab');
+    const { HapticTab } = require('../../../components/haptic-tab');
     let tree: any;
     act(() => {
       tree = create(
