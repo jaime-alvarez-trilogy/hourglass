@@ -30,6 +30,29 @@ import TrendSparkline from '@/src/components/TrendSparkline';
 import FadeInScreen from '@/src/components/FadeInScreen';
 import type { ScrubChangeCallback } from '@/src/hooks/useScrubGesture';
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Returns a status-aware colour for a weekly hours snapshot value.
+ * Gold is reserved for earnings; this uses the status tokens (success/warning/critical).
+ *
+ * Thresholds (01-color-semantics spec):
+ *   >= 85% of weeklyLimit → success (on-track)
+ *   60–84%                → warning (behind pace)
+ *   < 60%                 → critical (significantly behind)
+ *
+ * Edge cases:
+ *   weeklyLimit === 0 → success (no target configured)
+ *   hours > weeklyLimit  → success (overtime counts as on-track)
+ */
+export function computeSnapshotHoursColor(hours: number, weeklyLimit: number): string {
+  if (weeklyLimit === 0) return colors.success;
+  const ratio = hours / weeklyLimit;
+  if (ratio >= 0.85) return colors.success;
+  if (ratio >= 0.60) return colors.warning;
+  return colors.critical;
+}
+
 // ─── Chart section ────────────────────────────────────────────────────────────
 
 interface ChartSectionProps {
@@ -249,7 +272,7 @@ export default function OverviewScreen() {
                 <Text style={{ color: colors.textMuted ?? '#888', fontSize: 10, marginTop: 2 }}>Earnings</Text>
               </View>
               <View style={{ alignItems: 'center' }}>
-                <Text style={{ color: colors.success, fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] }}>
+                <Text style={{ color: computeSnapshotHoursColor(heroHours, weeklyLimit), fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] }}>
                   {`${heroHours.toFixed(1)}h`}
                 </Text>
                 <Text style={{ color: colors.textMuted ?? '#888', fontSize: 10, marginTop: 2 }}>Hours</Text>
