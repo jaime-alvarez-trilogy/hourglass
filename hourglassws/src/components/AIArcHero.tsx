@@ -122,13 +122,11 @@ export default function AIArcHero({
   // Track arc path — static full 270°
   const trackPath = arcPath(cx, cy, r, START_ANGLE, START_ANGLE + SWEEP);
 
-  // Delta badge styling
+  // Delta badge styling — only used when deltaPercent !== null (see conditional render below)
   const deltaBadgeColor =
-    deltaPercent === null
-      ? colors.textSecondary
-      : deltaPercent > 0
+    deltaPercent !== null && deltaPercent > 0
       ? colors.success
-      : deltaPercent < 0
+      : deltaPercent !== null && deltaPercent < 0
       ? colors.critical
       : colors.textSecondary;
 
