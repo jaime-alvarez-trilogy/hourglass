@@ -156,6 +156,16 @@ export default function TrendSparkline({
     clipProgress.value = withTiming(1, timingChartFill);
   }, []);
 
+  // Bridge clipProgress to plain React state so RNSkia never reads a SharedValue
+  // via JSI from the JS thread. Passing a SharedValue directly to <Path end={}>
+  // causes WorkletRuntime::executeSync to deadlock when other Reanimated worklets
+  // (e.g. useAnimatedProps in AIArcHero) hold the worklet mutex simultaneously.
+  const [clipEnd, setClipEnd] = useState(0);
+  useAnimatedReaction(
+    () => clipProgress.value,
+    (v) => { runOnJS(setClipEnd)(v); },
+  );
+
   // Recompute path when data or dimensions change
   const { pathStr, min, max, hasData, isSinglePoint } = useMemo(() => {
     if (data.length === 0) {
@@ -323,7 +333,7 @@ export default function TrendSparkline({
           strokeWidth={strokeWidth}
           strokeCap="round"
           strokeJoin="round"
-          end={clipProgress}
+          end={clipEnd}
         >
           {/* Layer 1: outer glow — wide, very soft */}
           <Paint color={color + '40'} style="stroke" strokeWidth={14} strokeCap="round">
