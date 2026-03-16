@@ -98,7 +98,7 @@ Layer 3 — Glass Cards (scroll over Layer 1)
 | 2026-03-16 | [01-ambient-layer](specs/01-ambient-layer/spec.md) | AmbientBackground component, getAmbientColor mapping, Card opacity/intensity update |
 | 2026-03-16 | [02-home-hero-ambient](specs/02-home-hero-ambient/spec.md) | Wire AmbientBackground to Home screen, expand PanelGradient inner gradient opacity |
 | 2026-03-16 | [03-overview-hero](specs/03-overview-hero/spec.md) | OverviewHeroCard dual-metric hero, computeEarningsPace utility, ambient wiring to overview screen |
-| 2026-03-16 | [04-ai-hero-arc](specs/04-ai-hero-arc/spec.md) | AIArcHero component (bold % + animated arc), arcPath utility, ambient wiring to AI screen |
+| 2026-03-16 | [04-ai-hero-arc](specs/04-ai-hero-arc/spec.md) | **Complete** — AIArcHero component (bold % + animated arc), arcPath utility, ambient wiring to AI screen |
 
 ## Files Touched
 
@@ -121,6 +121,13 @@ Layer 3 — Glass Cards (scroll over Layer 1)
 - `hourglassws/src/lib/__tests__/overviewUtils.test.ts` — **Created** (12 tests)
 - `hourglassws/app/(tabs)/overview.tsx` — **Modified** (FR4/FR5: AmbientBackground wiring, OverviewHeroCard, toggle migration)
 - `hourglassws/app/(tabs)/__tests__/overview.test.tsx` — **Modified** (FR4/FR5 ambient + hero wiring tests, 18 new tests)
+
+### 04-ai-hero-arc
+- `hourglassws/src/components/AIArcHero.tsx` — **Created** (FR1: arc gauge, FR2: BrainLift secondary, FR6: arcPath)
+- `hourglassws/src/components/__tests__/AIArcHero.test.tsx` — **Created** (41 tests: FR1-FR3, FR6)
+- `hourglassws/app/(tabs)/ai.tsx` — **Modified** (FR4: AmbientBackground wiring, FR5: AIArcHero hero replacement)
+- `hourglassws/app/(tabs)/__tests__/ai.test.tsx` — **Modified** (FR4+FR5 wiring assertions, SC3.x updated)
+- `hourglassws/src/components/__tests__/AITab.test.tsx` — **Modified** (updated for AIArcHero architecture)
 
 ## Reference Files
 
