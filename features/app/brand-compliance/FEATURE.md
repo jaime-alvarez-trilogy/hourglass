@@ -34,6 +34,12 @@ Two rounds of UX Gauntlet video review (run-001 2026-03-15, run-002 2026-03-16) 
 
 All four specs are independent and can run in parallel.
 
+## Changelog
+
+| Date | Spec | Description |
+|------|------|-------------|
+| 2026-03-16 | [01-color-semantics](specs/01-color-semantics/spec.md) | Spec and checklist created — 5 colour violations, FR1–FR5 |
+
 ## Reference Files
 
 - Brand guidelines: `BRAND_GUIDELINES.md`
