@@ -4,7 +4,8 @@
 
 Implement all fixes surfaced by UX Gauntlet Run #001 and upgrade the app to the v1.1 brand guidelines. This feature closes the gap between what the brand guidelines specify and what the app actually delivers.
 
-**Source:** `gauntlet-runs/video/run-001-2026-03-15/` — synthesis + brand evolution analysis
+**Source:** `gauntlet-runs/video/run-001-2026-03-15/` — v1 specs (01–05)
+**Source:** `gauntlet-runs/video/run-002-2026-03-16/` — v2 specs (06–07)
 **Brand guidelines version:** v1.1 (`BRAND_GUIDELINES.md`)
 
 ---
@@ -51,8 +52,10 @@ The UX Gauntlet (3/7 models, avg ~5/10) identified a consistent pattern: **stron
 | 03-touch-and-navigation | AnimatedPressable, HapticTab scale, FadeInScreen spring | — | 01 | M |
 | 04-card-entry-animations | useStaggeredEntry hook, wire to all screens | — | 01 | M |
 | 05-panel-glass-surfaces | Radial gradients (SVG), coloured glows, expo-blur, noise texture | — | 01 | M |
+| 06-wiring-and-tokens | NoiseOverlay wired to tabs layout, tab bar token fix, toggle gold→violet, MetricValue 800wt | — | — | S |
+| 07-chart-line-polish | TrendSparkline glow (Skia BlurMaskFilter, 2.5px), WeeklyBarChart today-bar glow | — | — | S |
 
-**Parallelism:** 01 must complete first. 02–05 all run in parallel.
+**Parallelism:** 01 must complete first for v1 specs. 06 and 07 are independent of everything — run immediately.
 
 ---
 
@@ -85,3 +88,5 @@ The UX Gauntlet (3/7 models, avg ~5/10) identified a consistent pattern: **stron
 - 2026-03-15: [05-panel-glass-surfaces](specs/05-panel-glass-surfaces/spec.md) — **COMPLETE**. SVG RadialGradient (cx=50% cy=30%) replaces LinearGradient, getGlowStyle coloured shadows (iOS) + elevation fallback (Android), BlurView modal (intensity=30), NoiseOverlay (opacity:0.04). 61 tests passing.
 - 2026-03-15: [03-touch-and-navigation](specs/03-touch-and-navigation/spec.md) — **COMPLETE**. AnimatedPressable (timingInstant+springSnappy), FadeInScreen translateY spring entrance, HapticTab scale pulse, ApprovalCard/modal button migration. 71 tests passing.
 - 2026-03-15: [04-card-entry-animations](specs/04-card-entry-animations/spec.md) — **COMPLETE**. useStaggeredEntry hook (springBouncy, 50ms stagger, maxStaggerIndex cap, reduceMotion safety), wired to all 4 tab screens. 65 tests passing.
+- 2026-03-16: [06-wiring-and-tokens](specs/06-wiring-and-tokens/spec-research.md) — **READY**. Post-gauntlet run-002 gaps: NoiseOverlay not wired, tab bar v1.0 hex, gold on toggle, MetricValue 700→800 weight, loading screen token cleanup.
+- 2026-03-16: [07-chart-line-polish](specs/07-chart-line-polish/spec-research.md) — **READY**. Sci-fi holographic chart lines: TrendSparkline 2.5px + BlurMaskFilter glow, WeeklyBarChart today-bar ambient glow.
