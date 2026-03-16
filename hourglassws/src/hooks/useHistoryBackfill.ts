@@ -85,7 +85,7 @@ async function runBackfill(
   useQA: boolean,
   username: string,
   password: string,
-): Promise<WeeklySnapshot[] | null> {
+): Promise<WeeklySnapshot[]> {
   const history = await loadWeeklyHistory();
   const historyMap = new Map(history.map(s => [s.weekStart, s]));
 
@@ -101,7 +101,9 @@ async function runBackfill(
     }
   }
 
-  if (weeksToFill.length === 0) return null;
+  // Always return history (even if nothing to fill) so callers get fresh storage state.
+  // This ensures useOverviewData sees writes from week-transition flush in useAIData.
+  if (weeksToFill.length === 0) return history;
 
   // Get auth token once, reuse for all calls
   let token: string;
@@ -172,7 +174,7 @@ export function useHistoryBackfill(): WeeklySnapshot[] | null {
       if (!creds) return;
       return runBackfill(config.assignmentId, config.useQA, creds.username, creds.password)
         .then(updated => {
-          if (updated) setSnapshots(updated);
+          setSnapshots(updated);
         });
     }).catch(() => {
       // Silent failure — overview shows whatever history was already loaded
