@@ -574,3 +574,77 @@ describe('HoursDashboard — FR4 (01-overtime-display): normal state preserved',
     expect(json).toContain('TODAY');
   });
 });
+
+// ─── FR1 (02-home-hero-ambient): AmbientBackground wiring ────────────────────
+//
+// Strategy: source-file static analysis — NativeWind v4 hashes className in Jest.
+// These tests verify the wiring contract: import, render, placement, and signal.
+
+describe('HoursDashboard — FR1 (02-home-hero-ambient): AmbientBackground wiring', () => {
+  let source: string;
+
+  beforeAll(() => {
+    source = fs.readFileSync(INDEX_FILE, 'utf8');
+  });
+
+  it('FR1.T1 — imports AmbientBackground from @/src/components/AmbientBackground', () => {
+    expect(source).toMatch(/import\s+AmbientBackground.*from.*AmbientBackground/);
+  });
+
+  it('FR1.T2 — imports getAmbientColor from @/src/components/AmbientBackground', () => {
+    expect(source).toMatch(/getAmbientColor/);
+    // Must come from AmbientBackground module (same import line or destructured)
+    expect(source).toMatch(/AmbientBackground.*getAmbientColor|getAmbientColor.*AmbientBackground/s);
+  });
+
+  it('FR1.T3 — renders <AmbientBackground in JSX', () => {
+    expect(source).toContain('<AmbientBackground');
+  });
+
+  it('FR1.T4 — AmbientBackground appears before ScrollView in JSX', () => {
+    const ambientPos = source.indexOf('<AmbientBackground');
+    const scrollViewPos = source.indexOf('<ScrollView');
+    expect(ambientPos).toBeGreaterThan(-1);
+    expect(scrollViewPos).toBeGreaterThan(-1);
+    expect(ambientPos).toBeLessThan(scrollViewPos);
+  });
+
+  it('FR1.T5 — getAmbientColor is called with type: panelState signal', () => {
+    expect(source).toMatch(/getAmbientColor\s*\(\s*\{[^}]*type\s*:\s*['"]panelState['"]/);
+  });
+
+  it('FR1.T6 — getAmbientColor receives panelState as the state argument', () => {
+    expect(source).toMatch(/getAmbientColor\s*\(\s*\{[^}]*panelState/);
+  });
+
+  it('FR1.T7 — no StyleSheet import added (SC3.1 still passes)', () => {
+    const noComments = source
+      .replace(/\/\/.*$/gm, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(noComments).not.toMatch(/\bStyleSheet\b/);
+  });
+
+  it('FR1.T8 — no hardcoded hex color strings added (SC3.2 still passes)', () => {
+    const noComments = source
+      .replace(/\/\/.*$/gm, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(noComments).not.toMatch(/#[0-9A-Fa-f]{3,8}\b/);
+  });
+});
+
+// ─── FR3 (02-home-hero-ambient): Ambient transition integration ───────────────
+
+describe('HoursDashboard — FR3 (02-home-hero-ambient): ambient transition', () => {
+  let source: string;
+
+  beforeAll(() => {
+    source = fs.readFileSync(INDEX_FILE, 'utf8');
+  });
+
+  it('FR3.T1 — index.tsx does NOT import springPremium (animation is internal to AmbientBackground)', () => {
+    const noComments = source
+      .replace(/\/\/.*$/gm, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(noComments).not.toContain('springPremium');
+  });
+});

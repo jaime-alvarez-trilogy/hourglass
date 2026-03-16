@@ -337,3 +337,36 @@ describe('PanelGradient — FR4 (02-dark-glass): BlurView glass base layer', () 
     expect(source).toContain('BLUR_INTENSITY_PANEL');
   });
 });
+
+// ─── FR2 (02-home-hero-ambient): PanelGradient gradient expansion ─────────────
+//
+// Inner stop opacity expanded from 0.35 → 0.50 so the hero glow
+// bleeds more strongly into the ambient field.
+
+describe('PanelGradient — FR2 (02-home-hero-ambient): expanded inner gradient opacity', () => {
+  let source: string;
+
+  beforeAll(() => {
+    source = fs.readFileSync(PANEL_GRADIENT_FILE, 'utf8');
+  });
+
+  it('FR2.T1 — inner stop uses stopOpacity={0.50}', () => {
+    expect(source).toContain('stopOpacity={0.50}');
+  });
+
+  it('FR2.T2 — source still has r="70%" (radius unchanged)', () => {
+    expect(source).toContain('r="70%"');
+  });
+
+  it('FR2.T3 — source still has cx="50%" (center x unchanged)', () => {
+    expect(source).toContain('cx="50%"');
+  });
+
+  it('FR2.T4 — source still has cy="30%" (center y unchanged)', () => {
+    expect(source).toContain('cy="30%"');
+  });
+
+  it('FR2.T5 — source does NOT have stopOpacity={0.35} (old value removed)', () => {
+    expect(source).not.toContain('stopOpacity={0.35}');
+  });
+});
