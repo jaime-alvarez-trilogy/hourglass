@@ -13,7 +13,6 @@ import {
   Text,
   ScrollView,
   RefreshControl,
-  TouchableOpacity,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
@@ -27,6 +26,7 @@ import AIRingChart from '@/src/components/AIRingChart';
 import AIConeChart from '@/src/components/AIConeChart';
 import type { AIScrubPoint } from '@/src/components/AIConeChart';
 import FadeInScreen from '@/src/components/FadeInScreen';
+import { AnimatedPressable } from '@/src/components/AnimatedPressable';
 import MetricValue from '@/src/components/MetricValue';
 import Card from '@/src/components/Card';
 import SectionLabel from '@/src/components/SectionLabel';
@@ -56,7 +56,7 @@ interface AITier {
 function classifyAIPct(avg: number): AITier {
   if (avg >= 75) return { label: 'AI Leader', color: colors.cyan };
   if (avg >= 50) return { label: 'Consistent Progress', color: colors.success };
-  if (avg >= 30) return { label: 'Building Momentum', color: colors.gold };
+  if (avg >= 30) return { label: 'Building Momentum', color: colors.warning };
   return { label: 'Getting Started', color: colors.textMuted };
 }
 
@@ -119,13 +119,13 @@ export default function AIScreen() {
       <View className="flex-1 bg-background items-center justify-center p-6 gap-3" testID="error-auth">
         <Text className="text-xl font-bold text-textPrimary text-center">Session expired</Text>
         <Text className="text-sm text-textSecondary text-center">Please re-login to continue.</Text>
-        <TouchableOpacity
+        <AnimatedPressable
           className="bg-success rounded-xl px-6 py-3 mt-2"
           onPress={() => router.replace('/(auth)/welcome')}
           testID="relogin-button"
         >
           <Text className="text-base font-bold text-background">Re-login</Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
       </View>
     );
   }
@@ -136,13 +136,13 @@ export default function AIScreen() {
       <View className="flex-1 bg-background items-center justify-center p-6 gap-3" testID="error-network">
         <Text className="text-xl font-bold text-textPrimary text-center">No connection</Text>
         <Text className="text-sm text-textSecondary text-center">Pull to refresh when connected.</Text>
-        <TouchableOpacity
+        <AnimatedPressable
           className="bg-success rounded-xl px-6 py-3 mt-2"
           onPress={refetch}
           testID="retry-button"
         >
           <Text className="text-base font-bold text-background">Retry</Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
       </View>
     );
   }
@@ -153,12 +153,12 @@ export default function AIScreen() {
       <View className="flex-1 bg-background items-center justify-center p-6 gap-3" testID="empty-state">
         <Text className="text-xl font-bold text-textPrimary text-center">No data yet.</Text>
         <Text className="text-sm text-textSecondary text-center">Come back after tracking some hours.</Text>
-        <TouchableOpacity
+        <AnimatedPressable
           className="bg-success rounded-xl px-6 py-3 mt-2"
           onPress={refetch}
         >
           <Text className="text-base font-bold text-background">Refresh</Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
       </View>
     );
   }
@@ -423,7 +423,7 @@ export default function AIScreen() {
             {[
               { label: 'AI Leader', range: '75%+', color: colors.cyan as string },
               { label: 'Consistent Progress', range: '50–74%', color: colors.success as string },
-              { label: 'Building Momentum', range: '30–49%', color: colors.gold as string },
+              { label: 'Building Momentum', range: '30–49%', color: colors.warning as string },
               { label: 'Getting Started', range: '<30%', color: colors.textMuted as string },
             ].map(t => {
               const isActive = tier.label === t.label;
