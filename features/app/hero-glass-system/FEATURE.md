@@ -97,6 +97,14 @@ Layer 3 — Glass Cards (scroll over Layer 1)
 |------|------|-------------|
 | 2026-03-16 | [01-ambient-layer](specs/01-ambient-layer/spec.md) | AmbientBackground component, getAmbientColor mapping, Card opacity/intensity update |
 
+## Files Touched
+
+### 01-ambient-layer
+- `hourglassws/src/components/AmbientBackground.tsx` — **Created** (FR1, FR2, FR5)
+- `hourglassws/src/components/__tests__/AmbientBackground.test.tsx` — **Created** (50 tests)
+- `hourglassws/src/components/Card.tsx` — **Modified** (FR3/FR4: opacity 0.12/0.18, intensity 60/80)
+- `hourglassws/src/components/__tests__/Card.test.tsx` — **Modified** (updated intensity/opacity assertions)
+
 ## Reference Files
 
 - Design tokens: `hourglassws/src/lib/colors.ts`, `tailwind.config.js`
