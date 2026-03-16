@@ -35,6 +35,20 @@ interface OverviewHeroCardProps {
   onWindowChange: (w: 4 | 12) => void;
 }
 
+// ─── Toggle pill style constants (stable references — no recreation per render) ─
+
+const ACTIVE_PILL = {
+  backgroundColor: colors.surface,
+  borderRadius: 8,
+  paddingHorizontal: 12,
+  paddingVertical: 4,
+} as const;
+
+const INACTIVE_PILL = {
+  paddingHorizontal: 12,
+  paddingVertical: 4,
+} as const;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function OverviewHeroCard({
@@ -45,18 +59,6 @@ export default function OverviewHeroCard({
   onWindowChange,
 }: OverviewHeroCardProps): JSX.Element {
   const periodLabel = window === 4 ? 'LAST 4 WEEKS' : 'LAST 12 WEEKS';
-
-  // ── Toggle pill styles ──────────────────────────────────────────────────────
-  const activePill = {
-    backgroundColor: colors.surface,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  };
-  const inactivePill = {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  };
 
   return (
     <Card elevated>
@@ -74,7 +76,7 @@ export default function OverviewHeroCard({
         }}>
           <TouchableOpacity
             onPress={() => onWindowChange(4)}
-            style={window === 4 ? activePill : inactivePill}
+            style={window === 4 ? ACTIVE_PILL : INACTIVE_PILL}
             activeOpacity={0.7}
           >
             <Text style={{
@@ -88,7 +90,7 @@ export default function OverviewHeroCard({
 
           <TouchableOpacity
             onPress={() => onWindowChange(12)}
-            style={window === 12 ? activePill : inactivePill}
+            style={window === 12 ? ACTIVE_PILL : INACTIVE_PILL}
             activeOpacity={0.7}
           >
             <Text style={{
