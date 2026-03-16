@@ -1,7 +1,8 @@
 // Card.tsx
-// FR1 (02-dark-glass): Card glass layer — base variant (BlurView intensity 40)
-// FR2 (02-dark-glass): Card glass layer — elevated variant (BlurView intensity 60)
+// FR1 (02-dark-glass): Card glass layer — base variant (BlurView intensity 60)
+// FR2 (02-dark-glass): Card glass layer — elevated variant (BlurView intensity 80)
 // FR3 (02-dark-glass): glass={false} opt-out for flat legacy render
+// FR3/FR4 (01-ambient-layer): opacity 0.12/0.18, intensity 60/80 — enables ambient frost sampling
 //
 // Design system: BRAND_GUIDELINES.md "Surface & Depth — Dark Glass System"
 //   backdrop-filter: blur(16px), background: hsla(248,15%,10%,0.75)
@@ -21,19 +22,19 @@ import { BlurView } from 'expo-blur';
 // ─── Glass style constants (exported for test access) ─────────────────────────
 
 export const GLASS_BASE = {
-  backgroundColor: 'rgba(22, 21, 31, 0.75)',    // surface (#16151F) at 75% opacity
-  borderColor: 'rgba(255, 255, 255, 0.06)',
+  backgroundColor: 'rgba(22, 21, 31, 0.12)',    // surface (#16151F) at 12% — ambient field bleeds through for tinted frost
+  borderColor: 'rgba(255, 255, 255, 0.10)',
   borderWidth: 1,
 } as const;
 
 export const GLASS_ELEVATED = {
-  backgroundColor: 'rgba(31, 30, 41, 0.80)',    // surfaceElevated (#1F1E29) at 80% opacity
-  borderColor: 'rgba(255, 255, 255, 0.06)',
+  backgroundColor: 'rgba(31, 30, 41, 0.18)',    // surfaceElevated (#1F1E29) at 18% — slightly more opaque than base
+  borderColor: 'rgba(255, 255, 255, 0.10)',
   borderWidth: 1,
 } as const;
 
-export const BLUR_INTENSITY_BASE = 40;
-export const BLUR_INTENSITY_ELEVATED = 60;
+export const BLUR_INTENSITY_BASE = 60;      // increased: more pronounced frost at lower opacity
+export const BLUR_INTENSITY_ELEVATED = 80;  // increased: elevated cards get maximum frost depth
 
 // ─── Layout constants (inline — no StyleSheet.create per design system rule) ──
 // StyleSheet.absoluteFill is used below (read-only constant, not StyleSheet.create)
@@ -96,8 +97,10 @@ export default function Card({
       className={className}
       style={[OUTER_STYLE, { borderColor: glassStyle.borderColor, borderWidth: glassStyle.borderWidth }, style]}
     >
-      {/* Blur layer — absolutely fills outer wrapper, clipped by overflow:hidden */}
-      <BlurView intensity={intensity} tint="dark" style={StyleSheet.absoluteFill} />
+      {/* Blur layer — wrapped in pointerEvents=none View so touches always pass through */}
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <BlurView intensity={intensity} tint="systemChromeMaterialDark" style={{ flex: 1 }} />
+      </View>
       {/* Content layer — semi-transparent surface lets blur show through */}
       <View style={[INNER_STYLE, { backgroundColor: glassStyle.backgroundColor }]}>
         {children}
