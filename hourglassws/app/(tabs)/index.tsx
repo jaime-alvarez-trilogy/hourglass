@@ -14,7 +14,6 @@ import {
   View,
   Text,
   ScrollView,
-  TouchableOpacity,
   RefreshControl,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -31,6 +30,7 @@ import { computeAICone } from '@/src/lib/aiCone';
 import { getUrgencyLevel, getWeekLabels } from '@/src/lib/hours';
 import { colors } from '@/src/lib/colors';
 import FadeInScreen from '@/src/components/FadeInScreen';
+import { AnimatedPressable } from '@/src/components/AnimatedPressable';
 import PanelGradient from '@/src/components/PanelGradient';
 import MetricValue from '@/src/components/MetricValue';
 import WeeklyBarChart from '@/src/components/WeeklyBarChart';
@@ -43,6 +43,19 @@ import { UrgencyBanner } from '@/src/components/UrgencyBanner';
 import type { PanelState } from '@/src/lib/panelState';
 import type { DailyHours } from '@/src/components/WeeklyBarChart';
 import type { DailyEntry } from '@/src/lib/hours';
+
+// ─── Today bar color mapping (04-chart-polish FR4) ───────────────────────────
+// Maps panel state to the colour used for today's in-progress bar in WeeklyBarChart.
+// Gold is reserved for money/earnings — today's hours bar uses status colours.
+
+const TODAY_BAR_COLORS: Record<PanelState, string> = {
+  onTrack:   colors.success,
+  behind:    colors.warning,
+  critical:  colors.critical,
+  crushedIt: colors.overtimeWhiteGold,
+  overtime:  colors.overtimeWhiteGold,
+  idle:      colors.textMuted,
+};
 
 // ─── State badge ─────────────────────────────────────────────────────────────
 
@@ -197,12 +210,12 @@ export default function HoursDashboard() {
               </View>
             )}
           </View>
-          <TouchableOpacity
+          <AnimatedPressable
             onPress={() => router.push('/modal')}
             testID="settings-button"
           >
             <Text className="text-textSecondary text-2xl">⚙️</Text>
-          </TouchableOpacity>
+          </AnimatedPressable>
         </View>
 
         {/* ── Zone 1: Hero Panel ────────────────────────────────────────── */}
@@ -267,7 +280,7 @@ export default function HoursDashboard() {
               Failed to load hours data
             </Text>
             <Text className="text-textSecondary text-xs mt-1">{error}</Text>
-            <TouchableOpacity
+            <AnimatedPressable
               onPress={refetch}
               className="mt-2"
               testID="retry-button"
@@ -275,7 +288,7 @@ export default function HoursDashboard() {
               <Text className="text-textPrimary font-sans-semibold text-sm">
                 Retry
               </Text>
-            </TouchableOpacity>
+            </AnimatedPressable>
           </View>
         )}
 
@@ -299,6 +312,7 @@ export default function HoursDashboard() {
                 maxHours={Math.max(8, weeklyLimit / 5)}
                 watermarkLabel={data ? `${data.total.toFixed(1)}h` : undefined}
                 weeklyLimit={weeklyLimit}
+                todayColor={TODAY_BAR_COLORS[panelState]}
               />
             </View>
           )}

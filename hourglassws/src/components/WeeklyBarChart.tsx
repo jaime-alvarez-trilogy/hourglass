@@ -11,7 +11,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { Canvas, Rect, Line, vec, matchFont, Text, Paint, BlurMaskFilter } from '@shopify/react-native-skia';
+import { Canvas, Rect, Line, vec, matchFont, Text, Paint, BlurMask } from '@shopify/react-native-skia';
 import {
   useSharedValue,
   withTiming,
@@ -37,14 +37,20 @@ export interface WeeklyBarChartProps {
   watermarkLabel?: string;
   /** When provided, bars whose running cumulative total exceeds this value shift to OVERTIME_WHITE_GOLD */
   weeklyLimit?: number;
+  /**
+   * Hex colour for today's in-progress bar.
+   * Should reflect the current panel state (success/warning/critical/overtimeWhiteGold/textMuted).
+   * Default: colors.success (on-track green).
+   */
+  todayColor?: string;
 }
 
-const TRACK_COLOR = colors.border;
+const TRACK_COLOR = colors.border + '28'; // ~16% opacity — subtle slot guide, not a wall of blocks
 const WATERMARK_FONT_SIZE = 52;
 /** Warm white-gold used for bars that push the running total beyond weeklyLimit */
 const OVERTIME_WHITE_GOLD = '#FFF8E7';
 
-export default function WeeklyBarChart({ data, maxHours, width, height, watermarkLabel, weeklyLimit }: WeeklyBarChartProps) {
+export default function WeeklyBarChart({ data, maxHours, width, height, watermarkLabel, weeklyLimit, todayColor = colors.success }: WeeklyBarChartProps) {
   const [animProgress, setAnimProgress] = useState(0);
   const progress = useSharedValue(0);
 
@@ -108,7 +114,7 @@ export default function WeeklyBarChart({ data, maxHours, width, height, watermar
         } else if (weeklyLimit !== undefined && runningTotal > weeklyLimit) {
           barColor = OVERTIME_WHITE_GOLD;
         } else if (entry.isToday) {
-          barColor = colors.gold;
+          barColor = todayColor;
         } else {
           barColor = colors.success;
         }
@@ -125,13 +131,7 @@ export default function WeeklyBarChart({ data, maxHours, width, height, watermar
             <Rect x={x} y={trackY} width={barWidth} height={trackHeight} color={TRACK_COLOR} />
             {/* Data bar (animates up from bottom) */}
             {entry.hours > 0 && animatedBarHeight >= 1 && (
-              <Rect x={x} y={dataBarY} width={barWidth} height={animatedBarHeight} color={barColor}>
-                {entry.isToday && (
-                  <Paint color={barColor + '30'} style="fill">
-                    <BlurMaskFilter blur={12} style="normal" />
-                  </Paint>
-                )}
-              </Rect>
+              <Rect x={x} y={dataBarY} width={barWidth} height={animatedBarHeight} color={barColor} />
             )}
           </React.Fragment>
         );

@@ -22,7 +22,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Canvas, Path, Circle, Line, vec, matchFont, Text, Paint, BlurMaskFilter } from '@shopify/react-native-skia';
+import { Canvas, Path, Circle, Line, vec, matchFont, Text, Paint, BlurMask } from '@shopify/react-native-skia';
 import { useSharedValue, withTiming, useAnimatedReaction, runOnJS } from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { colors } from '@/src/lib/colors';
@@ -37,7 +37,7 @@ export interface TrendSparklineProps {
   height: number;
   /** Line color. Default: colors.gold */
   color?: string;
-  /** Line stroke width. Default: 2 */
+  /** Line stroke width. Default: 3 */
   strokeWidth?: number;
   /**
    * Optional ceiling value for the Y-axis scale.
@@ -139,7 +139,7 @@ export default function TrendSparkline({
   width,
   height,
   color = colors.gold,
-  strokeWidth = 2,
+  strokeWidth = 3,
   maxValue,
   showGuide = false,
   capLabel,
@@ -320,13 +320,18 @@ export default function TrendSparkline({
           path={pathStr}
           color={color}
           style="stroke"
-          strokeWidth={2.5}
+          strokeWidth={strokeWidth}
           strokeCap="round"
           strokeJoin="round"
           end={clipProgress}
         >
-          <Paint color={color + '40'} style="stroke" strokeWidth={10} strokeCap="round">
-            <BlurMaskFilter blur={8} style="solid" />
+          {/* Layer 1: outer glow — wide, very soft */}
+          <Paint color={color + '40'} style="stroke" strokeWidth={14} strokeCap="round">
+            <BlurMask blur={12} style="solid" />
+          </Paint>
+          {/* Layer 2: mid glow — tighter bloom */}
+          <Paint color={color + '80'} style="stroke" strokeWidth={7} strokeCap="round">
+            <BlurMask blur={4} style="solid" />
           </Paint>
         </Path>
         {cursor && (
