@@ -470,13 +470,12 @@ describe('AITab FR1 (04) — render: ActivityIndicator during initial load', () 
     expect(indicator).not.toBeNull();
   });
 
-  it('SC1.21 — ActivityIndicator uses colors.success color', () => {
+  it('SC1.21 — ActivityIndicator uses colors.success color (#10B981)', () => {
     const tree = renderAIScreen();
     const indicator = findByType(tree.toJSON(), 'ActivityIndicator');
     expect(indicator).not.toBeNull();
-    // colors.success = '#4CAF50' or the project's success color
-    // We verify a color prop is set (not undefined/null)
-    expect(indicator.props.color).toBeTruthy();
+    // colors.success = '#10B981' (emerald green)
+    expect(indicator.props.color).toBe('#10B981');
   });
 
   it('SC1.21b — does NOT render AIConeChart when data=null', () => {
