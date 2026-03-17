@@ -21,6 +21,17 @@ This means a small mismatch is possible and correct: if a user in EST works Sund
 
 **The implementer must not change `computeDaysElapsed` to use UTC.** It must stay on local timezone.
 
+### Week-end boundary
+
+The Crossover UTC week closes at Sunday 23:59:59 UTC. For users in western timezones, this maps to Sunday afternoon/evening local time — e.g. UTC-6 (CST) = Sunday 6pm local.
+
+This means Saturday and Sunday clamp to `5.0` in `computeDaysElapsed`, which is correct:
+- The full-week target (40h) applies all weekend — pacing shows how you're tracking toward it
+- After the UTC deadline (e.g. 6pm Sunday local), the week is closed and new hours go to next week — but `daysElapsed` stays at 5.0 since the pacing week is done
+- The urgency/deadline countdown is handled separately by `timeRemaining` via `getSundayMidnightGMT()` — not by `computeDaysElapsed`
+
+**Do not try to make `computeDaysElapsed` aware of the UTC deadline.** The weekend clamp to 5.0 is intentional.
+
 ## Exploration Findings
 
 ### Files
