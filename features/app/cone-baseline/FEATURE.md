@@ -60,4 +60,4 @@ When complete, on Monday morning after a week ending at 81%:
 
 | Date | Spec | Description |
 |------|------|-------------|
-| 2026-03-17 | [01-baseline-start](specs/01-baseline-start/spec-research.md) | Add `baselinePct` param to `computeAICone`; thread from call sites |
+| 2026-03-17 | [01-baseline-start](specs/01-baseline-start/spec.md) | Add `baselinePct` param to `computeAICone`; thread from call sites |
