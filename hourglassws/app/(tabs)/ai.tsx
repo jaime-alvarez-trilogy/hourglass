@@ -146,13 +146,14 @@ export default function AIScreen() {
     );
   }
 
-  // data !== null guaranteed below this point.
+  // data !== null guaranteed below this point. TypeScript non-null assertion for narrowing.
+  const safeData = data!;
 
   // Compute trajectory: use all 12 weeks but only average weeks with real data (> 0)
   // Include current week (last entry) in sparkline, exclude from average (partial week)
   const currentMonday = getWeekStartDate(true); // UTC Monday — matches storage keys
   const pastSnaps = snapshots.filter(s => s.weekStart < currentMonday).slice(-11);
-  const currentAiPct = Math.round((data.aiPctLow + data.aiPctHigh) / 2);
+  const currentAiPct = Math.round((safeData.aiPctLow + safeData.aiPctHigh) / 2);
   const aiPctSeries = [...pastSnaps.map(s => s.aiPct), currentAiPct];
   const completedAIPct = aiPctSeries.slice(0, -1); // past completed weeks only
   const nonZeroCompleted = completedAIPct.filter(v => v > 0);
@@ -164,14 +165,14 @@ export default function AIScreen() {
   const trend = trendDirection(completedAIPct);
 
   // Cone data — computed once data is guaranteed non-null
-  const coneData = computeAICone(data.dailyBreakdown, weeklyLimit);
+  const coneData = computeAICone(safeData.dailyBreakdown, weeklyLimit);
 
   // Derive display values
-  const aiPercent = (data.aiPctLow + data.aiPctHigh) / 2;
+  const aiPercent = (safeData.aiPctLow + safeData.aiPctHigh) / 2;
 
   // Hero AI% — overridden by scrubPoint during scrub, otherwise live value
   const heroAIPct = scrubPoint !== null ? scrubPoint.pctY : aiPercent;
-  const brainliftHours = data.brainliftHours;
+  const brainliftHours = safeData.brainliftHours;
 
   // Week-over-week delta (FR4) — only computed when we have real data and a prior week reference
   const delta = previousWeekPercent !== undefined ? aiPercent - previousWeekPercent : null;
@@ -228,7 +229,7 @@ export default function AIScreen() {
           </Card>
 
           {/* Daily Breakdown Card — FR5 */}
-          {data.dailyBreakdown.length > 0 && (
+          {safeData.dailyBreakdown.length > 0 && (
             <Card testID="daily-breakdown">
               {/* Column headers */}
               <View className="flex-row pb-1.5 border-b border-border mb-1">
@@ -236,7 +237,7 @@ export default function AIScreen() {
                 <Text className="w-[70px] text-right text-xs text-textMuted uppercase tracking-wider">AI%</Text>
                 <Text className="w-[70px] text-right text-xs text-textMuted uppercase tracking-wider">BrainLift</Text>
               </View>
-              {data.dailyBreakdown.map((day) => (
+              {safeData.dailyBreakdown.map((day) => (
                 <DailyAIRow key={day.date} item={day} />
               ))}
             </Card>
