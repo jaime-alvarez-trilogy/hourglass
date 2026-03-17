@@ -119,8 +119,8 @@ export default function AIArcHero({
 
   // FR1: Compute arc geometry ONCE in render scope (JS thread — not in worklet)
   const arcLength = r * (SWEEP * Math.PI / 180);
+  // fullArcPath is used for both the track and the fill (same geometry, different strokes)
   const fullArcPath = arcPath(cx, cy, r, START_ANGLE, START_ANGLE + SWEEP);
-  const trackPath = arcPath(cx, cy, r, START_ANGLE, START_ANGLE + SWEEP);
 
   // FR1: dashOffset SharedValue — starts at arcLength (arc fully hidden)
   const dashOffset = useSharedValue(arcLength);
@@ -167,7 +167,7 @@ export default function AIArcHero({
           <Svg width={size} height={size}>
             {/* Track arc — full 270°, colors.border */}
             <Path
-              d={trackPath}
+              d={fullArcPath}
               stroke={colors.border}
               strokeWidth={STROKE_WIDTH}
               strokeLinecap="round"
