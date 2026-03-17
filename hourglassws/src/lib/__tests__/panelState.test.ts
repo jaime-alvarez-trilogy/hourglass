@@ -61,6 +61,7 @@ describe('computePanelState', () => {
     });
 
     it('returns onTrack when daysElapsed=0 but some hours worked (early work is positive)', () => {
+      // days=0 → expectedHours=0 → zero-guard returns onTrack (no division by zero)
       expect(computePanelState(5, 40, 0)).toBe('onTrack');
     });
 
@@ -69,6 +70,7 @@ describe('computePanelState', () => {
     });
 
     it('clamps daysElapsed < 0 to 0 with 0 hours → idle', () => {
+      // clamped to 0 → days < 1 && hours === 0 → idle
       expect(computePanelState(0, 40, -1)).toBe('idle');
     });
 
@@ -150,6 +152,58 @@ describe('computePanelState', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // FR2 (01-fractional-days): idle guard updated — days < 1 && hours === 0
+  // ---------------------------------------------------------------------------
+  describe('idle guard — FR2 (01-fractional-days)', () => {
+    it('FR2.1 — daysElapsed=0.333 (Mon 8am), 0h → idle (days < 1 guard)', () => {
+      expect(computePanelState(0, 40, 0.333)).toBe('idle');
+    });
+
+    it('FR2.2 — daysElapsed=0.999 (Mon near-midnight), 0h → idle', () => {
+      expect(computePanelState(0, 40, 0.999)).toBe('idle');
+    });
+
+    it('FR2.3 — daysElapsed=0.0 (Mon midnight), 0h → idle (preserved)', () => {
+      expect(computePanelState(0, 40, 0.0)).toBe('idle');
+    });
+
+    it('FR2.4 — daysElapsed=0.0 (Mon midnight), 5h → onTrack (zero-guard prevents division by zero)', () => {
+      // expectedHours = (0 / 5) * 40 = 0 → zero-guard fires → onTrack
+      expect(computePanelState(5, 40, 0.0)).toBe('onTrack');
+    });
+
+    it('FR2.5 — daysElapsed=1.0 (Tue started), 0h → critical (days >= 1, no longer idle)', () => {
+      // expectedHours = (1/5)*40 = 8h; ratio = 0/8 = 0 < 0.60 → critical
+      expect(computePanelState(0, 40, 1.0)).toBe('critical');
+    });
+
+    it('FR2.6 — daysElapsed=1.292 (Tue 7am), 0h → critical (Tue morning, nothing logged)', () => {
+      // expectedHours = (1.292/5)*40 = 10.33h; ratio = 0 → critical
+      expect(computePanelState(0, 40, 1.292)).toBe('critical');
+    });
+
+    it('FR2.7 — daysElapsed=1.292 (Tue 7am), 12h → onTrack (116% pace — bug case fixed)', () => {
+      // expectedHours = (1.292/5)*40 ≈ 10.33h; ratio = 12/10.33 ≈ 1.16 ≥ 0.85
+      expect(computePanelState(12, 40, 1.292)).toBe('onTrack');
+    });
+
+    it('FR2.8 — daysElapsed=1.292 (Tue 7am), 8h → onTrack (77% of 10.33h expected)', () => {
+      // ratio = 8/10.33 ≈ 0.774 < 0.85 but ≥ 0.60 → behind
+      // Wait: 8/10.336 = 0.774 → behind (not onTrack)
+      // Spec says onTrack — re-check: (1.292/5)*40 = 10.336; 8/10.336 = 0.7741 — behind
+      // Spec-research says "onTrack (77% of 10.33h expected)" but 0.774 < 0.85 → behind
+      // The spec-research comment is wrong about the state label; the threshold logic is authoritative.
+      // 0.60 ≤ 0.774 < 0.85 → behind
+      expect(computePanelState(8, 40, 1.292)).toBe('behind');
+    });
+
+    it('FR2.9 — daysElapsed=1.292 (Tue 7am), 5h → critical (48% of 10.33h expected)', () => {
+      // ratio = 5/10.336 ≈ 0.484 < 0.60 → critical
+      expect(computePanelState(5, 40, 1.292)).toBe('critical');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Constant exports
   // ---------------------------------------------------------------------------
   describe('exported constants', () => {
@@ -164,8 +218,8 @@ describe('computePanelState', () => {
 });
 
 // ---------------------------------------------------------------------------
-// computeDaysElapsed — FR1 (05-hours-dashboard)
-// Uses local timezone via Date.getDay() / getHours() etc.
+// computeDaysElapsed — FR1 (01-fractional-days)
+// Returns float 0.0–5.0 using local timezone.
 // ---------------------------------------------------------------------------
 
 describe('computeDaysElapsed', () => {
@@ -182,29 +236,59 @@ describe('computeDaysElapsed', () => {
     return new Date(year, month - 1, day, hour, minute, second, 0);
   }
 
-  describe('weekdays', () => {
-    it('SC1.1 — Monday 08:00 → 1', () => {
-      // 2026-03-09 is a Monday
-      expect(computeDaysElapsed(localDate(2026, 3, 9, 8, 0, 0))).toBe(1);
+  describe('weekdays — fractional return (FR1: 01-fractional-days)', () => {
+    it('SC1.1 — Monday 08:00 → ≈ 0.333 (fractional, not integer 1)', () => {
+      // 2026-03-09 is a Monday; dayIndex=0, hourOfDay=8 → 0 + 8/24 = 0.3333
+      const result = computeDaysElapsed(localDate(2026, 3, 9, 8, 0, 0));
+      expect(result).toBeCloseTo(8 / 24, 3);
     });
 
-    it('SC1.2 — Monday 00:00:00 → 0 (start-of-week edge)', () => {
+    it('SC1.2 — Monday 00:00:00 → exactly 0.0 (start-of-week edge preserved)', () => {
       expect(computeDaysElapsed(localDate(2026, 3, 9, 0, 0, 0))).toBe(0);
     });
 
-    it('SC1.3 — Tuesday 12:00 → 2', () => {
-      expect(computeDaysElapsed(localDate(2026, 3, 10, 12, 0, 0))).toBe(2);
+    it('SC1.2b — Monday 12:00 → ≈ 0.500', () => {
+      const result = computeDaysElapsed(localDate(2026, 3, 9, 12, 0, 0));
+      expect(result).toBeCloseTo(0.5, 3);
     });
 
-    it('SC1.4 — Wednesday 12:00 → 3', () => {
-      expect(computeDaysElapsed(localDate(2026, 3, 11, 12, 0, 0))).toBe(3);
+    it('SC1.3 — Tuesday 12:00 → ≈ 1.500 (fractional, not integer 2)', () => {
+      // dayIndex=1, hourOfDay=12 → 1 + 12/24 = 1.5
+      const result = computeDaysElapsed(localDate(2026, 3, 10, 12, 0, 0));
+      expect(result).toBeCloseTo(1.5, 3);
     });
 
-    it('SC1.5 — Thursday 09:00 → 4', () => {
-      expect(computeDaysElapsed(localDate(2026, 3, 12, 9, 0, 0))).toBe(4);
+    it('SC1.3b — Tuesday 07:00 → ≈ 1.292 (original bug scenario)', () => {
+      // dayIndex=1, hourOfDay=7 → 1 + 7/24 ≈ 1.2917
+      const result = computeDaysElapsed(localDate(2026, 3, 10, 7, 0, 0));
+      expect(result).toBeCloseTo(1 + 7 / 24, 3);
     });
 
-    it('SC1.6 — Friday 23:59 → 5', () => {
+    it('SC1.4 — Wednesday 12:00 → ≈ 2.500 (fractional, not integer 3)', () => {
+      // dayIndex=2, hourOfDay=12 → 2 + 12/24 = 2.5
+      const result = computeDaysElapsed(localDate(2026, 3, 11, 12, 0, 0));
+      expect(result).toBeCloseTo(2.5, 3);
+    });
+
+    it('SC1.4b — Wednesday 09:00 → ≈ 2.375', () => {
+      // dayIndex=2, hourOfDay=9 → 2 + 9/24 = 2.375
+      const result = computeDaysElapsed(localDate(2026, 3, 11, 9, 0, 0));
+      expect(result).toBeCloseTo(2 + 9 / 24, 3);
+    });
+
+    it('SC1.5 — Thursday 09:00 → ≈ 3.375 (fractional, not integer 4)', () => {
+      // dayIndex=3, hourOfDay=9 → 3 + 9/24 = 3.375
+      const result = computeDaysElapsed(localDate(2026, 3, 12, 9, 0, 0));
+      expect(result).toBeCloseTo(3 + 9 / 24, 3);
+    });
+
+    it('SC1.5b — Thursday 15:00 → ≈ 3.625', () => {
+      // dayIndex=3, hourOfDay=15 → 3 + 15/24 = 3.625
+      const result = computeDaysElapsed(localDate(2026, 3, 12, 15, 0, 0));
+      expect(result).toBeCloseTo(3 + 15 / 24, 3);
+    });
+
+    it('SC1.6 — Friday 23:59 → exactly 5.0 (clamped)', () => {
       expect(computeDaysElapsed(localDate(2026, 3, 13, 23, 59, 0))).toBe(5);
     });
   });
@@ -219,18 +303,26 @@ describe('computeDaysElapsed', () => {
     });
   });
 
-  describe('Monday midnight boundary', () => {
-    it('SC1.9 — Monday 00:01 → 1 (one minute past midnight is elapsed)', () => {
-      expect(computeDaysElapsed(localDate(2026, 3, 9, 0, 1, 0))).toBe(1);
+  describe('Monday fractional boundary', () => {
+    it('SC1.9 — Monday 00:01 → ≈ 0.000694 (tiny fraction, not integer 1)', () => {
+      // dayIndex=0, hourOfDay=1/60 → 0 + (1/60)/24 = 1/1440 ≈ 0.000694
+      const result = computeDaysElapsed(localDate(2026, 3, 9, 0, 1, 0));
+      expect(result).toBeCloseTo(1 / 1440, 4);
+      // Must be < 1 (idle guard will catch it as idle when hours === 0)
+      expect(result).toBeGreaterThan(0);
+      expect(result).toBeLessThan(1);
     });
 
-    it('SC1.10 — Monday 23:59:59 → 1', () => {
-      expect(computeDaysElapsed(localDate(2026, 3, 9, 23, 59, 59))).toBe(1);
+    it('SC1.10 — Monday 23:59:59 → ≈ 0.9999 (less than 1, not integer 1)', () => {
+      // dayIndex=0, hourOfDay≈24 → 0 + ~23.9997/24 ≈ 0.99999
+      const result = computeDaysElapsed(localDate(2026, 3, 9, 23, 59, 59));
+      expect(result).toBeGreaterThan(0.999);
+      expect(result).toBeLessThan(1);
     });
   });
 
   describe('no-argument call', () => {
-    it('SC1.11 — called with no argument does not crash and returns 0–5', () => {
+    it('SC1.11 — called with no argument does not crash and returns 0.0–5.0', () => {
       const result = computeDaysElapsed();
       expect(typeof result).toBe('number');
       expect(result).toBeGreaterThanOrEqual(0);
