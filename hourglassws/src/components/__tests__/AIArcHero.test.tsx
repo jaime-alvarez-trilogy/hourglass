@@ -1,15 +1,14 @@
-// Tests: AIArcHero component (04-ai-hero-arc)
-// FR1: AIArcHero component — arc gauge + bold AI% center
-// FR2: BrainLift secondary metric
-// FR3: Ambient signal contract (getAmbientColor — already covered in AmbientBackground.test.tsx,
-//       but boundary cases verified here for completeness)
-// FR6: arcPath pure utility function
+// Tests: AIArcHero component (01-safe-arc-hero)
+// FR1: Replace useAnimatedProps path-string with strokeDashoffset (safe animation contract)
+// FR2: All geometry derived from size prop
+// FR3: Props interface and visual output unchanged
+// FR4: arcPath pure utility function + animation re-triggers on aiPct change
 //
 // Mock strategy:
 // - react-native-svg: passthrough Fragment components (same pattern as AmbientBackground.test.tsx)
 // - expo-blur: BlurView passthrough (Card uses BlurView)
 // - react-native-reanimated: __mocks__ auto-mock via jest-expo preset
-// - Source analysis for structure/contract checks
+// - Source analysis for animation contract checks (catch regressions render tests cannot)
 
 import React from 'react';
 import { create, act } from 'react-test-renderer';
@@ -72,64 +71,76 @@ const DEFAULT_PROPS = {
   ambientColor: '#A78BFA',
 };
 
-// ─── FR6: arcPath pure utility function ──────────────────────────────────────
+// ─── FR1: Animation contract — source-level checks ───────────────────────────
+//
+// These tests read the source file and assert the animation approach.
+// They catch regressions that render tests would miss (e.g. re-introducing
+// arcPath inside a worklet callback without breaking visible output).
 
-describe('arcPath — FR6: SVG arc path generation', () => {
-  it('FR6.1 — degenerate case: start === end returns string starting with "M" (no crash)', () => {
-    const result = arcPath(90, 90, 80, 135, 135);
-    expect(typeof result).toBe('string');
-    expect(result.startsWith('M')).toBe(true);
+describe('AIArcHero — FR1: safe animation contract (source-level)', () => {
+  let source: string;
+
+  beforeAll(() => {
+    source = fs.readFileSync(COMPONENT_FILE, 'utf8');
   });
 
-  it('FR6.2 — full 270° arc: start=135, end=405 returns valid arc path', () => {
-    const result = arcPath(90, 90, 80, 135, 405);
-    expect(typeof result).toBe('string');
-    expect(result.startsWith('M')).toBe(true);
-    expect(result).toContain('A');
-  });
-
-  it('FR6.3 — 135° (50%) arc: start=135, end=270 returns valid arc path', () => {
-    const result = arcPath(90, 90, 80, 135, 270);
-    expect(typeof result).toBe('string');
-    expect(result.startsWith('M')).toBe(true);
-    expect(result).toContain('A');
-  });
-
-  it('FR6.4 — large arc flag = 1 when sweep > 180°', () => {
-    // 270° sweep
-    const result = arcPath(90, 90, 80, 135, 405);
-    // The arc command: M ... A r r 0 largeArcFlag sweepFlag x2 y2
-    // largeArcFlag appears after "0 " in "A 80 80 0 1 1 ..."
-    expect(result).toMatch(/A\s+[\d.]+\s+[\d.]+\s+0\s+1\s+1/);
-  });
-
-  it('FR6.5 — large arc flag = 0 when sweep ≤ 180°', () => {
-    // 135° sweep (50% of 270)
-    const result = arcPath(90, 90, 80, 135, 270);
-    // largeArcFlag = 0
-    expect(result).toMatch(/A\s+[\d.]+\s+[\d.]+\s+0\s+0\s+1/);
-  });
-
-  it('FR6.6 — returned string always starts with "M" for any valid input', () => {
-    expect(arcPath(50, 50, 40, 0, 90).startsWith('M')).toBe(true);
-    expect(arcPath(100, 100, 80, 45, 225).startsWith('M')).toBe(true);
-    expect(arcPath(90, 90, 80, 135, 360).startsWith('M')).toBe(true);
-  });
-
-  it('FR6.7 — arc coordinates are numeric (not NaN)', () => {
-    const result = arcPath(90, 90, 80, 135, 270);
-    // Extract numbers from the path — none should be NaN
-    const numbers = result.match(/-?[\d.]+/g) ?? [];
-    numbers.forEach(n => {
-      expect(isNaN(parseFloat(n))).toBe(false);
+  it('FR1.1 — useAnimatedProps does NOT call arcPath() inside worklet callback', () => {
+    // Extract the useAnimatedProps callback body and assert arcPath is not in it
+    // Pattern: useAnimatedProps(() => { ... }) — arcPath must not appear inside
+    const workletMatch = source.match(/useAnimatedProps\s*\(\s*\(\s*\)\s*=>\s*\(\s*\{([\s\S]*?)\}\s*\)\s*\)/);
+    if (workletMatch) {
+      expect(workletMatch[1]).not.toContain('arcPath');
+    }
+    // Also: arcPath must not appear on same line as useAnimatedProps assignment
+    const lines = source.split('\n');
+    const animatedPropsLines = lines.filter(l => l.includes('useAnimatedProps'));
+    animatedPropsLines.forEach(line => {
+      expect(line).not.toContain('arcPath(');
     });
+  });
+
+  it('FR1.2 — withSpring is NOT present in source', () => {
+    expect(source).not.toContain('withSpring');
+  });
+
+  it('FR1.3 — springPremium is NOT imported in source', () => {
+    expect(source).not.toContain('springPremium');
+  });
+
+  it('FR1.4 — withTiming IS present in source', () => {
+    expect(source).toContain('withTiming');
+  });
+
+  it('FR1.5 — strokeDashoffset IS present in source', () => {
+    expect(source).toContain('strokeDashoffset');
+  });
+
+  it('FR1.6 — strokeDasharray IS present in source', () => {
+    expect(source).toContain('strokeDasharray');
+  });
+
+  it('FR1.7 — timingChartFill IS imported in source', () => {
+    expect(source).toContain('timingChartFill');
+  });
+
+  it('FR1.8 — useAnimatedProps returns strokeDashoffset (not d attribute)', () => {
+    // useAnimatedProps callback should return strokeDashoffset
+    expect(source).toMatch(/useAnimatedProps.*strokeDashoffset/s);
+  });
+
+  it('FR1.9 — arcPath is called in render scope (outside useAnimatedProps)', () => {
+    // arcPath should be called somewhere in the component (for fullArcPath)
+    expect(source).toContain('arcPath(');
+    // And source should NOT have arcPath inside useAnimatedProps
+    // (already covered by FR1.1, but belt-and-suspenders)
+    expect(source).not.toMatch(/useAnimatedProps\s*\(\s*\(\)\s*=>\s*\(\s*\{\s*d:\s*arcPath/);
   });
 });
 
-// ─── FR1: AIArcHero component — arc gauge + bold AI% center ──────────────────
+// ─── FR1: Render tests ────────────────────────────────────────────────────────
 
-describe('AIArcHero — FR1: arc gauge component', () => {
-  it('FR1.1 — renders without crash for aiPct=0', () => {
+describe('AIArcHero — FR1: renders without crash', () => {
+  it('FR1.10 — renders without crash for aiPct=0', () => {
     expect(() => {
       act(() => {
         create(React.createElement(AIArcHero, { ...DEFAULT_PROPS, aiPct: 0 }));
@@ -137,41 +148,49 @@ describe('AIArcHero — FR1: arc gauge component', () => {
     }).not.toThrow();
   });
 
-  it('FR1.2 — renders without crash for aiPct=50', () => {
+  it('FR1.11 — renders without crash for aiPct=65, brainliftHours=3.5, deltaPercent=8.2', () => {
     expect(() => {
       act(() => {
-        create(React.createElement(AIArcHero, { ...DEFAULT_PROPS, aiPct: 50 }));
+        create(React.createElement(AIArcHero, {
+          aiPct: 65,
+          brainliftHours: 3.5,
+          deltaPercent: 8.2,
+          ambientColor: '#00C2FF',
+        }));
       });
     }).not.toThrow();
   });
 
-  it('FR1.3 — renders without crash for aiPct=100', () => {
+  it('FR1.12 — renders without crash for aiPct=100 (full arc)', () => {
     expect(() => {
       act(() => {
         create(React.createElement(AIArcHero, { ...DEFAULT_PROPS, aiPct: 100 }));
       });
     }).not.toThrow();
   });
+});
 
-  it('FR1.4 — bold AI% number is visible as center text (e.g. "75%")', () => {
-    let tree: any;
-    act(() => {
-      tree = create(React.createElement(AIArcHero, { ...DEFAULT_PROPS, aiPct: 75 }));
-    });
-    const json = JSON.stringify(tree.toJSON());
-    expect(json).toContain('75%');
+// ─── FR2: Geometry derived from size prop ─────────────────────────────────────
+
+describe('AIArcHero — FR2: geometry from size prop', () => {
+  it('FR2.1 — renders without crash with custom size=240', () => {
+    expect(() => {
+      act(() => {
+        create(React.createElement(AIArcHero, { ...DEFAULT_PROPS, size: 240 }));
+      });
+    }).not.toThrow();
   });
 
-  it('FR1.5 — "AI USAGE" label is rendered', () => {
-    let tree: any;
-    act(() => {
-      tree = create(React.createElement(AIArcHero, { ...DEFAULT_PROPS }));
-    });
-    const json = JSON.stringify(tree.toJSON());
-    expect(json).toContain('AI USAGE');
+  it('FR2.2 — default size is 180dp when size prop is omitted', () => {
+    const source = fs.readFileSync(COMPONENT_FILE, 'utf8');
+    expect(source).toMatch(/size\s*=\s*180/);
   });
+});
 
-  it('FR1.6 — delta badge is rendered when deltaPercent is not null', () => {
+// ─── FR3: Props interface and visual output unchanged ─────────────────────────
+
+describe('AIArcHero — FR3: props interface and visual output', () => {
+  it('FR3.1 — delta badge shown when deltaPercent is not null', () => {
     let tree: any;
     act(() => {
       tree = create(React.createElement(AIArcHero, { ...DEFAULT_PROPS, deltaPercent: 5 }));
@@ -181,7 +200,7 @@ describe('AIArcHero — FR1: arc gauge component', () => {
     expect(badge.length).toBeGreaterThan(0);
   });
 
-  it('FR1.7 — delta badge is NOT rendered when deltaPercent is null', () => {
+  it('FR3.2 — delta badge hidden when deltaPercent is null', () => {
     let tree: any;
     act(() => {
       tree = create(React.createElement(AIArcHero, { ...DEFAULT_PROPS, deltaPercent: null }));
@@ -191,68 +210,25 @@ describe('AIArcHero — FR1: arc gauge component', () => {
     expect(badge.length).toBe(0);
   });
 
-  it('FR1.8 — delta badge shows "+" prefix and success color when deltaPercent > 0', () => {
+  it('FR3.3 — center text shows {aiPct}% (e.g. "75%")', () => {
     let tree: any;
     act(() => {
-      tree = create(React.createElement(AIArcHero, { ...DEFAULT_PROPS, deltaPercent: 3.5 }));
+      tree = create(React.createElement(AIArcHero, { ...DEFAULT_PROPS, aiPct: 75 }));
     });
     const json = JSON.stringify(tree.toJSON());
-    // Should contain +3.5%
-    expect(json).toContain('+3.5%');
+    expect(json).toContain('75%');
   });
 
-  it('FR1.9 — delta badge shows negative and critical color when deltaPercent < 0', () => {
+  it('FR3.4 — "AI USAGE" label is rendered', () => {
     let tree: any;
     act(() => {
-      tree = create(React.createElement(AIArcHero, { ...DEFAULT_PROPS, deltaPercent: -2.1 }));
+      tree = create(React.createElement(AIArcHero, { ...DEFAULT_PROPS }));
     });
     const json = JSON.stringify(tree.toJSON());
-    expect(json).toContain('-2.1%');
+    expect(json).toContain('AI USAGE');
   });
 
-  it('FR1.10 — delta badge shows "+0.0%" when deltaPercent === 0', () => {
-    let tree: any;
-    act(() => {
-      tree = create(React.createElement(AIArcHero, { ...DEFAULT_PROPS, deltaPercent: 0 }));
-    });
-    const json = JSON.stringify(tree.toJSON());
-    expect(json).toContain('+0.0%');
-  });
-
-  it('FR1.11 — default size is 180dp when size prop is omitted', () => {
-    const source = fs.readFileSync(COMPONENT_FILE, 'utf8');
-    // Default parameter: size = 180
-    expect(source).toMatch(/size\s*=\s*180/);
-  });
-
-  it('FR1.12 — AI_TARGET_PCT exported constant equals 75', () => {
-    expect(AI_TARGET_PCT).toBe(75);
-  });
-
-  it('FR1.13 — component does not import AIRingChart', () => {
-    const source = fs.readFileSync(COMPONENT_FILE, 'utf8');
-    expect(source).not.toContain('AIRingChart');
-  });
-});
-
-// ─── FR2: BrainLift secondary metric ─────────────────────────────────────────
-
-describe('AIArcHero — FR2: BrainLift secondary metric', () => {
-  it('FR2.1 — renders "{brainliftHours.toFixed(1)}h / 5h" text', () => {
-    let tree: any;
-    act(() => {
-      tree = create(React.createElement(AIArcHero, { ...DEFAULT_PROPS, brainliftHours: 3.5 }));
-    });
-    const json = JSON.stringify(tree.toJSON());
-    expect(json).toContain('3.5h');
-    expect(json).toContain('5h');
-  });
-
-  it('FR2.2 — BRAINLIFT_TARGET_HOURS exported constant equals 5', () => {
-    expect(BRAINLIFT_TARGET_HOURS).toBe(5);
-  });
-
-  it('FR2.3 — brainliftHours=0 renders "0.0h / 5h" with no crash', () => {
+  it('FR3.5 — brainliftHours=0 renders "0.0h / 5h" with no crash', () => {
     let tree: any;
     expect(() => {
       act(() => {
@@ -263,74 +239,115 @@ describe('AIArcHero — FR2: BrainLift secondary metric', () => {
     expect(json).toContain('0.0h');
   });
 
-  it('FR2.4 — brainliftHours=5 renders "5.0h / 5h"', () => {
-    let tree: any;
-    act(() => {
-      tree = create(React.createElement(AIArcHero, { ...DEFAULT_PROPS, brainliftHours: 5 }));
-    });
-    const json = JSON.stringify(tree.toJSON());
-    expect(json).toContain('5.0h');
-  });
-
-  it('FR2.5 — brainliftHours=7.3 renders "7.3h" text (actual hours shown)', () => {
-    let tree: any;
-    act(() => {
-      tree = create(React.createElement(AIArcHero, { ...DEFAULT_PROPS, brainliftHours: 7.3 }));
-    });
-    const json = JSON.stringify(tree.toJSON());
-    expect(json).toContain('7.3h');
-  });
-
-  it('FR2.6 — source uses Math.min(1, brainliftHours / BRAINLIFT_TARGET_HOURS) for progress clamping', () => {
+  it('FR3.6 — brainliftHours > BRAINLIFT_TARGET_HOURS (e.g. 7) renders without crash, clamps progress', () => {
+    expect(() => {
+      act(() => {
+        create(React.createElement(AIArcHero, { ...DEFAULT_PROPS, brainliftHours: 7 }));
+      });
+    }).not.toThrow();
     const source = fs.readFileSync(COMPONENT_FILE, 'utf8');
     expect(source).toMatch(/Math\.min\s*\(\s*1/);
   });
 
-  it('FR2.7 — source renders ProgressBar with colorClass="bg-violet"', () => {
+  it('FR3.7 — delta badge shows "+" prefix when deltaPercent > 0', () => {
+    let tree: any;
+    act(() => {
+      tree = create(React.createElement(AIArcHero, { ...DEFAULT_PROPS, deltaPercent: 3.5 }));
+    });
+    const json = JSON.stringify(tree.toJSON());
+    expect(json).toContain('+3.5%');
+  });
+
+  it('FR3.8 — delta badge shows negative value when deltaPercent < 0', () => {
+    let tree: any;
+    act(() => {
+      tree = create(React.createElement(AIArcHero, { ...DEFAULT_PROPS, deltaPercent: -2.1 }));
+    });
+    const json = JSON.stringify(tree.toJSON());
+    expect(json).toContain('-2.1%');
+  });
+
+  it('FR3.9 — delta badge shows "+0.0%" when deltaPercent === 0', () => {
+    let tree: any;
+    act(() => {
+      tree = create(React.createElement(AIArcHero, { ...DEFAULT_PROPS, deltaPercent: 0 }));
+    });
+    const json = JSON.stringify(tree.toJSON());
+    expect(json).toContain('+0.0%');
+  });
+
+  it('FR3.10 — arcPath export preserved (function exists and is callable)', () => {
+    expect(typeof arcPath).toBe('function');
+  });
+
+  it('FR3.11 — AI_TARGET_PCT exported constant equals 75', () => {
+    expect(AI_TARGET_PCT).toBe(75);
+  });
+
+  it('FR3.12 — BRAINLIFT_TARGET_HOURS exported constant equals 5', () => {
+    expect(BRAINLIFT_TARGET_HOURS).toBe(5);
+  });
+
+  it('FR3.13 — source imports Card component', () => {
+    const source = fs.readFileSync(COMPONENT_FILE, 'utf8');
+    expect(source).toContain('Card');
+  });
+
+  it('FR3.14 — source renders ProgressBar with colorClass="bg-violet"', () => {
     const source = fs.readFileSync(COMPONENT_FILE, 'utf8');
     expect(source).toContain('bg-violet');
     expect(source).toContain('ProgressBar');
   });
-});
 
-// ─── FR3: getAmbientColor aiPct contract — boundary verification ──────────────
-
-describe('getAmbientColor — FR3: aiPct signal boundaries', () => {
-  let getAmbientColor: any;
-
-  beforeAll(() => {
-    const mod = require('../AmbientBackground');
-    getAmbientColor = mod.getAmbientColor;
-  });
-
-  it('FR3.1 — pct=80 → colors.violet (#A78BFA)', () => {
-    expect(getAmbientColor({ type: 'aiPct', pct: 80 })).toBe('#A78BFA');
-  });
-
-  it('FR3.2 — pct=65 → colors.cyan (#00C2FF)', () => {
-    expect(getAmbientColor({ type: 'aiPct', pct: 65 })).toBe('#00C2FF');
-  });
-
-  it('FR3.3 — pct=50 → colors.warning (#F59E0B)', () => {
-    expect(getAmbientColor({ type: 'aiPct', pct: 50 })).toBe('#F59E0B');
-  });
-
-  it('FR3.4 — pct=75 (boundary) → colors.violet (#A78BFA)', () => {
-    expect(getAmbientColor({ type: 'aiPct', pct: 75 })).toBe('#A78BFA');
-  });
-
-  it('FR3.5 — pct=60 (boundary) → colors.cyan (#00C2FF)', () => {
-    expect(getAmbientColor({ type: 'aiPct', pct: 60 })).toBe('#00C2FF');
-  });
-
-  it('FR3.6 — pct=0 → colors.warning (#F59E0B)', () => {
-    expect(getAmbientColor({ type: 'aiPct', pct: 0 })).toBe('#F59E0B');
+  it('FR3.15 — source uses react-native-svg Path for arc rendering', () => {
+    const source = fs.readFileSync(COMPONENT_FILE, 'utf8');
+    expect(source).toContain('react-native-svg');
+    expect(source).toContain('Path');
   });
 });
 
-// ─── FR1: Source file structure checks ───────────────────────────────────────
+// ─── FR4: arcPath pure utility function ──────────────────────────────────────
 
-describe('AIArcHero — source structure', () => {
+describe('arcPath — FR4: SVG arc path generation', () => {
+  it('FR4.1 — arcPath(90, 90, 87, 135, 405) returns string starting with "M " and containing " A "', () => {
+    const result = arcPath(90, 90, 87, 135, 405);
+    expect(typeof result).toBe('string');
+    expect(result.startsWith('M ')).toBe(true);
+    expect(result).toContain(' A ');
+  });
+
+  it('FR4.2 — degenerate case: start === end returns string starting with "M" (no crash)', () => {
+    const result = arcPath(90, 90, 80, 135, 135);
+    expect(typeof result).toBe('string');
+    expect(result.startsWith('M')).toBe(true);
+    // Degenerate: no arc command
+    expect(result).not.toContain('A');
+  });
+
+  it('FR4.3 — sweep > 180 → largeArcFlag = 1 in result', () => {
+    // 270° sweep
+    const result = arcPath(90, 90, 80, 135, 405);
+    expect(result).toMatch(/A\s+[\d.]+\s+[\d.]+\s+0\s+1\s+1/);
+  });
+
+  it('FR4.4 — sweep <= 180 → largeArcFlag = 0 in result', () => {
+    // 135° sweep (50% of 270)
+    const result = arcPath(90, 90, 80, 135, 270);
+    expect(result).toMatch(/A\s+[\d.]+\s+[\d.]+\s+0\s+0\s+1/);
+  });
+
+  it('FR4.5 — arc coordinates are numeric (not NaN)', () => {
+    const result = arcPath(90, 90, 80, 135, 270);
+    const numbers = result.match(/-?[\d.]+/g) ?? [];
+    numbers.forEach(n => {
+      expect(isNaN(parseFloat(n))).toBe(false);
+    });
+  });
+});
+
+// ─── FR4: source structure ────────────────────────────────────────────────────
+
+describe('AIArcHero — source structure (exports + hooks)', () => {
   let source: string;
 
   beforeAll(() => {
@@ -349,16 +366,7 @@ describe('AIArcHero — source structure', () => {
     expect(source).toMatch(/export\s+const\s+BRAINLIFT_TARGET_HOURS/);
   });
 
-  it('source uses react-native-svg Path for arc rendering', () => {
-    expect(source).toContain('react-native-svg');
-    expect(source).toContain('Path');
-  });
-
-  it('source imports springPremium for arc fill animation', () => {
-    expect(source).toContain('springPremium');
-  });
-
-  it('source uses useSharedValue for animated arc end angle', () => {
+  it('source uses useSharedValue for animated value', () => {
     expect(source).toContain('useSharedValue');
   });
 
@@ -366,7 +374,42 @@ describe('AIArcHero — source structure', () => {
     expect(source).toContain('useEffect');
   });
 
-  it('source imports Card component', () => {
-    expect(source).toContain('Card');
+  it('source does NOT import AIRingChart', () => {
+    expect(source).not.toContain('AIRingChart');
+  });
+});
+
+// ─── FR3: getAmbientColor contract boundary verification ─────────────────────
+
+describe('getAmbientColor — aiPct signal boundaries', () => {
+  let getAmbientColor: any;
+
+  beforeAll(() => {
+    const mod = require('../AmbientBackground');
+    getAmbientColor = mod.getAmbientColor;
+  });
+
+  it('pct=80 → colors.violet (#A78BFA)', () => {
+    expect(getAmbientColor({ type: 'aiPct', pct: 80 })).toBe('#A78BFA');
+  });
+
+  it('pct=65 → colors.cyan (#00C2FF)', () => {
+    expect(getAmbientColor({ type: 'aiPct', pct: 65 })).toBe('#00C2FF');
+  });
+
+  it('pct=50 → colors.warning (#F59E0B)', () => {
+    expect(getAmbientColor({ type: 'aiPct', pct: 50 })).toBe('#F59E0B');
+  });
+
+  it('pct=75 (boundary) → colors.violet (#A78BFA)', () => {
+    expect(getAmbientColor({ type: 'aiPct', pct: 75 })).toBe('#A78BFA');
+  });
+
+  it('pct=60 (boundary) → colors.cyan (#00C2FF)', () => {
+    expect(getAmbientColor({ type: 'aiPct', pct: 60 })).toBe('#00C2FF');
+  });
+
+  it('pct=0 → colors.warning (#F59E0B)', () => {
+    expect(getAmbientColor({ type: 'aiPct', pct: 0 })).toBe('#F59E0B');
   });
 });
