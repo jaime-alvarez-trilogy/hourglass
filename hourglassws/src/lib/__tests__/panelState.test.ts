@@ -214,8 +214,8 @@ describe('computePanelState', () => {
     });
 
     it('FR1.3 — returns aheadOfPace when pacingRatio is exactly 1.5', () => {
-      // daysElapsed=1.667, expected = (1.667/5)*40 ≈ 13.33h, ratio = 20/13.33 ≈ 1.5
-      expect(computePanelState(20, 40, 1.667)).toBe('aheadOfPace');
+      // daysElapsed=2.5, expected = (2.5/5)*40 = 20h, ratio = 30/20 = 1.5 exactly
+      expect(computePanelState(30, 40, 2.5)).toBe('aheadOfPace');
     });
 
     it('FR1.4 — returns aheadOfPace when pacingRatio is 2.0 (well above threshold)', () => {
