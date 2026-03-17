@@ -168,6 +168,10 @@ describe('getAmbientColor — FR2: panelState signal', () => {
   it('FR2.6 — idle → null', () => {
     expect(getAmbientColor({ type: 'panelState', state: 'idle' })).toBeNull();
   });
+
+  it('FR2.aop — aheadOfPace → colors.gold (#E8C97A)', () => {
+    expect(getAmbientColor({ type: 'panelState', state: 'aheadOfPace' })).toBe('#E8C97A');
+  });
 });
 
 // ─── FR2: getAmbientColor — earningsPace signal ──────────────────────────────
@@ -237,7 +241,7 @@ describe('AMBIENT_COLORS — FR2: constant structure', () => {
     expect(AMBIENT_COLORS).toBeDefined();
   });
 
-  it('FR2.21 — panelState record has all 6 PanelState keys', () => {
+  it('FR2.21 — panelState record has all 7 PanelState keys (including aheadOfPace)', () => {
     const keys = Object.keys(AMBIENT_COLORS.panelState);
     expect(keys).toContain('onTrack');
     expect(keys).toContain('behind');
@@ -245,7 +249,8 @@ describe('AMBIENT_COLORS — FR2: constant structure', () => {
     expect(keys).toContain('crushedIt');
     expect(keys).toContain('overtime');
     expect(keys).toContain('idle');
-    expect(keys).toHaveLength(6);
+    expect(keys).toContain('aheadOfPace');
+    expect(keys).toHaveLength(7);
   });
 
   it('FR2.22 — panelState.idle is null', () => {

@@ -3,6 +3,7 @@ import {
   computeDaysElapsed,
   PACING_ON_TRACK_THRESHOLD,
   PACING_BEHIND_THRESHOLD,
+  PACING_CRUSHING_THRESHOLD,
 } from '../panelState';
 
 describe('computePanelState', () => {
@@ -199,6 +200,51 @@ describe('computePanelState', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // FR1 (01-ahead-of-pace-state): aheadOfPace state
+  // ---------------------------------------------------------------------------
+  describe('aheadOfPace state — FR1 (01-ahead-of-pace-state)', () => {
+    it('FR1.1 — returns aheadOfPace on Mon EOD with 12h (12/8 = 150% of expected)', () => {
+      // daysElapsed=1.0, expected = (1/5)*40 = 8h, ratio = 12/8 = 1.5 ≥ 1.5
+      expect(computePanelState(12, 40, 1.0)).toBe('aheadOfPace');
+    });
+
+    it('FR1.2 — returns aheadOfPace on Tue EOD with 24h (24/16 = 150% of expected)', () => {
+      // daysElapsed=2.0, expected = (2/5)*40 = 16h, ratio = 24/16 = 1.5 ≥ 1.5
+      expect(computePanelState(24, 40, 2.0)).toBe('aheadOfPace');
+    });
+
+    it('FR1.3 — returns aheadOfPace when pacingRatio is exactly 1.5', () => {
+      // daysElapsed=1.667, expected = (1.667/5)*40 ≈ 13.33h, ratio = 20/13.33 ≈ 1.5
+      expect(computePanelState(20, 40, 1.667)).toBe('aheadOfPace');
+    });
+
+    it('FR1.4 — returns aheadOfPace when pacingRatio is 2.0 (well above threshold)', () => {
+      // daysElapsed=1.0, expected=8h, ratio = 16/8 = 2.0
+      expect(computePanelState(16, 40, 1.0)).toBe('aheadOfPace');
+    });
+
+    it('FR1.5 — returns onTrack when pacingRatio is 1.499 (just below threshold)', () => {
+      // Need ratio just below 1.5. daysElapsed=1.0, expected=8h, hours=11.99 → ratio≈1.499
+      expect(computePanelState(11.99, 40, 1.0)).toBe('onTrack');
+    });
+
+    it('FR1.6 — overtime takes priority over aheadOfPace (hours > weeklyLimit)', () => {
+      // hours=45 > weeklyLimit=40 → overtime fires before pacing ratio check
+      expect(computePanelState(45, 40, 1.0)).toBe('overtime');
+    });
+
+    it('FR1.7 — crushedIt takes priority over aheadOfPace (hours >= weeklyLimit)', () => {
+      // hours=40 === weeklyLimit=40 → crushedIt fires before pacing ratio check
+      expect(computePanelState(40, 40, 1.0)).toBe('crushedIt');
+    });
+
+    it('FR1.8 — idle guard preserved (days < 1 && hours === 0 → idle)', () => {
+      // daysElapsed=0.5, hours=0 → idle guard fires before pacing ratio check
+      expect(computePanelState(0, 40, 0.5)).toBe('idle');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Constant exports
   // ---------------------------------------------------------------------------
   describe('exported constants', () => {
@@ -208,6 +254,10 @@ describe('computePanelState', () => {
 
     it('exports PACING_BEHIND_THRESHOLD as 0.60', () => {
       expect(PACING_BEHIND_THRESHOLD).toBe(0.6);
+    });
+
+    it('exports PACING_CRUSHING_THRESHOLD as 1.5', () => {
+      expect(PACING_CRUSHING_THRESHOLD).toBe(1.5);
     });
   });
 });

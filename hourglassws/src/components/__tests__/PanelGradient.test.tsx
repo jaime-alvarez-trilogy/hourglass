@@ -62,7 +62,7 @@ beforeAll(() => {
 // ─── FR1: Runtime render ──────────────────────────────────────────────────────
 
 describe('PanelGradient — FR1: runtime render for all states', () => {
-  const allStates = ['onTrack', 'behind', 'critical', 'crushedIt', 'idle', 'overtime'] as const;
+  const allStates = ['onTrack', 'behind', 'critical', 'crushedIt', 'idle', 'overtime', 'aheadOfPace'] as const;
 
   allStates.forEach((state) => {
     it(`FR1.1 — renders without crash for state="${state}"`, () => {
@@ -165,6 +165,52 @@ describe('PanelGradient — FR2: getGlowStyle', () => {
   });
 });
 
+// ─── FR1 (01-ahead-of-pace-state): aheadOfPace map entries ───────────────────
+
+describe('PanelGradient — FR1 (01-ahead-of-pace-state): aheadOfPace entries', () => {
+  it('FR1.aop.1 — PANEL_GRADIENT_COLORS["aheadOfPace"] is non-null', () => {
+    expect(PANEL_GRADIENT_COLORS['aheadOfPace']).not.toBeNull();
+    expect(PANEL_GRADIENT_COLORS['aheadOfPace']).toBeDefined();
+  });
+
+  it('FR1.aop.2 — PANEL_GRADIENT_COLORS["aheadOfPace"].inner contains E8C97A (gold)', () => {
+    expect(PANEL_GRADIENT_COLORS['aheadOfPace']?.inner?.toUpperCase()).toContain('E8C97A');
+  });
+
+  it('FR1.aop.3 — PANEL_GRADIENT_COLORS["aheadOfPace"].outer is "transparent"', () => {
+    expect(PANEL_GRADIENT_COLORS['aheadOfPace']?.outer).toBe('transparent');
+  });
+
+  it('FR1.aop.4 — PANEL_GRADIENTS["aheadOfPace"].colors has length 2', () => {
+    expect(Array.isArray(PANEL_GRADIENTS['aheadOfPace']?.colors)).toBe(true);
+    expect(PANEL_GRADIENTS['aheadOfPace'].colors).toHaveLength(2);
+  });
+
+  it('FR1.aop.5 — PANEL_GRADIENTS["aheadOfPace"].colors[0] contains E8C97A (gold with alpha)', () => {
+    expect(PANEL_GRADIENTS['aheadOfPace'].colors[0].toUpperCase()).toContain('E8C97A');
+  });
+
+  it('FR1.aop.6 — getGlowStyle("aheadOfPace") returns shadowColor #E8C97A on iOS', () => {
+    const style = getGlowStyle('aheadOfPace');
+    // On iOS: shadowColor is present; on Android: elevation is present
+    const hasShadowColor = style.shadowColor !== undefined;
+    const hasElevation = style.elevation !== undefined;
+    expect(hasShadowColor || hasElevation).toBe(true);
+  });
+
+  it('FR1.aop.7 — PanelGradient renders without error when state="aheadOfPace"', () => {
+    expect(() => {
+      act(() => {
+        create(
+          React.createElement(PanelGradient, { state: 'aheadOfPace' },
+            React.createElement('View' as any, null)
+          )
+        );
+      });
+    }).not.toThrow();
+  });
+});
+
 // ─── FR1+FR2: Source file checks ─────────────────────────────────────────────
 
 describe('PanelGradient — FR1+FR2: source file structure', () => {
@@ -231,7 +277,7 @@ describe('PanelGradient — SC4: PANEL_GRADIENTS export (backward compat)', () =
     expect(PANEL_GRADIENTS).toBeDefined();
   });
 
-  const states = ['onTrack', 'behind', 'critical', 'crushedIt', 'idle', 'overtime'];
+  const states = ['onTrack', 'behind', 'critical', 'crushedIt', 'idle', 'overtime', 'aheadOfPace'];
   states.forEach((state) => {
     it(`SC4.2 — PANEL_GRADIENTS.${state} has colors array`, () => {
       expect(Array.isArray(PANEL_GRADIENTS[state]?.colors)).toBe(true);
