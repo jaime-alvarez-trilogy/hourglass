@@ -1,9 +1,11 @@
-// Tests: AI Tab screen — 03-ai-tab-integration
+// Tests: AI Tab screen — 03-ai-tab-integration + 04-ai-tab-screen
 // FR1: Prime Radiant card wired into app/(tabs)/ai.tsx
+// FR1-FR5 (04-ai-tab-screen): Data-gated loading, useStaggeredEntry removal,
+//   SkeletonLoader removal, useHistoryBackfill verification, content rendering
 //
 // Strategy:
 // - Source-file static analysis for import/structure checks (NativeWind v4 hashes className)
-// - Mock useAIData, useConfig, useFocusKey, AIConeChart, computeAICone, SkeletonLoader
+// - Mock useAIData, useConfig, useFocusKey, AIConeChart, computeAICone
 // - Render tests via react-test-renderer for structural behavior
 // - testID and component-type assertions for runtime structural checks
 
@@ -74,15 +76,6 @@ jest.mock('expo-router', () => ({
 }));
 
 // Stub design-system components that use Reanimated/Skia (tested individually)
-jest.mock('@/src/components/SkeletonLoader', () => {
-  const R = require('react');
-  return {
-    __esModule: true,
-    default: ({ width, height, rounded, ...props }: any) =>
-      R.createElement('SkeletonLoader', { width, height, rounded, ...props }),
-  };
-});
-
 jest.mock('@/src/components/MetricValue', () => {
   const R = require('react');
   return {
@@ -115,10 +108,10 @@ jest.mock('@/src/components/AIConeChart', () => {
   const R = require('react');
   return {
     __esModule: true,
-    default: ({ data, width, height, size, ...props }: any) =>
-      R.createElement('AIConeChart', { data, width, height, size, ...props }),
-    AIConeChart: ({ data, width, height, size, ...props }: any) =>
-      R.createElement('AIConeChart', { data, width, height, size, ...props }),
+    default: ({ data, width, height, size, onScrubChange, ...props }: any) =>
+      R.createElement('AIConeChart', { data, width, height, size, onScrubChange, ...props }),
+    AIConeChart: ({ data, width, height, size, onScrubChange, ...props }: any) =>
+      R.createElement('AIConeChart', { data, width, height, size, onScrubChange, ...props }),
   };
 });
 
@@ -165,7 +158,7 @@ jest.mock('@/src/hooks/useAIData', () => ({
   useAIData: (...args: any[]) => mockUseAIData(...args),
 }));
 
-// useHistoryBackfill + useOverviewData — stub for AI trajectory card
+// useHistoryBackfill — stub (should NOT be called by ai.tsx after spec 03)
 jest.mock('@/src/hooks/useHistoryBackfill', () => ({
   useHistoryBackfill: () => null,
 }));
@@ -325,7 +318,7 @@ function collectText(node: any, collected: string[]): void {
   if (node.children) { for (const c of node.children) collectText(c, collected); }
 }
 
-// ─── FR1: Prime Radiant Card — Source Structure ───────────────────────────────
+// ─── FR1 (03-ai-tab-integration): Prime Radiant Card — Source Structure ───────
 
 describe('AITab FR1 — source: imports and structure', () => {
   let source: string;
@@ -377,14 +370,9 @@ describe('AITab FR1 — source: imports and structure', () => {
   it('SC1.10 — renders AIConeChart with height={240}', () => {
     expect(source).toMatch(/height\s*=\s*\{?\s*240\s*\}?/);
   });
-
-  it('SC1.11 — uses SkeletonLoader with height={240} for Prime Radiant skeleton', () => {
-    // Source should have a SkeletonLoader height=240 for the cone card skeleton
-    expect(source).toMatch(/SkeletonLoader[\s\S]{0,100}height\s*=\s*\{240\}/);
-  });
 });
 
-// ─── FR1: Prime Radiant Card — Render: happy path ────────────────────────────
+// ─── FR1 (03-ai-tab-integration): Prime Radiant Card — Render: happy path ─────
 
 describe('AITab FR1 — render: Prime Radiant card with data', () => {
   beforeEach(() => {
@@ -439,9 +427,12 @@ describe('AITab FR1 — render: Prime Radiant card with data', () => {
   });
 });
 
-// ─── FR1: Prime Radiant Card — Render: skeleton during initial load ───────────
+// ─── FR1 (04-ai-tab-screen): Loading state renders ActivityIndicator ──────────
+//
+// SC1.1–SC1.6: data-gated loading gate uses ActivityIndicator, not SkeletonLoader
+// SC1.5: no SkeletonLoader renders during loading state
 
-describe('AITab FR1 — render: skeleton during initial load', () => {
+describe('AITab FR1 (04) — render: ActivityIndicator during initial load', () => {
   beforeEach(() => {
     mockComputeAICone.mockReturnValue(MOCK_CONE_DATA);
     mockUseFocusKey.mockReturnValue(0);
@@ -464,22 +455,51 @@ describe('AITab FR1 — render: skeleton during initial load', () => {
     expect(() => { renderAIScreen(); }).not.toThrow();
   });
 
-  it('SC1.20 — renders a SkeletonLoader for the Prime Radiant section when loading', () => {
+  it('SC1.20 — renders ActivityIndicator when data=null and isLoading=true', () => {
     const tree = renderAIScreen();
-    const skeletons = findAllByType(tree.toJSON(), 'SkeletonLoader');
-    // At least one SkeletonLoader with height=240 (Prime Radiant slot)
-    const coneSkeletons = skeletons.filter((s: any) => s.props.height === 240);
-    expect(coneSkeletons.length).toBeGreaterThan(0);
+    const indicator = findByType(tree.toJSON(), 'ActivityIndicator');
+    expect(indicator).not.toBeNull();
   });
 
-  it('SC1.21 — does NOT render AIConeChart when data=null', () => {
+  it('SC1.21 — ActivityIndicator uses colors.success color', () => {
+    const tree = renderAIScreen();
+    const indicator = findByType(tree.toJSON(), 'ActivityIndicator');
+    expect(indicator).not.toBeNull();
+    // colors.success = '#4CAF50' or the project's success color
+    // We verify a color prop is set (not undefined/null)
+    expect(indicator.props.color).toBeTruthy();
+  });
+
+  it('SC1.21b — does NOT render AIConeChart when data=null', () => {
     const tree = renderAIScreen();
     const coneChart = findByType(tree.toJSON(), 'AIConeChart');
     expect(coneChart).toBeNull();
   });
+
+  it('SC1.21c — does NOT render SkeletonLoader when data=null and isLoading=true', () => {
+    const tree = renderAIScreen();
+    const skeletons = findAllByType(tree.toJSON(), 'SkeletonLoader');
+    expect(skeletons.length).toBe(0);
+  });
 });
 
-// ─── FR1: Prime Radiant Card — Render: null guard when data=null, not loading ─
+// ─── FR1 (04-ai-tab-screen): ActivityIndicator NOT rendered when data available ─
+
+describe('AITab FR1 (04) — render: no ActivityIndicator when data available', () => {
+  beforeEach(() => {
+    mockComputeAICone.mockReturnValue(MOCK_CONE_DATA);
+    mockUseFocusKey.mockReturnValue(0);
+    defaultHookResults();
+  });
+
+  it('SC1.22 — does NOT render ActivityIndicator when data !== null', () => {
+    const tree = renderAIScreen();
+    const indicator = findByType(tree.toJSON(), 'ActivityIndicator');
+    expect(indicator).toBeNull();
+  });
+});
+
+// ─── FR1 (03-ai-tab-integration): no cone card when data=null and not loading ──
 
 describe('AITab FR1 — render: no cone card when data=null and not loading', () => {
   beforeEach(() => {
@@ -500,7 +520,7 @@ describe('AITab FR1 — render: no cone card when data=null and not loading', ()
     });
   });
 
-  it('SC1.22 — does NOT render AIConeChart when data=null and isLoading=false', () => {
+  it('SC1.22b — does NOT render AIConeChart when data=null and isLoading=false', () => {
     // When data=null and isLoading=false, the screen shows empty-state (no chart)
     const tree = renderAIScreen();
     const coneChart = findByType(tree.toJSON(), 'AIConeChart');
@@ -508,7 +528,7 @@ describe('AITab FR1 — render: no cone card when data=null and not loading', ()
   });
 });
 
-// ─── FR1: Prime Radiant Card — weeklyLimit from useConfig ────────────────────
+// ─── FR1 (03-ai-tab-integration): weeklyLimit from useConfig ──────────────────
 
 describe('AITab FR1 — weeklyLimit sourced from useConfig', () => {
   it('SC1.23 — computeAICone called with weeklyLimit=30 when config.weeklyLimit=30', () => {
@@ -537,7 +557,7 @@ describe('AITab FR1 — weeklyLimit sourced from useConfig', () => {
   });
 });
 
-// ─── FR1: Prime Radiant Card — chartKey from useFocusKey ─────────────────────
+// ─── FR1 (03-ai-tab-integration): chartKey from useFocusKey ───────────────────
 
 describe('AITab FR1 — source: chartKey prop on AIConeChart', () => {
   it('SC1.24 — ai.tsx source passes key={chartKey} to AIConeChart', () => {
@@ -552,7 +572,7 @@ describe('AITab FR1 — source: chartKey prop on AIConeChart', () => {
   });
 });
 
-// ─── FR1: Prime Radiant Card — render order (below BrainLift, above breakdown) ─
+// ─── FR1 (03-ai-tab-integration): render order ────────────────────────────────
 
 describe('AITab FR1 — render order: Prime Radiant between BrainLift and breakdown', () => {
   beforeEach(() => {
@@ -569,6 +589,132 @@ describe('AITab FR1 — render order: Prime Radiant between BrainLift and breakd
     expect(brainliftIdx).toBeGreaterThanOrEqual(0);
     expect(primeIdx).toBeGreaterThanOrEqual(0);
     expect(brainliftIdx).toBeLessThan(primeIdx);
+  });
+});
+
+// ─── FR2 (04-ai-tab-screen): useStaggeredEntry removed ────────────────────────
+
+describe('AITab FR2 (04) — source: useStaggeredEntry removed', () => {
+  let source: string;
+
+  beforeAll(() => {
+    source = fs.readFileSync(AI_TAB_PATH, 'utf8');
+  });
+
+  it('SC2.1 — source does NOT import useStaggeredEntry', () => {
+    expect(source).not.toMatch(/from\s+['"]@\/src\/hooks\/useStaggeredEntry['"]/);
+  });
+
+  it('SC2.2 — source does NOT call useStaggeredEntry', () => {
+    expect(source).not.toMatch(/useStaggeredEntry\s*\(/);
+  });
+
+  it('SC2.3 — source does NOT use getEntryStyle', () => {
+    expect(source).not.toMatch(/getEntryStyle/);
+  });
+
+  it('SC2.4 — source does NOT have Animated.View wrappers with getEntryStyle (belt-and-suspenders)', () => {
+    // Any Animated.View with getEntryStyle pattern is forbidden
+    expect(source).not.toMatch(/Animated\.View[\s\S]{0,100}getEntryStyle/);
+  });
+});
+
+// ─── FR3 (04-ai-tab-screen): useHistoryBackfill not called ────────────────────
+
+describe('AITab FR3 (04) — source: useHistoryBackfill removed', () => {
+  let source: string;
+
+  beforeAll(() => {
+    source = fs.readFileSync(AI_TAB_PATH, 'utf8');
+  });
+
+  it('SC3.1 — source does NOT import useHistoryBackfill', () => {
+    expect(source).not.toMatch(/from\s+['"]@\/src\/hooks\/useHistoryBackfill['"]/);
+  });
+
+  it('SC3.2 — source does NOT call useHistoryBackfill()', () => {
+    expect(source).not.toMatch(/useHistoryBackfill\s*\(\s*\)/);
+  });
+});
+
+// ─── FR4 (04-ai-tab-screen): SkeletonLoader removed ──────────────────────────
+
+describe('AITab FR4 (04) — source: SkeletonLoader removed', () => {
+  let source: string;
+
+  beforeAll(() => {
+    source = fs.readFileSync(AI_TAB_PATH, 'utf8');
+  });
+
+  it('SC4.1 — source does NOT import SkeletonLoader', () => {
+    expect(source).not.toMatch(/from\s+['"]@\/src\/components\/SkeletonLoader['"]/);
+  });
+
+  it('SC4.2 — source does NOT reference SkeletonLoader component', () => {
+    expect(source).not.toMatch(/<SkeletonLoader/);
+  });
+
+  it('SC4.3 — source does NOT contain showSkeleton variable', () => {
+    expect(source).not.toMatch(/showSkeleton/);
+  });
+});
+
+// ─── FR1 (04-ai-tab-screen): ActivityIndicator source check ──────────────────
+
+describe('AITab FR1 (04) — source: ActivityIndicator from react-native', () => {
+  let source: string;
+
+  beforeAll(() => {
+    source = fs.readFileSync(AI_TAB_PATH, 'utf8');
+  });
+
+  it('SC1.6 — source imports ActivityIndicator from react-native', () => {
+    // ActivityIndicator must appear in the react-native import line
+    expect(source).toMatch(/ActivityIndicator/);
+    // Must be from react-native (not a custom component import)
+    const rnImportMatch = source.match(/import\s*\{[^}]+\}\s*from\s*['"]react-native['"]/);
+    expect(rnImportMatch).not.toBeNull();
+    expect(rnImportMatch![0]).toContain('ActivityIndicator');
+  });
+});
+
+// ─── FR5 (04-ai-tab-screen): onScrubChange still passed to AIConeChart ────────
+
+describe('AITab FR5 (04) — source: onScrubChange wiring preserved', () => {
+  let source: string;
+
+  beforeAll(() => {
+    source = fs.readFileSync(AI_TAB_PATH, 'utf8');
+  });
+
+  it('SC5.6 — source passes onScrubChange to AIConeChart', () => {
+    expect(source).toMatch(/onScrubChange/);
+  });
+});
+
+// ─── FR5 (04-ai-tab-screen): content renders without Animated.View wrappers ───
+
+describe('AITab FR5 (04) — render: content sections present with data', () => {
+  beforeEach(() => {
+    mockComputeAICone.mockReturnValue(MOCK_CONE_DATA);
+    mockUseFocusKey.mockReturnValue(0);
+    defaultHookResults();
+  });
+
+  it('SC5.1 — renders without crash when data is available (no stagger wrappers)', () => {
+    expect(() => { renderAIScreen(); }).not.toThrow();
+  });
+
+  it('SC5.2 — AIConeChart renders when coneData is available', () => {
+    const tree = renderAIScreen();
+    const coneChart = findByType(tree.toJSON(), 'AIConeChart');
+    expect(coneChart).not.toBeNull();
+  });
+
+  it('SC5.3 — daily-breakdown card renders when dailyBreakdown.length > 0', () => {
+    const tree = renderAIScreen();
+    const node = findByTestId(tree, 'daily-breakdown');
+    expect(node).not.toBeNull();
   });
 });
 
