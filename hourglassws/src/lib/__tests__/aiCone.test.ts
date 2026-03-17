@@ -359,3 +359,97 @@ describe('computeAICone', () => {
     });
   });
 });
+
+// ─── 01-baseline-start: FR1 + FR2 baselinePct tests ──────────────────────────
+
+describe('computeAICone — baselinePct (01-baseline-start)', () => {
+  const emptyBreakdown: DailyTagData[] = [];
+  const someDays = [
+    makeDay('2026-03-09', 24, 18, 2),  // Mon: 24 slots, 18 AI, 2 noTags
+    makeDay('2026-03-10', 24, 16, 1),  // Tue
+  ];
+
+  // ── FR2: hourlyPoints[0].pctY reflects baselinePct ────────────────────────
+
+  describe('FR2: baselinePct threads to hourlyPoints origin', () => {
+    it('baselinePct=81 → hourlyPoints[0].pctY === 81', () => {
+      const result = computeAICone(emptyBreakdown, 40, 81);
+      expect(result.hourlyPoints[0].pctY).toBe(81);
+    });
+
+    it('baselinePct=75 → hourlyPoints[0].pctY === 75', () => {
+      const result = computeAICone(emptyBreakdown, 40, 75);
+      expect(result.hourlyPoints[0].pctY).toBe(75);
+    });
+
+    it('baselinePct=100 → hourlyPoints[0].pctY === 100', () => {
+      const result = computeAICone(emptyBreakdown, 40, 100);
+      expect(result.hourlyPoints[0].pctY).toBe(100);
+    });
+
+    it('baselinePct=0 explicit → hourlyPoints[0].pctY === 0 (no regression)', () => {
+      const result = computeAICone(emptyBreakdown, 40, 0);
+      expect(result.hourlyPoints[0].pctY).toBe(0);
+    });
+
+    it('baselinePct omitted → hourlyPoints[0].pctY === 0 (default, no regression)', () => {
+      const result = computeAICone(emptyBreakdown, 40);
+      expect(result.hourlyPoints[0].pctY).toBe(0);
+    });
+
+    it('hourlyPoints[0].hoursX is always 0 regardless of baselinePct', () => {
+      expect(computeAICone(emptyBreakdown, 40, 81).hourlyPoints[0].hoursX).toBe(0);
+      expect(computeAICone(emptyBreakdown, 40).hourlyPoints[0].hoursX).toBe(0);
+    });
+  });
+
+  // ── FR2: subsequent hourlyPoints track actual AI% (baseline only affects origin) ─
+
+  describe('FR2: baseline only affects origin — subsequent points track actual', () => {
+    it('with data, hourlyPoints[1+] are unaffected by baselinePct', () => {
+      const withBaseline = computeAICone(someDays, 40, 81);
+      const withoutBaseline = computeAICone(someDays, 40, 0);
+
+      // Origin differs
+      expect(withBaseline.hourlyPoints[0].pctY).toBe(81);
+      expect(withoutBaseline.hourlyPoints[0].pctY).toBe(0);
+
+      // All subsequent points are identical (same actual data)
+      const withLen = withBaseline.hourlyPoints.length;
+      const withoutLen = withoutBaseline.hourlyPoints.length;
+      expect(withLen).toBe(withoutLen);
+      for (let i = 1; i < withLen; i++) {
+        expect(withBaseline.hourlyPoints[i].hoursX).toBeCloseTo(withoutBaseline.hourlyPoints[i].hoursX, 5);
+        expect(withBaseline.hourlyPoints[i].pctY).toBeCloseTo(withoutBaseline.hourlyPoints[i].pctY, 5);
+      }
+    });
+  });
+
+  // ── FR2: cone bounds, currentAIPct, targetPct unaffected ──────────────────
+
+  describe('FR2: cone bounds and scalars unaffected by baselinePct', () => {
+    it('currentAIPct is the same with or without baselinePct', () => {
+      const withBaseline = computeAICone(someDays, 40, 81);
+      const withoutBaseline = computeAICone(someDays, 40);
+      expect(withBaseline.currentAIPct).toBeCloseTo(withoutBaseline.currentAIPct, 5);
+    });
+
+    it('upperBound is unchanged regardless of baselinePct', () => {
+      const withBaseline = computeAICone(someDays, 40, 81);
+      const withoutBaseline = computeAICone(someDays, 40);
+      expect(withBaseline.upperBound).toEqual(withoutBaseline.upperBound);
+    });
+
+    it('lowerBound is unchanged regardless of baselinePct', () => {
+      const withBaseline = computeAICone(someDays, 40, 81);
+      const withoutBaseline = computeAICone(someDays, 40);
+      expect(withBaseline.lowerBound).toEqual(withoutBaseline.lowerBound);
+    });
+
+    it('targetPct is always 75 regardless of baselinePct', () => {
+      expect(computeAICone(emptyBreakdown, 40, 0).targetPct).toBe(75);
+      expect(computeAICone(emptyBreakdown, 40, 81).targetPct).toBe(75);
+      expect(computeAICone(emptyBreakdown, 40, 100).targetPct).toBe(75);
+    });
+  });
+});
