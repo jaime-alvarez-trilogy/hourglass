@@ -20,9 +20,9 @@ export const PACING_BEHIND_THRESHOLD = 0.60;
  *
  * @param hoursWorked  Hours logged so far this week (e.g. 28.5).
  * @param weeklyLimit  Contractual weekly hour target (e.g. 40).
- * @param daysElapsed  Work days elapsed Mon–Fri. 0 = Monday morning before
- *                     any work; 5 = Friday EOD or later. Values outside [0, 5]
- *                     are clamped.
+ * @param daysElapsed  Fractional work days elapsed Mon–Fri (0.0–5.0). 0.0 =
+ *                     Monday midnight; 1.292 = Tuesday 7am; 5.0 = Friday or
+ *                     weekend. Values outside [0, 5] are clamped.
  *
  * @returns One of: "onTrack" | "behind" | "critical" | "crushedIt" | "idle" | "overtime"
  */
@@ -44,14 +44,15 @@ export function computePanelState(
   // Goal exactly met — crushed it.
   if (hours >= weeklyLimit) return 'crushedIt';
 
-  // Monday morning with nothing logged — fresh week.
-  if (days === 0 && hours === 0) return 'idle';
+  // All of Monday (days < 1) with nothing logged — fresh week, getting started.
+  if (days < 1 && hours === 0) return 'idle';
 
-  // Hours logged before the first full day has elapsed (e.g. pre-Monday work
-  // or very early Monday). Treat expected hours as 0 → worker is ahead.
-  if (days === 0) return 'onTrack';
-
+  // Compute expected hours. If days is exactly 0 (Monday midnight) with hours
+  // already logged, expectedHours is 0 — treat as on track to avoid division
+  // by zero.
   const expectedHours = (days / 5) * weeklyLimit;
+  if (expectedHours === 0) return 'onTrack';
+
   const pacingRatio = hours / expectedHours;
 
   if (pacingRatio >= PACING_ON_TRACK_THRESHOLD) return 'onTrack';
@@ -60,17 +61,19 @@ export function computePanelState(
 }
 
 /**
- * Returns the number of work days elapsed in the current week (Mon–Fri).
+ * Returns the fractional number of work days elapsed in the current week
+ * (Mon–Fri), using local timezone.
+ *
+ * Returns 0.0–5.0:
+ *   0.0   — Monday at exactly 00:00:00 (week just started)
+ *   0.333 — Monday at 08:00 (one-third of the first day elapsed)
+ *   1.292 — Tuesday at 07:00 (one day plus 7/24 of the second day)
+ *   5.0   — Friday (any time), Saturday, or Sunday (clamped to full week)
  *
  * Uses local timezone (getDay / getHours / getMinutes / getSeconds).
- *
- * Returns 0–5:
- *   0 — Monday at exactly 00:00:00 (week just started, no day has elapsed yet)
- *   1 — Monday (any time after midnight)
- *   2 — Tuesday
- *   3 — Wednesday
- *   4 — Thursday
- *   5 — Friday, Saturday, or Sunday (weekend clamped to 5)
+ * This is intentional: users experience their workweek in local time.
+ * The hoursWorked value from the Crossover API uses UTC — the mismatch is
+ * expected and correct.
  *
  * @param now  Optional Date to use (defaults to new Date()).
  */
@@ -81,23 +84,13 @@ export function computeDaysElapsed(now?: Date): number {
   // Weekend — clamp to 5
   if (day === 0 || day === 6) return 5;
 
-  // Friday through Saturday already handled above; day is now 1–5 (Mon–Fri)
-  // Friday
+  // Friday — full week elapsed, clamp to 5
   if (day === 5) return 5;
 
-  // Thursday
-  if (day === 4) return 4;
-
-  // Wednesday
-  if (day === 3) return 3;
-
-  // Tuesday
-  if (day === 2) return 2;
-
-  // Monday (day === 1)
-  // Special edge: Monday at exactly midnight → 0 (week hasn't started)
-  if (d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0) {
-    return 0;
-  }
-  return 1;
+  // Mon–Thu (day 1–4): return fractional days elapsed.
+  // dayIndex: 0=Mon, 1=Tue, 2=Wed, 3=Thu
+  // Monday midnight: dayIndex=0, hourOfDay=0 → returns 0.0 naturally.
+  const dayIndex = day - 1;
+  const hourOfDay = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
+  return dayIndex + hourOfDay / 24;
 }
