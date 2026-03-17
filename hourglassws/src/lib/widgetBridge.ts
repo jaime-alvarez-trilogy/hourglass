@@ -1,15 +1,22 @@
 /**
- * Boundary stub: updateWidgetData
- * Implemented in spec 06-widgets.
- * Re-exported here so handler.ts has a stable import path.
+ * FR3 (01-widget-activation): widgetBridge — thin wrapper over widgets/bridge
+ *
+ * Translates CrossoverSnapshot (used by background push handler) into the
+ * individual args expected by widgets/bridge.updateWidgetData().
+ *
+ * handler.ts calls: updateWidgetData(snapshot)
+ * widgets/bridge expects: updateWidgetData(hoursData, aiData, pendingCount, config)
  */
 
-import { CrossoverSnapshot } from './crossoverData';
+import { updateWidgetData as _updateWidgetData } from '../widgets/bridge';
+import type { CrossoverSnapshot } from './crossoverData';
 
 /**
- * Write fresh Crossover data to the local store so the home screen widget can read it.
- * Stub: replaced by real implementation in 06-widgets spec.
+ * Write fresh Crossover data to the home screen widget store.
+ * Delegates to widgets/bridge.updateWidgetData — no data transformation.
+ *
+ * @param data CrossoverSnapshot from fetchFreshData()
  */
-export async function updateWidgetData(_data: CrossoverSnapshot): Promise<void> {
-  throw new Error('updateWidgetData: not yet implemented — pending spec 06-widgets');
+export async function updateWidgetData(data: CrossoverSnapshot): Promise<void> {
+  await _updateWidgetData(data.hoursData, data.aiData, data.pendingCount, data.config);
 }
