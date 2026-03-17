@@ -140,7 +140,7 @@ function coneAt(
  *
  * Creates one point per integer hour within each day (linear interpolation
  * within the day) plus an end-of-day point when the day ends mid-hour.
- * Starting origin (0, 0) always included.
+ * Starting origin (0, baselinePct) always included; defaults to (0, 0).
  */
 function computeHourlyPoints(
   dailyBreakdown: DailyTagData[],
