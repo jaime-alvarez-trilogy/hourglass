@@ -5,7 +5,9 @@
  * individual args expected by widgets/bridge.updateWidgetData().
  *
  * handler.ts calls: updateWidgetData(snapshot)
- * widgets/bridge expects: updateWidgetData(hoursData, aiData, pendingCount, config)
+ * widgets/bridge expects: updateWidgetData(hoursData, aiData, pendingCount, config, approvalItems, myRequests)
+ *
+ * Extended in 08-widget-enhancements: forwards approvalItems and myRequests from snapshot.
  */
 
 import { updateWidgetData as _updateWidgetData } from '../widgets/bridge';
@@ -18,5 +20,12 @@ import type { CrossoverSnapshot } from './crossoverData';
  * @param data CrossoverSnapshot from fetchFreshData()
  */
 export async function updateWidgetData(data: CrossoverSnapshot): Promise<void> {
-  await _updateWidgetData(data.hoursData, data.aiData, data.pendingCount, data.config);
+  await _updateWidgetData(
+    data.hoursData,
+    data.aiData,
+    data.pendingCount,
+    data.config,
+    data.approvalItems ?? [],
+    data.myRequests ?? []
+  );
 }
