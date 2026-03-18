@@ -92,7 +92,7 @@ Widget reads local store
 | 2026-03-08 | [03-hours-dashboard](specs/03-hours-dashboard/spec.md) | Contributor dashboard: hours, earnings, deadline countdown, daily bar chart, cache failover, urgency theming |
 | 2026-03-08 | [04-ai-brainlift](specs/04-ai-brainlift/spec.md) | Work diary fetch, tag parsing, AI% formula, BrainLift hours, per-day AsyncStorage cache, AI tab screen |
 | 2026-03-08 | [06-widgets](specs/06-widgets/spec.md) | iOS (expo-widgets) + Android (react-native-android-widget) home screen widgets, WidgetData bridge, timeline entry generation, graceful degradation — **Complete** |
-| 2026-03-18 | [08-widget-enhancements](specs/08-widget-enhancements/spec.md) | Daily bar chart (large, Mon–Sun), manager approval mode-switch, contributor request status mode-switch, WidgetData type extension |
+| 2026-03-18 | [08-widget-enhancements](specs/08-widget-enhancements/spec.md) | Daily bar chart (large, Mon–Sun), manager approval mode-switch, contributor request status mode-switch, WidgetData type extension — **Complete** |
 
 ## Files Created/Modified
 
@@ -107,19 +107,21 @@ WS/
       hooks/                    ← React Query hooks
       store/                    ← SecureStore config
       widgets/                  ← Widget definitions            [06-widgets]
-        types.ts                ← WidgetData interface           [06-widgets]
-        bridge.ts               ← updateWidgetData, buildTimelineEntries, readWidgetData  [06-widgets]
+        types.ts                ← WidgetData interface           [06-widgets, 08-widget-enhancements]
+        bridge.ts               ← updateWidgetData, buildTimelineEntries, readWidgetData  [06-widgets, 08-widget-enhancements]
         ios/
           HourglassWidget.tsx   ← expo-widgets JSX component (small/medium/large)  [06-widgets]
         android/
-          HourglassWidget.tsx   ← react-native-android-widget component  [06-widgets]
+          HourglassWidget.tsx   ← react-native-android-widget component  [06-widgets, 08-widget-enhancements]
           widgetTaskHandler.ts  ← Android widget lifecycle handler  [06-widgets]
       types/
         modules.d.ts            ← Type declarations for native-only packages  [06-widgets]
       lib/
         pushToken.ts            ← FR4: register/unregister device tokens  [07-ping-server]
-        crossoverData.ts        ← Boundary stub: fetchFreshData()         [07-ping-server]
-        widgetBridge.ts         ← Boundary stub: updateWidgetData()       [07-ping-server]
+        crossoverData.ts        ← Boundary stub: fetchFreshData()         [07-ping-server, 08-widget-enhancements]
+        widgetBridge.ts         ← Boundary stub: updateWidgetData()       [07-ping-server, 08-widget-enhancements]
+      hooks/
+        useWidgetSync.ts        ← Foreground widget sync hook             [06-widgets, 08-widget-enhancements]
       notifications/
         handler.ts              ← FR5: background push handler            [07-ping-server]
       components/               ← Shared UI
