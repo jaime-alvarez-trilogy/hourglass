@@ -120,17 +120,85 @@ function SmallWidget({ data }: { data: WidgetData }) {
   );
 }
 
+// ─── Action mode badge colors (08-widget-enhancements) ────────────────────────
+
+const BADGE_COLORS: Record<string, string> = {
+  MANUAL:   '#00C2FF',
+  OVERTIME: '#A78BFA',
+  PENDING:  '#F59E0B',
+  APPROVED: '#10B981',
+  REJECTED: '#F43F5E',
+};
+
 // ─── Medium widget ─────────────────────────────────────────────────────────────
 
 function MediumWidget({ data }: { data: WidgetData }) {
-  const bg = URGENCY_BG[data.urgency] ?? URGENCY_BG.none;
-  const accent = URGENCY_ACCENT[data.urgency] ?? URGENCY_ACCENT.none;
-  const stale = isStale(data.cachedAt);
+  // 08-widget-enhancements: action mode switch
+  const hasApprovals = data.approvalItems && data.approvalItems.length > 0;
+  const hasRequests  = data.myRequests && data.myRequests.length > 0;
+  const actionMode   = hasApprovals || hasRequests;
+  const bg           = data.actionBg ?? URGENCY_BG[data.urgency] ?? URGENCY_BG.none;
+  const accent       = URGENCY_ACCENT[data.urgency] ?? URGENCY_ACCENT.none;
+  const stale        = isStale(data.cachedAt);
 
+  // Action mode: compact hero + up to 2 item rows
+  if (actionMode) {
+    const actionItems = hasApprovals
+      ? (data.approvalItems ?? [])
+      : (data.myRequests ?? []);
+    const displayItems = actionItems.slice(0, 2);
+
+    return (
+      <FlexWidget
+        style={{
+          backgroundColor: bg,
+          flex: 1,
+          flexDirection: 'column',
+          padding: 12,
+        }}
+      >
+        {/* Compact hero */}
+        <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TextWidget
+            text={`${data.hoursDisplay}  ·  ${data.earnings}`}
+            style={{ color: accent, fontSize: 14, fontWeight: 'bold' }}
+          />
+        </FlexWidget>
+
+        <TextWidget text="" style={{ height: 6 }} />
+
+        {/* Item rows */}
+        {displayItems.map((item) => {
+          const badgeKey = ('category' in item ? item.category : item.status) ?? '';
+          const badgeColor = BADGE_COLORS[badgeKey] ?? '#AAAAAA';
+          const label = ('name' in item ? item.name : item.memo) ?? '';
+          return (
+            <FlexWidget key={item.id} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <TextWidget
+                text={label}
+                style={{ color: '#FFFFFF', fontSize: 12, flex: 1 }}
+              />
+              <TextWidget
+                text={item.hours}
+                style={{ color: accent, fontSize: 12, fontWeight: '600' }}
+              />
+              <TextWidget text=" " style={{ fontSize: 12 }} />
+              <TextWidget
+                text={badgeKey}
+                style={{ color: badgeColor, fontSize: 11 }}
+              />
+            </FlexWidget>
+          );
+        })}
+      </FlexWidget>
+    );
+  }
+
+  // Hours mode (unchanged from 06-widgets)
   return (
     <FlexWidget
       style={{
-        backgroundColor: bg,
+        backgroundColor: URGENCY_BG[data.urgency] ?? URGENCY_BG.none,
         flex: 1,
         flexDirection: 'column',
         padding: 12,
