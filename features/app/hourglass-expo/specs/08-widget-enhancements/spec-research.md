@@ -11,6 +11,9 @@ theming, and iOS timeline entries. Three capabilities that were deferred are now
    "hours view" to "approval list view" so pending items surface immediately without opening the app.
 3. **Contributor request mode** — contributors with pending/recent manual time requests see
    their request status (PENDING / APPROVED / REJECTED) in the widget without opening the app.
+4. **Action-mode background tint** — widget background shifts to a dark warning amber when the
+   manager is in approval mode (pending items exist), creating urgency to act. Contributor rejected
+   requests use a dark critical tint. Hours mode always uses the standard dark brand background.
 
 The trigger for this spec was a design review of the live widget — the Scriptable version's
 bar chart and manager cards were identified as meaningful value the Expo widget was missing.
@@ -222,12 +225,17 @@ export interface WidgetData {
   // ... existing fields unchanged ...
 
   // New in 08-widget-enhancements:
-  daily: WidgetDailyEntry[];          // always 7 entries, Mon[0]–Sun[6]
-                                      // ← computed from HoursData.daily
+  daily: WidgetDailyEntry[];           // always 7 entries, Mon[0]–Sun[6]
+                                       // ← computed from HoursData.daily
   approvalItems: WidgetApprovalItem[]; // max 3; [] for contributors
                                        // ← from ApprovalItem[] param
   myRequests: WidgetMyRequest[];       // max 3; [] for managers
                                        // ← from ManualRequestEntry[] param
+  actionBg: string | null;            // hex color for action-mode background tint
+                                       // ← '#1C1400' (amber) if manager has approvals
+                                       // ← '#1C0A0E' (crimson) if contributor has rejected requests
+                                       // ← '#120E1A' (violet-tint) if contributor has pending requests
+                                       // ← null in hours mode (use standard BG '#0D0C14')
 }
 ```
 
@@ -250,6 +258,11 @@ Sources:
 - `approvalItems` ← `formatApprovalItems(approvalItems, 3)` (new internal helper)
 - `myRequests` ← `formatMyRequests(myRequests, 3)` (new internal helper)
 - `pendingCount` ← `config.isManager ? approvalItems.length : 0`
+- `actionBg` ← derived from role + item states:
+  - manager + approvals.length > 0 → `'#1C1400'`
+  - contributor + any request status === 'REJECTED' → `'#1C0A0E'`
+  - contributor + any request status === 'PENDING' → `'#120E1A'`
+  - otherwise → `null`
 
 ### Updated `updateWidgetData` signature
 
@@ -317,12 +330,27 @@ function formatMyRequests(
 
 ## iOS Layout Spec (WIDGET_LAYOUT_JS)
 
-### Mode-switch logic (applies to medium + large)
+### Mode-switch and background logic (applies to all sizes)
 ```
 hasApprovals = props.approvalItems.length > 0
 hasRequests  = props.myRequests.length > 0
 actionMode   = hasApprovals || hasRequests
+
+// Background: action-mode tint overrides standard dark brand bg
+bg = props.actionBg || '#0D0C14'
 ```
+
+**Background tint table (set by `buildWidgetData`, not the layout):**
+
+| State | `actionBg` | Visual |
+|-------|-----------|--------|
+| Manager with pending approvals | `'#1C1400'` | Dark amber — urgency to approve |
+| Contributor with REJECTED requests | `'#1C0A0E'` | Dark crimson — something was rejected |
+| Contributor with PENDING requests | `'#120E1A'` | Dark violet-tint — neutral awareness |
+| Hours mode (no pending items) | `null` | Standard `#0D0C14` brand bg |
+
+The tint is intentionally subtle — dark enough to maintain readability, vivid enough to
+register as "something needs attention" when glanced at the home screen.
 
 ### systemSmall — unchanged
 No mode switch. Too small for item lists.
