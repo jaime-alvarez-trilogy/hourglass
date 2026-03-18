@@ -88,7 +88,7 @@ Widget reads local store
 | 2026-03-08 | [01-foundation](specs/01-foundation/spec.md) | Project skeleton, API client, SecureStore/AsyncStorage config layer, shared TypeScript types |
 | 2026-03-08 | [02-auth-onboarding](specs/02-auth-onboarding/spec.md) | Auth gate, 5-screen onboarding flow, fetchAndBuildConfig, useSetup/useConfig/useRoleRefresh hooks |
 | 2026-03-08 | [07-ping-server](specs/07-ping-server/spec.md) | Railway ping server (Express + SQLite + node-cron), silent push dispatch, app push token registration and background handler — **Complete** |
-| 2026-03-08 | [05-manager-approvals](specs/05-manager-approvals/spec.md) | Pending manual time + overtime fetch, approve/reject actions, optimistic updates, role-guarded approvals screen |
+| 2026-03-08 | [05-manager-approvals](specs/05-manager-approvals/spec.md) | Pending manual time + overtime fetch, approve/reject actions, optimistic updates, role-guarded approvals screen — **Complete** |
 | 2026-03-08 | [03-hours-dashboard](specs/03-hours-dashboard/spec.md) | Contributor dashboard: hours, earnings, deadline countdown, daily bar chart, cache failover, urgency theming |
 | 2026-03-08 | [04-ai-brainlift](specs/04-ai-brainlift/spec.md) | Work diary fetch, tag parsing, AI% formula, BrainLift hours, per-day AsyncStorage cache, AI tab screen |
 | 2026-03-08 | [06-widgets](specs/06-widgets/spec.md) | iOS (expo-widgets) + Android (react-native-android-widget) home screen widgets, WidgetData bridge, timeline entry generation, graceful degradation — **Complete** |

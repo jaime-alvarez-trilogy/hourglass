@@ -73,7 +73,7 @@
 - [x] `feat(FR1)`: Implement `parseManualItems(raw: RawManualResponse[]): ManualApprovalItem[]`
 - [x] `feat(FR1)`: Implement `parseOvertimeItems(raw: RawOvertimeResponse[]): OvertimeApprovalItem[]`
 - [x] `feat(FR1)`: Implement `getWeekStartDate(): string` (local timezone, Mon–Sun)
-- [ ] `feat(FR1)`: All FR1 tests pass
+- [x] `feat(FR1)`: All FR1 tests pass
 
 ### FR2: API Functions
 
@@ -84,7 +84,7 @@
 - [x] `feat(FR2)`: Implement `rejectManual`
 - [x] `feat(FR2)`: Implement `approveOvertime`
 - [x] `feat(FR2)`: Implement `rejectOvertime`
-- [ ] `feat(FR2)`: All FR2 tests pass
+- [x] `feat(FR2)`: All FR2 tests pass
 
 ### FR3: useApprovalItems Hook
 
@@ -94,7 +94,7 @@
 - [x] `feat(FR3)`: Implement `rejectItem` with empty reason guard
 - [x] `feat(FR3)`: Implement `approveAll` with Promise.allSettled
 - [x] `feat(FR3)`: Early return when isManager === false
-- [ ] `feat(FR3)`: All FR3 tests pass
+- [x] `feat(FR3)`: All FR3 tests pass
 
 ### FR4: ApprovalCard Component
 
@@ -102,14 +102,14 @@
 - [x] `feat(FR4)`: Implement swipe gesture handlers (react-native-gesture-handler)
 - [x] `feat(FR4)`: Render type badge for MANUAL, cost for OVERTIME
 - [x] `feat(FR4)`: Add accessibilityLabel props
-- [ ] `feat(FR4)`: All FR4 tests pass
+- [x] `feat(FR4)`: All FR4 tests pass
 
 ### FR5: RejectionSheet Component
 
 - [x] `feat(FR5)`: Create `src/components/RejectionSheet.tsx`
 - [x] `feat(FR5)`: Implement bottom sheet with pre-filled input (Modal fallback if @gorhom/bottom-sheet not available)
 - [x] `feat(FR5)`: Disable Confirm when input empty/whitespace
-- [ ] `feat(FR5)`: All FR5 tests pass
+- [x] `feat(FR5)`: All FR5 tests pass
 
 ### FR6: Approvals Screen
 
@@ -119,21 +119,30 @@
 - [x] `feat(FR6)`: Implement pull-to-refresh
 - [x] `feat(FR6)`: Wire RejectionSheet for swipe-left flow
 - [x] `feat(FR6)`: Modify `app/(tabs)/_layout.tsx` to hide approvals tab for contributors
-- [ ] `feat(FR6)`: All FR6 tests pass
-- [ ] All tests pass (full suite)
+- [x] `feat(FR6)`: All FR6 tests pass
+- [x] All tests pass (full suite)
 
 ---
 
 ## Phase 5.2 — Review
 
-- [ ] Run `spec-implementation-alignment`: verify all FR success criteria met
-- [ ] Run `pr-review-toolkit:review-pr`: address any feedback
-- [ ] Run `test-optimiser`: remove redundant tests, improve coverage where needed
-- [ ] Final test suite passes
-- [ ] Commit documentation: update checklist.md + FEATURE.md changelog
+- [x] Run `spec-implementation-alignment`: verify all FR success criteria met
+- [x] Run `pr-review-toolkit:review-pr`: address any feedback
+- [x] Run `test-optimiser`: remove redundant tests, improve coverage where needed
+- [x] Final test suite passes
+- [x] Commit documentation: update checklist.md + FEATURE.md changelog
 
 ---
 
 ## Session Notes
 
-<!-- Added by spec-executor after completion -->
+**2026-03-18**: Spec execution complete.
+
+- Phase 5.0: 6 test suites written (FR1–FR6), 127 test cases
+- Phase 5.1: All implementation files verified passing — FR1 lib (17), FR2 api (33), FR3 hook (11), FR4 card (28+9), FR5 sheet (17), FR6 screen (27)
+- Phase 5.2:
+  - `__tests__/approvals-screen.test.tsx` had 12 stale tests from the original spec-05 design that were superseded by the spec-07 approvals-tab-redesign. Stale behavior tests (router.replace redirect, "managers" contributor message, single isLoading variable) removed. NativeWind token compliance tests (10) retained.
+  - Canonical FR6 runtime behavior now tested in `app/(tabs)/__tests__/approvals.test.tsx` (27 tests — added by spec 07).
+  - Alignment confirmed: all FR success criteria met. Screen redesign (Team Requests + My Requests layout) is an intentional evolution from spec 07, not a regression.
+  - 154 tests passing across 8 spec-05 test suites.
+- All tests passing.
