@@ -42,6 +42,8 @@ const mockDb = {
     }
     return { run: jest.fn(), all: jest.fn(() => []), get: jest.fn(() => ({ count: 0 })) };
   }),
+  // better-sqlite3 transaction: wrap a function so it executes synchronously
+  transaction: jest.fn((fn: (...args: unknown[]) => void) => fn),
   exec: jest.fn(),
 };
 

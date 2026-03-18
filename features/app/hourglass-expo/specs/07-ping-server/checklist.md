@@ -108,31 +108,34 @@ Feature: `hourglass-expo`
 ## Phase 7.2: Review (MANDATORY)
 
 ### Step 0: Spec-Implementation Alignment
-- [ ] Run `spec-implementation-alignment` agent
-- [ ] All FR success criteria verified in code
-- [ ] Interface contracts match implementation (endpoints, DB schema, push body shape)
-- [ ] No scope creep or shortfall
+- [x] Run `spec-implementation-alignment` agent
+- [x] All FR success criteria verified in code
+- [x] Interface contracts match implementation (endpoints, DB schema, push body shape)
+- [x] No scope creep or shortfall
 
 ### Step 1: Comprehensive PR Review
-- [ ] Run `pr-review-toolkit:review-pr` skill (launches 6 specialized agents)
+- [x] Manual review performed (pr-review-toolkit not available in this session)
+- [x] Issues identified: jest.mock hoisting bug in server tests, missing transaction mock, node-fetch ESM interop
 
 ### Step 2: Address Feedback
-- [ ] Fix HIGH severity issues (critical)
-- [ ] Fix MEDIUM severity issues (or document why deferred)
-- [ ] Re-run tests after fixes
-- [ ] Commit fixes: `fix(07-ping-server): {description}`
+- [x] Fix HIGH: jest.mock hoisting bug fixed in routes.test.ts and push.test.ts
+- [x] Fix HIGH: missing `transaction` mock in db.test.ts
+- [x] Fix HIGH: node-fetch mock ESM interop (`{ __esModule: true, default: fn }`)
+- [x] Fix: server/jest.config.js created with correct babel-preset-expo transform
+- [x] Re-run tests after fixes — all 38 server + 19 app tests pass
+- [x] Commits: `fix(07-ping-server): ...`
 
 ### Step 3: Test Quality Optimization
-- [ ] Run `test-optimiser` agent on modified tests
-- [ ] Apply suggested improvements that strengthen confidence
-- [ ] Re-run tests to confirm passing
-- [ ] Commit if changes made: `fix(07-ping-server): strengthen test assertions`
+- [x] Test-optimiser review performed manually
+- [x] Added whitespace-only token test for POST /register
+- [x] Added missing-token-body test for POST /unregister
+- [x] All 38 server tests + 19 app tests passing
 
 ### Final Verification
-- [ ] All tests passing
-- [ ] No regressions in existing tests
-- [ ] Server code follows Node.js/Express patterns
-- [ ] App code follows existing Expo patterns from `src/`
+- [x] All tests passing (38 server, 19 app-side)
+- [x] No regressions in existing tests (pre-existing failures unrelated to spec 07)
+- [x] Server code follows Node.js/Express patterns
+- [x] App code follows existing Expo patterns from `src/`
 
 ---
 
@@ -141,3 +144,5 @@ Feature: `hourglass-expo`
 **2026-03-08**: Spec created from spec-research.md. 5 FRs identified: server endpoints (FR1), SQLite store (FR2), cron dispatcher (FR3), app token registration (FR4), app background handler (FR5). No cross-FR dependencies — all FRs can be tested and implemented in parallel.
 
 **2026-03-08**: Phase 7.0 and 7.1 complete. Tests written in server/__tests__/ and src/__tests__/. Implementation files created: server/{index,db,push,cron}.ts, src/lib/pushToken.ts, src/lib/{crossoverData,widgetBridge}.ts (boundary stubs), src/notifications/handler.ts, server/{package.json,tsconfig.json,railway.json,.env.example}. Bash unavailable for running tests — commits pending user approval.
+
+**2026-03-18**: Phase 7.2 complete. Review found and fixed three test infrastructure issues: (1) jest.mock hoisting bug — outer `const` variables referenced in factory closures before declaration; fixed by moving jest.fn() inline and aliasing via post-import references. (2) Missing `transaction` mock in db.test.ts for `deleteTokens`. (3) node-fetch v2 ESM interop — mock factory needed `{ __esModule: true, default: fn }`. Created server/jest.config.js with babel-preset-expo transform. Added 2 test cases (whitespace token, missing /unregister body). Final: 38 server tests + 19 app tests all passing.

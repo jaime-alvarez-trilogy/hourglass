@@ -4,15 +4,11 @@
  * Uses supertest for HTTP-level assertions against the Express app.
  */
 
-// Mock the db module
-const mockUpsertToken = jest.fn();
-const mockDeleteToken = jest.fn();
-const mockGetTokenCount = jest.fn();
-
+// Mock the db module — use jest.fn() inside factory (hoisting safe)
 jest.mock('../db', () => ({
-  upsertToken: mockUpsertToken,
-  deleteToken: mockDeleteToken,
-  getTokenCount: mockGetTokenCount,
+  upsertToken: jest.fn(),
+  deleteToken: jest.fn(),
+  getTokenCount: jest.fn(),
 }));
 
 // Mock the cron module so it doesn't start during tests
@@ -23,6 +19,12 @@ jest.mock('../cron', () => ({
 // Use node's built-in http to test without supertest dependency
 import http from 'http';
 import { app } from '../index';
+import * as db from '../db';
+
+// Convenience references to mocks
+const mockUpsertToken = db.upsertToken as jest.Mock;
+const mockDeleteToken = db.deleteToken as jest.Mock;
+const mockGetTokenCount = db.getTokenCount as jest.Mock;
 
 // Helper: make an HTTP request to the Express app
 function request(
@@ -103,6 +105,12 @@ describe('FR1: POST /register', () => {
     expect(res.status).toBe(400);
     expect((res.body as { error: string }).error).toMatch(/token/i);
   });
+
+  it('returns 400 for whitespace-only token (trimmed to empty string)', async () => {
+    const res = await request('POST', '/register', { token: '   ' });
+    expect(res.status).toBe(400);
+    expect((res.body as { error: string }).error).toMatch(/token/i);
+  });
 });
 
 describe('FR1: POST /unregister', () => {
@@ -122,6 +130,13 @@ describe('FR1: POST /unregister', () => {
     const res = await request('POST', '/unregister', { token: 'ExponentPushToken[nonexistent]' });
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ ok: true });
+  });
+
+  it('returns 200 { ok: true } when request body has no token field (graceful)', async () => {
+    const res = await request('POST', '/unregister', {});
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ok: true });
+    expect(mockDeleteToken).not.toHaveBeenCalled();
   });
 });
 
