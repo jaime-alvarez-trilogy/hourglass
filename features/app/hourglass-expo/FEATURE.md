@@ -69,6 +69,7 @@ Widget reads local store
 | 05-manager-approvals | Pending manual time + overtime fetch, approve/reject actions, approval notifications | 06 | 01,02 | L |
 | 06-widgets | iOS (expo-widgets) + Android (react-native-android-widget) home screen widgets, data bridge, timeline scheduling | — | 01,02,03,04,05 | L |
 | 07-ping-server | Vercel cron function, device token registration endpoint, silent push dispatch, push token storage | — | 01,02 | S |
+| 08-widget-enhancements | Daily bar chart (large, Mon–Sun), manager approval mode-switch, contributor request status mode-switch, WidgetData type extension | — | 06 | M |
 
 ## Out of Scope (v1)
 
@@ -91,6 +92,7 @@ Widget reads local store
 | 2026-03-08 | [03-hours-dashboard](specs/03-hours-dashboard/spec.md) | Contributor dashboard: hours, earnings, deadline countdown, daily bar chart, cache failover, urgency theming |
 | 2026-03-08 | [04-ai-brainlift](specs/04-ai-brainlift/spec.md) | Work diary fetch, tag parsing, AI% formula, BrainLift hours, per-day AsyncStorage cache, AI tab screen |
 | 2026-03-08 | [06-widgets](specs/06-widgets/spec.md) | iOS (expo-widgets) + Android (react-native-android-widget) home screen widgets, WidgetData bridge, timeline entry generation, graceful degradation — **Complete** |
+| 2026-03-18 | [08-widget-enhancements](specs/08-widget-enhancements/spec-research.md) | Daily bar chart (large, Mon–Sun), manager approval mode-switch, contributor request status mode-switch, WidgetData type extension |
 
 ## Files Created/Modified
 
