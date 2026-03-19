@@ -36,10 +36,11 @@ module.exports = {
         critical:    "#F43F5E", // Critical behind-pace, overdue approvals, urgent alerts
         destructive: "#F85149", // Destructive actions (delete, reject), irreversible ops
 
-        // Text hierarchy
-        textPrimary:   "#FFFFFF", // Hero numbers, headings, primary labels
-        textSecondary: "#8B949E", // Supporting labels, metadata, secondary values
-        textMuted:     "#484F58", // Placeholder text, disabled states, fine print
+        // Text hierarchy — desaturated per brand-revamp/01-design-tokens
+        // Pure white (#FFFFFF) causes halation on dark backgrounds.
+        textPrimary:   "#E0E0E0", // Hero numbers, headings, primary labels (was #FFFFFF)
+        textSecondary: "#A0A0A0", // Supporting labels, metadata, secondary values (was #8B949E)
+        textMuted:     "#757575", // Placeholder text, disabled states, fine print (was #484F58)
 
         // Special states
         overtimeWhiteGold: "#FFF8E7", // Overtime achievement — warm white-gold, near-white (01-overtime-display)
@@ -54,24 +55,32 @@ module.exports = {
       // Fonts must be loaded via expo-font / @expo-google-fonts before use.
       // -----------------------------------------------------------------------
       fontFamily: {
-        // ── v1.1 Inter-only type system ──────────────────────────────────────
-        // All tiers now use Inter. Hierarchy via weight + letter-spacing only.
-        // Reference: BRAND_GUIDELINES.md → Typography System v1.1
+        // ── v2.0 three-font type system (brand-revamp/01-design-tokens) ──────
+        // SpaceGrotesk: hero metrics, headings, section titles
+        // SpaceMono:    data tables, timestamps, numeric columns
+        // Inter:        body copy, labels, metadata (unchanged)
+        // Reference: BRAND_GUIDELINES.md → Typography System v2.0
 
-        // Tier 1 — Hero numbers, metric values, large headings (Inter heavy)
-        'display':           ['Inter_700Bold'],
-        'display-medium':    ['Inter_500Medium'],
-        'display-semibold':  ['Inter_600SemiBold'],
-        'display-bold':      ['Inter_700Bold'],
-        'display-extrabold': ['Inter_800ExtraBold'], // v1.1 Display 800 for hero states
+        // Tier 1 — Hero numbers, metric values, large headings (SpaceGrotesk)
+        // display-extrabold uses 700Bold per optical weight rule: light-emitting
+        // screens render text optically heavier than print — 800 becomes 700.
+        'display':           ['SpaceGrotesk_700Bold'],
+        'display-medium':    ['SpaceGrotesk_500Medium'],
+        'display-semibold':  ['SpaceGrotesk_600SemiBold'],
+        'display-bold':      ['SpaceGrotesk_700Bold'],
+        'display-extrabold': ['SpaceGrotesk_700Bold'], // optical weight reduction: was Inter_800ExtraBold
 
-        // Tier 2 — UI labels, navigation, buttons, form inputs (unchanged)
+        // Monospace — data tables, timestamps, numeric columns (SpaceMono)
+        'mono':      ['SpaceMono_400Regular'],
+        'mono-bold': ['SpaceMono_700Bold'],
+
+        // Tier 2 — UI labels, navigation, buttons, form inputs (Inter, unchanged)
         'sans':         ['Inter_400Regular'],
         'sans-medium':  ['Inter_500Medium'],
         'sans-semibold':['Inter_600SemiBold'],
         'sans-bold':    ['Inter_700Bold'],
 
-        // Tier 3 — Descriptive text, AI insights, onboarding copy (was Plus Jakarta Sans)
+        // Tier 3 — Descriptive text, AI insights, onboarding copy (Inter, unchanged)
         'body':        ['Inter_400Regular'],
         'body-light':  ['Inter_300Light'],  // fallback: Inter_400Regular if 300 unavailable
         'body-medium': ['Inter_500Medium'],

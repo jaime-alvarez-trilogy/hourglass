@@ -29,10 +29,11 @@ export const colors = {
   critical:    '#F43F5E', // Critical behind-pace, overdue approvals, urgent alerts
   destructive: '#F85149', // Destructive actions (delete, reject), irreversible ops
 
-  // Text hierarchy
-  textPrimary:   '#FFFFFF', // Hero numbers, headings, primary labels
-  textSecondary: '#8B949E', // Supporting labels, metadata, secondary values
-  textMuted:     '#484F58', // Placeholder text, disabled states, fine print
+  // Text hierarchy — desaturated per brand-revamp/01-design-tokens
+  // Pure white (#FFFFFF) causes halation on dark backgrounds.
+  textPrimary:   '#E0E0E0', // Hero numbers, headings, primary labels (was #FFFFFF)
+  textSecondary: '#A0A0A0', // Supporting labels, metadata, secondary values (was #8B949E)
+  textMuted:     '#757575', // Placeholder text, disabled states, fine print (was #484F58)
 
   // Special states
   overtimeWhiteGold: '#FFF8E7', // Overtime achievement — warm white-gold, near-white (01-overtime-display)
