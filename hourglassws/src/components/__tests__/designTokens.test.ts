@@ -314,9 +314,10 @@ describe('FR4 — MetricValue proportional letterSpacing formula', () => {
     expect(source).toMatch(/fontVariant\s*:\s*\[\s*['"]tabular-nums['"]\s*\]/);
   });
 
-  it('SC4.2 — source contains negative letterSpacing formula (letterSpacing: -...)', () => {
-    // Must have a negative letterSpacing derived from fontSize, not a fixed literal
-    expect(noComments).toMatch(/letterSpacing\s*:\s*-\s*fontSize/);
+  it('SC4.2 — source computes letterSpacing as -fontSize * 0.02', () => {
+    // The variable must be assigned as a formula derived from fontSize (not a fixed literal).
+    // Implementation may use shorthand property { letterSpacing } in the style object.
+    expect(noComments).toMatch(/letterSpacing\s*=\s*-\s*fontSize\s*\*\s*0\.02/);
   });
 
   it('SC4.3 — TAILWIND_FONT_SIZES map contains text-4xl → 36', () => {
