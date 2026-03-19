@@ -2,7 +2,7 @@
 
 **Domain:** app
 **Feature path:** features/app/brand-revamp
-**Status:** Research complete — ready for implementation
+**Status:** 01-design-tokens complete — 02+ ready for implementation
 
 ---
 
@@ -45,7 +45,7 @@ The Hourglass application has a solid architectural foundation (Expo SDK 55, Rea
 
 | Date | Spec | Description |
 |------|------|-------------|
-| 2026-03-19 | [01-design-tokens](specs/01-design-tokens/spec.md) | Typography system migration + text color desaturation |
+| 2026-03-19 | [01-design-tokens](specs/01-design-tokens/spec.md) | Typography system migration + text color desaturation — **COMPLETE** |
 | 2026-03-19 | [02-animated-mesh](specs/02-animated-mesh/spec-research.md) | Animated Skia RadialGradient background |
 | 2026-03-19 | [03-glass-surfaces](specs/03-glass-surfaces/spec-research.md) | Skia BackdropFilter GlassCard + gradient borders + inner shadows |
 | 2026-03-19 | [04-victory-charts](specs/04-victory-charts/spec-research.md) | VNX chart migration + neon glows + SweepGradient AI arc |
