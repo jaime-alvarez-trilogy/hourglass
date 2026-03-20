@@ -1,43 +1,37 @@
-// AIArcHero.tsx
-// FR1 (01-safe-arc-hero): strokeDashoffset animation — safe, number-only worklet
-// FR2 (01-safe-arc-hero): All geometry derived from size prop
-// FR3 (01-safe-arc-hero): Props interface and visual output unchanged
-// FR4 (01-safe-arc-hero): arcPath pure SVG path generator + animation re-triggers on aiPct change
+// AIArcHero.tsx — 04-victory-charts FR4
+// Rebuilt from react-native-svg to Skia Canvas + Path + SweepGradient
 //
-// Design system: FEATURE.md "Hero Glass System — Layer 2: Hero Card"
-//   Arc gauge replaces two-ring ring hero — single bold 270° arc
-//   Arc fill color = ambientColor prop (violet/cyan/warning per AI% tier)
-//   Animated fill via AnimatedPath + useSharedValue + withTiming(timingChartFill)
-//   Wrapped in Card component (dark glass, BlurView backdrop)
+// Visual enhancement:
+//   Arc stroke paint: SweepGradient (cyan #00C2FF → violet #A78BFA → magenta #FF00FF)
+//   Animation: sweepProgress SharedValue 0→aiPct/100 via withSpring (mass=1, stiffness=80, damping=12)
+//   Path trim: Skia Path.copy().trim(0, sweepProgress, false)
 //
-// Arc geometry:
-//   START_ANGLE = 135°  (7 o'clock — bottom-left)
-//   SWEEP       = 270°
-//   END_TRACK   = 405°  (5 o'clock — bottom-right = START + SWEEP)
-//   cx = cy = size / 2
-//   r = size / 2 - STROKE_WIDTH / 2 - 2  (inset from edge)
+// External API UNCHANGED:
+//   Props: aiPct, brainliftHours, deltaPercent, ambientColor, size
+//   Exports: AI_TARGET_PCT, BRAINLIFT_TARGET_HOURS, arcPath
 //
-// Animation (SAFE — strokeDashoffset approach):
-//   fullArcPath  — arcPath() called ONCE in render scope (JS thread, not worklet)
-//   arcLength    — r * (SWEEP * Math.PI / 180), computed once
-//   dashOffset   — useSharedValue starts at arcLength (arc invisible)
-//   useEffect([aiPct]) → withTiming(arcLength * (1 - aiPct/100), timingChartFill)
-//   AnimatedPath drives ONLY strokeDashoffset: one number per frame, zero string alloc
+// Why arcPath is kept:
+//   - Existing tests reference it as a named export
+//   - The arc geometry calculation is still used internally (as SVG path string → Skia)
 //
-// Why this is safe:
-//   Previous approach: arcPath() called per-frame in worklet → ~120 string allocs
-//   New approach: strokeDashoffset is a single double-precision float per frame
-//   No string generation, no GC pressure on Hermes worklet heap → no Jetsam kill
+// Animation safety:
+//   sweepProgress is a SharedValue<number> (0.0 → 1.0).
+//   useDerivedValue trims the path on the Reanimated UI thread — no JS per frame.
+//   No string allocation per frame (unlike the old strokeDashoffset approach).
 
 import React, { useEffect } from 'react';
 import { View, Text } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import {
+  Canvas,
+  Path,
+  SweepGradient,
+  Skia,
+  useDerivedValue,
+} from '@shopify/react-native-skia';
 import Animated, {
   useSharedValue,
-  withTiming,
-  useAnimatedProps,
+  withSpring,
 } from 'react-native-reanimated';
-import { timingChartFill } from '@/src/lib/reanimated-presets';
 import { colors } from '@/src/lib/colors';
 import Card from '@/src/components/Card';
 import ProgressBar from '@/src/components/ProgressBar';
@@ -53,21 +47,15 @@ const START_ANGLE = 135;   // degrees — 7 o'clock position
 const SWEEP = 270;         // degrees — full track sweep
 const STROKE_WIDTH = 6;
 
-// ─── AnimatedPath — created once outside component to avoid recreation ────────
+// ─── Sweep gradient colors ────────────────────────────────────────────────────
 
-const AnimatedPath = Animated.createAnimatedComponent(Path);
+const GRADIENT_COLORS = ['#00C2FF', '#A78BFA', '#FF00FF'] as const;
 
-// ─── FR4: arcPath — pure SVG path string generator ────────────────────────────
+// ─── arcPath — pure SVG path string generator (preserved for backward compat) ─
 //
 // Converts (cx, cy, r, startAngleDeg, endAngleDeg) into an SVG path d= string.
-// Uses arc flag convention: large arc flag = 1 when sweep > 180°.
-// Always clockwise sweep (sweep-flag = 1).
-//
-// Degenerate case: startAngleDeg === endAngleDeg → returns "M x y" (no arc drawn, no crash).
-//
-// IMPORTANT: This function must NOT be called from a Reanimated worklet —
-// string allocation on the worklet heap causes Jetsam kills under load.
-// Call only from JS render scope (component body, useEffect, useMemo).
+// Kept as an exported utility so existing callers and tests continue to work.
+// IMPORTANT: Do NOT call this inside a Reanimated worklet (string allocation).
 
 export function arcPath(
   cx: number,
@@ -85,7 +73,6 @@ export function arcPath(
   const sweepAngle = endAngleDeg - startAngleDeg;
   const largeArcFlag = sweepAngle > 180 ? 1 : 0;
 
-  // Degenerate case: zero-length arc
   if (startAngleDeg === endAngleDeg) {
     return `M ${x1} ${y1}`;
   }
@@ -99,7 +86,7 @@ interface AIArcHeroProps {
   aiPct: number;               // 0–100, displayed as bold center number
   brainliftHours: number;      // displayed as secondary "X.Xh / 5h"
   deltaPercent: number | null; // week-over-week, null if no prior data
-  ambientColor: string;        // arc fill stroke color (violet/cyan/warning)
+  ambientColor: string;        // arc fill stroke color (kept for API compat; gradient takes priority)
   size?: number;               // arc diameter in dp, default 180
 }
 
@@ -112,33 +99,37 @@ export default function AIArcHero({
   ambientColor,
   size = 180,
 }: AIArcHeroProps): JSX.Element {
-  // FR2: All geometry derived from size prop
+  // Geometry derived from size prop
   const cx = size / 2;
   const cy = size / 2;
   const r = size / 2 - STROKE_WIDTH / 2 - 2;
 
-  // FR1: Compute arc geometry ONCE in render scope (JS thread — not in worklet)
-  const arcLength = r * (SWEEP * Math.PI / 180);
-  // fullArcPath is used for both the track and the fill (same geometry, different strokes)
-  const fullArcPath = arcPath(cx, cy, r, START_ANGLE, START_ANGLE + SWEEP);
+  // Build the full arc SVG path string ONCE in render scope (not in worklet)
+  const fullArcSvg = arcPath(cx, cy, r, START_ANGLE, START_ANGLE + SWEEP);
 
-  // FR1: dashOffset SharedValue — starts at arcLength (arc fully hidden)
-  const dashOffset = useSharedValue(arcLength);
+  // Convert SVG path to Skia Path ONCE — used for both track and trimmed fill
+  const fullSkiaPath = Skia.Path.MakeFromSVGString(fullArcSvg) ?? Skia.Path.Make();
 
-  // FR4: Re-trigger animation whenever aiPct changes
+  // sweepProgress: 0 (invisible arc) → aiPct/100 (fraction of full sweep visible)
+  const sweepProgress = useSharedValue(0);
+
+  // Animate to target aiPct on mount and whenever aiPct changes
   useEffect(() => {
-    // aiPct=0  → target = arcLength     (arc invisible — no fill)
-    // aiPct=100 → target = 0            (arc fully visible)
-    // aiPct=p   → target = arcLength * (1 - p/100)  (p% visible)
-    dashOffset.value = withTiming(arcLength * (1 - aiPct / 100), timingChartFill);
+    sweepProgress.value = withSpring(aiPct / 100, {
+      mass: 1,
+      stiffness: 80,
+      damping: 12,
+    });
   }, [aiPct]);
 
-  // FR1: useAnimatedProps returns ONLY a number — zero string allocation per frame
-  const fillProps = useAnimatedProps(() => ({
-    strokeDashoffset: dashOffset.value,
-  }));
+  // Trim path on UI thread via useDerivedValue — zero JS per frame
+  const trimmedPath = useDerivedValue(() => {
+    const p = fullSkiaPath.copy();
+    p.trim(0, sweepProgress.value, false);
+    return p;
+  });
 
-  // Delta badge styling — only used when deltaPercent !== null
+  // Delta badge styling
   const deltaBadgeColor =
     deltaPercent !== null && deltaPercent > 0
       ? colors.success
@@ -163,33 +154,31 @@ export default function AIArcHero({
       {/* Arc gauge container */}
       <View style={{ alignItems: 'center' }}>
         <View style={{ position: 'relative', width: size, height: size }}>
-          {/* SVG arc gauge */}
-          <Svg width={size} height={size}>
-            {/* Track arc — full 270°, colors.border */}
+          {/* Skia Canvas with arc */}
+          <Canvas style={{ width: size, height: size }}>
+            {/* Track arc — full 270°, colors.border stroke */}
             <Path
-              d={fullArcPath}
-              stroke={colors.border}
+              path={fullSkiaPath}
+              style="stroke"
               strokeWidth={STROKE_WIDTH}
-              strokeLinecap="round"
-              fill="none"
+              strokeCap="round"
+              color={colors.border}
             />
-            {/* Fill arc — strokeDashoffset animation, ambientColor
-                strokeDasharray=[arcLength, arcLength]:
-                  The "dash" is exactly the full arc length.
-                  The gap after it is also arcLength (no wrap-around).
-                strokeDashoffset=arcLength → dash shifted past start → invisible (0%)
-                strokeDashoffset=0        → dash at start position  → full arc (100%)
-                strokeDashoffset=arcLength*(1-p/100) → p% visible */}
-            <AnimatedPath
-              d={fullArcPath}
-              strokeDasharray={[arcLength, arcLength]}
-              animatedProps={fillProps}
-              stroke={ambientColor}
+
+            {/* Fill arc — trimmed by sweepProgress, SweepGradient paint */}
+            <Path
+              path={trimmedPath}
+              style="stroke"
               strokeWidth={STROKE_WIDTH}
-              strokeLinecap="round"
-              fill="none"
-            />
-          </Svg>
+              strokeCap="round"
+              color="transparent"
+            >
+              <SweepGradient
+                c={{ x: cx, y: cy }}
+                colors={[...GRADIENT_COLORS]}
+              />
+            </Path>
+          </Canvas>
 
           {/* Center text overlay */}
           <View
@@ -227,7 +216,7 @@ export default function AIArcHero({
           </View>
         </View>
 
-        {/* Delta badge — top-right of arc area, only when deltaPercent !== null */}
+        {/* Delta badge — only when deltaPercent !== null */}
         {deltaPercent !== null && (
           <View
             testID="delta-badge"
@@ -252,7 +241,7 @@ export default function AIArcHero({
         )}
       </View>
 
-      {/* BrainLift secondary metric — FR3 */}
+      {/* BrainLift secondary metric */}
       <View style={{ marginTop: 16, gap: 4 }}>
         <Text
           style={{
