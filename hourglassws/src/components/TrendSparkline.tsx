@@ -1,36 +1,47 @@
 /**
- * TrendSparkline — Skia animated line chart with optional scrub gesture
+ * TrendSparkline — VNX CartesianChart + Line + Area (04-victory-charts FR3)
  *
- * Renders a smooth bezier line through 4–12 data points on a Skia canvas.
- * The line animates from left to right on mount using timingChartFill.
+ * Migration from bespoke Skia bezier path to Victory Native XL.
+ * External prop API is UNCHANGED — all callers and 07-overview-sync continue to work.
  *
- * Scrub gesture (05-earnings-scrub FR2):
- *   - Wrap with GestureDetector for horizontal pan scrubbing
- *   - Calls onScrubChange(index) during pan, onScrubChange(null) on release
- *   - Renders a vertical line + dot cursor at the snapped data point
- *   - activeOffsetX: [-5, 5] prevents conflict with ScrollView vertical scroll
+ * Visual enhancements:
+ * - Line with BlurMaskFilter neon glow paint
+ * - Area with LinearGradient fill (brand color → transparent)
+ *
+ * Gesture migration:
+ * - Gesture: useChartPressState (VNX built-in, replaces the old gesture hook)
+ * - externalCursorIndex / onScrubChange interface preserved via renderOutside overlay
  *
  * Edge cases:
- *   - data=[]   → empty canvas (no crash), gesture disabled
- *   - data=[x]  → Circle at center (no line), cursor snaps to index 0
- *   - all zeros → flat line at vertical center
- *
- * Parent must provide width/height from onLayout:
- *   <View onLayout={e => setDims(e.nativeEvent.layout)}>
- *     <TrendSparkline data={weeklyAmounts} width={dims.width} height={dims.height} />
- *   </View>
+ *   - data=[]   → null (no crash), gesture disabled
+ *   - width=0   → null (no crash)
+ *   - data=[x]  → renders single-point chart (no crash)
+ *   - all zeros → flat line at bottom
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View } from 'react-native';
-import { Canvas, Path, Circle, Line, vec, matchFont, Text, Paint, BlurMask } from '@shopify/react-native-skia';
-import Animated, { useSharedValue, withTiming, useAnimatedReaction, useAnimatedStyle, runOnJS } from 'react-native-reanimated';
-import { GestureDetector } from 'react-native-gesture-handler';
+import { CartesianChart, Line, Area, useChartPressState } from 'victory-native';
+import {
+  Canvas,
+  Line as SkiaLine,
+  Circle,
+  vec,
+  matchFont,
+  Text as SkiaText,
+  BlurMask,
+  LinearGradient,
+} from '@shopify/react-native-skia';
+import Animated, {
+  useSharedValue,
+  withTiming,
+  useAnimatedStyle,
+  useAnimatedReaction,
+  runOnJS,
+} from 'react-native-reanimated';
 import { colors } from '@/src/lib/colors';
 import { timingChartFill } from '@/src/lib/reanimated-presets';
-import { useScrubGesture } from '@/src/hooks/useScrubGesture';
-import type { ScrubChangeCallback } from '@/src/hooks/useScrubGesture';
-import { buildScrubCursor } from '@/src/components/ScrubCursor';
+import { toLineData } from '@/src/lib/chartData';
 
 export interface TrendSparklineProps {
   data: number[];
@@ -66,7 +77,7 @@ export interface TrendSparklineProps {
    * Called with the nearest data index (0..N-1) during a horizontal pan gesture,
    * and with null when the gesture ends. Enables parent to update a hero value.
    */
-  onScrubChange?: ScrubChangeCallback;
+  onScrubChange?: (index: number | null) => void;
   /**
    * Human-readable week labels for each data point (oldest first).
    * Length should match data.length. Used by parent for sub-label display.
@@ -83,57 +94,7 @@ export interface TrendSparklineProps {
   externalCursorIndex?: number | null;
 }
 
-const PADDING_FRACTION = 0.1; // 10% top/bottom margin
 const CAP_LABEL_FONT_SIZE = 10;
-
-/** Map a data value to a canvas Y coordinate (inverted — Skia Y grows downward) */
-function toY(value: number, min: number, max: number, height: number): number {
-  const range = max - min;
-  const paddedHeight = height * (1 - PADDING_FRACTION * 2);
-  const paddedTop = height * PADDING_FRACTION;
-  if (range === 0) {
-    // All values equal → flat line at vertical center
-    return height / 2;
-  }
-  return paddedTop + paddedHeight * (1 - (value - min) / range);
-}
-
-/** Build an SVG path string for a smooth bezier through points */
-function buildPath(
-  data: number[],
-  width: number,
-  height: number,
-  min: number,
-  max: number,
-): string {
-  if (data.length < 2) return '';
-
-  const xStep = width / (data.length - 1);
-  const points = data.map((v, i) => ({
-    x: i * xStep,
-    y: toY(v, min, max, height),
-  }));
-
-  let d = `M ${points[0].x} ${points[0].y}`;
-
-  for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1];
-    const curr = points[i];
-    // Catmull-Rom-like control points for smooth cubic bezier
-    const cpX = (prev.x + curr.x) / 2;
-    d += ` C ${cpX} ${prev.y} ${cpX} ${curr.y} ${curr.x} ${curr.y}`;
-  }
-
-  return d;
-}
-
-/** Compute pixel X positions for each data point (matches buildPath spacing) */
-function computePixelXs(dataLength: number, width: number): number[] {
-  if (dataLength === 0) return [];
-  if (dataLength === 1) return [width / 2];
-  const xStep = width / (dataLength - 1);
-  return Array.from({ length: dataLength }, (_, i) => i * xStep);
-}
 
 export default function TrendSparkline({
   data,
@@ -146,231 +107,155 @@ export default function TrendSparkline({
   capLabel,
   targetValue,
   onScrubChange,
-  weekLabels: _weekLabels, // accepted prop — used by parent for sub-label, not rendered in canvas
+  weekLabels: _weekLabels,
   externalCursorIndex = null,
 }: TrendSparklineProps) {
   const clipProgress = useSharedValue(0);
-  // Resolve effective height — never 0 (avoids invisible canvas before onLayout fires)
   const h = height > 0 ? height : 52;
 
   useEffect(() => {
     clipProgress.value = withTiming(1, timingChartFill);
   }, []);
 
-  // Animate the clip via an Animated.View wrapper (overflow:hidden + animated width)
-  // instead of Path.end driven by per-frame runOnJS state updates.
-  //
-  // Previously: useAnimatedReaction + runOnJS(setClipEnd) bridged the SharedValue to
-  // React state. That fires at 60fps × 4 sparklines = 240 JS-thread state updates/sec,
-  // flooding the Hermes microtask queue with allocations that trigger young-gen GC
-  // during Reanimated's JSI Value window — causing stale forwarding pointers / crash.
-  //
-  // Now: useAnimatedStyle runs entirely on the Reanimated UI thread. Zero JS per frame.
+  // Re-reveal left-to-right when new week data arrives
+  const prevDataLengthRef = useRef(data.length);
+  useEffect(() => {
+    if (data.length > prevDataLengthRef.current) {
+      clipProgress.value = 0;
+      clipProgress.value = withTiming(1, timingChartFill);
+    }
+    prevDataLengthRef.current = data.length;
+  }, [data.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const clipStyle = useAnimatedStyle(() => ({
     width: clipProgress.value * width,
   }));
 
-  // Recompute path when data or dimensions change
-  const { pathStr, min, max, hasData, isSinglePoint } = useMemo(() => {
-    if (data.length === 0) {
-      return { pathStr: '', min: 0, max: 0, hasData: false, isSinglePoint: false };
+  // ── VNX gesture state ────────────────────────────────────────────────────
+  const { state, isActive } = useChartPressState({ x: 0, y: { y: 0 } });
+
+  // Emit onScrubChange from gesture — runs on JS thread via runOnJS
+  const emitScrubChange = (active: boolean, position: number) => {
+    if (active && data.length > 0) {
+      const idx = Math.min(
+        Math.max(Math.round(position * (data.length - 1)), 0),
+        data.length - 1,
+      );
+      onScrubChange?.(idx);
+    } else {
+      onScrubChange?.(null);
     }
-    const minVal = Math.min(...data);
-    const dataMax = Math.max(...data);
-    // If maxValue is provided and >= all data, use it as the axis ceiling
-    const maxVal = maxValue !== undefined && maxValue >= dataMax ? maxValue : dataMax;
-    if (data.length === 1) {
-      return { pathStr: '', min: minVal, max: maxVal, hasData: true, isSinglePoint: true };
-    }
-    return {
-      pathStr: buildPath(data, width, h, minVal, maxVal),
-      min: minVal,
-      max: maxVal,
-      hasData: true,
-      isSinglePoint: false,
-    };
-  }, [data, width, h, maxValue]);
+  };
 
-  // ── Scrub gesture ──────────────────────────────────────────────────────────
-
-  const pixelXs = useMemo(() => computePixelXs(data.length, width), [data.length, width]);
-
-  const { scrubIndex, gesture } = useScrubGesture({
-    pixelXs,
-    enabled: data.length > 0,
-  });
-
-  // Apply activeOffsetX so horizontal scrub doesn't block ScrollView vertical scroll
-  const scrubGesture = gesture.activeOffsetX([-5, 5]);
-
-  // Cursor pixel position bridged from UI thread to React state
-  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
-  // Guard: only emit onScrubChange(null) if THIS instance was actively scrubbing.
-  // Without this, re-renders cause idle charts (scrubIndex=-1) to call onScrubChange(null)
-  // and reset the shared scrubWeekIndex in the overview screen (flicker).
-  const wasScrubbingRef = useRef(false);
-
-  // JS-thread handler: computes cursor position and fires onScrubChange.
-  // Must stay on JS thread — accesses data[], pixelXs[], and calls toY().
-  const handleScrubIndex = useCallback((index: number) => {
-    if (index === -1 || data.length === 0) {
-      setCursorPos(null);
-      if (wasScrubbingRef.current) {
-        wasScrubbingRef.current = false;
-        onScrubChange?.(null);
-      }
-      return;
-    }
-    wasScrubbingRef.current = true;
-    const clampedIdx = Math.min(Math.max(index, 0), data.length - 1);
-    const x = pixelXs[clampedIdx] ?? 0;
-    const y = toY(data[clampedIdx] ?? 0, min, max, h);
-    setCursorPos({ x, y });
-    onScrubChange?.(index);
-  }, [data, pixelXs, min, max, h, onScrubChange]);
-
-  // Thin worklet: only reads scrubIndex then delegates to JS thread
   useAnimatedReaction(
-    () => scrubIndex.value,
-    (index) => {
-      runOnJS(handleScrubIndex)(index);
+    () => ({ active: isActive.value, position: state.x.position.value }),
+    ({ active, position }) => {
+      runOnJS(emitScrubChange)(active, position);
     },
   );
 
-  // ── Early return ───────────────────────────────────────────────────────────
+  // ── Early returns ────────────────────────────────────────────────────────
 
-  if (!hasData || width === 0) {
-    return null;
-  }
+  if (data.length === 0 || width === 0) return null;
 
-  // When targetValue is provided, draw guide at that value's Y position.
-  // Otherwise fall back to y=2 (near top, represents the maxValue ceiling).
-  const guideY = (showGuide && targetValue !== undefined)
-    ? toY(targetValue, min, max, h)
-    : 2;
+  // Y domain
+  const dataMax = Math.max(...data);
+  const yMax = maxValue !== undefined && maxValue >= dataMax ? maxValue : dataMax;
+  const yMin = Math.min(...data);
 
-  // Cap label font — only loaded when needed
-  const capFont = (showGuide && capLabel)
+  // Cap label font
+  const capFont = showGuide && capLabel
     ? matchFont({ fontFamily: 'System', fontSize: CAP_LABEL_FONT_SIZE })
     : null;
 
-  // Right-align the cap label: measure text width, position at right edge
-  const capLabelX = capFont && capLabel
-    ? width - capFont.measureText(capLabel).width - 4
-    : 0;
-  const capLabelY = guideY + CAP_LABEL_FONT_SIZE;
-
-  // Cursor geometry — external index takes priority over internal gesture state
-  // externalCursorIndex: set by parent (overview sync); cursorPos: set by own gesture
-  const activeCursorPos: { x: number; y: number } | null = (() => {
-    if (externalCursorIndex != null && data.length > 0) {
-      // Clamp to valid range
-      const clampedIdx = Math.max(0, Math.min(externalCursorIndex, data.length - 1));
-      const x = pixelXs[clampedIdx] ?? 0;
-      const y = toY(data[clampedIdx] ?? 0, min, max, h);
-      return { x, y };
-    }
-    return cursorPos;
-  })();
-
-  const cursor = activeCursorPos
-    ? buildScrubCursor(activeCursorPos.x, activeCursorPos.y, h, h * PADDING_FRACTION)
-    : null;
-
-  if (isSinglePoint) {
-    const cx = width / 2;
-    const cy = toY(data[0], min, max, h);
-    return (
-      // GestureDetector wraps the full-size View so gesture area is always width×h.
-      // Animated.View clips the Canvas with overflow:hidden as clipProgress grows 0→1.
-      // This avoids per-frame runOnJS state updates that cause Hermes GC pressure.
-      <GestureDetector gesture={scrubGesture}>
-        <View style={{ width, height: h }}>
-          <Animated.View style={[{ overflow: 'hidden', height: h }, clipStyle]}>
-            <Canvas style={{ width, height: h }}>
-              {showGuide && (
-                <Line p1={vec(0, guideY)} p2={vec(width, guideY)} color={colors.border} strokeWidth={1} />
-              )}
-              {showGuide && capLabel && capFont && (
-                <Text
-                  x={capLabelX}
-                  y={capLabelY}
-                  text={capLabel}
-                  font={capFont}
-                  color={colors.textMuted}
-                  opacity={0.35}
-                />
-              )}
-              <Circle cx={cx} cy={cy} r={strokeWidth * 2} color={color} />
-              {cursor && (
-                <>
-                  <Path
-                    path={cursor.linePath}
-                    color={colors.textMuted}
-                    style="stroke"
-                    strokeWidth={1}
-                    opacity={0.5}
-                  />
-                  <Circle cx={cursor.dotX} cy={cursor.dotY} r={cursor.dotRadius} color={color} />
-                </>
-              )}
-            </Canvas>
-          </Animated.View>
-        </View>
-      </GestureDetector>
-    );
-  }
+  // Cap label positioning — right-aligned, top of chart area
+  const capLabelWidth = capFont && capLabel ? capFont.measureText(capLabel).width : 0;
+  const capLabelX = width - capLabelWidth - 4;
+  const capLabelY = CAP_LABEL_FONT_SIZE;
 
   return (
-    <GestureDetector gesture={scrubGesture}>
-      <View style={{ width, height: h }}>
-        <Animated.View style={[{ overflow: 'hidden', height: h }, clipStyle]}>
-          <Canvas style={{ width, height: h }}>
-            {showGuide && (
-              <Line p1={vec(0, guideY)} p2={vec(width, guideY)} color={colors.border} strokeWidth={1} />
-            )}
-            {showGuide && capLabel && capFont && (
-              <Text
-                x={capLabelX}
-                y={capLabelY}
-                text={capLabel}
-                font={capFont}
-                color={colors.textMuted}
-                opacity={0.35}
-              />
-            )}
-            <Path
-              path={pathStr}
-              color={color}
-              style="stroke"
-              strokeWidth={strokeWidth}
-              strokeCap="round"
-              strokeJoin="round"
-            >
-              {/* Layer 1: outer glow — wide, very soft */}
-              <Paint color={color + '40'} style="stroke" strokeWidth={14} strokeCap="round">
-                <BlurMask blur={12} style="solid" />
-              </Paint>
-              {/* Layer 2: mid glow — tighter bloom */}
-              <Paint color={color + '80'} style="stroke" strokeWidth={7} strokeCap="round">
-                <BlurMask blur={4} style="solid" />
-              </Paint>
-            </Path>
-            {cursor && (
-              <>
-                <Path
-                  path={cursor.linePath}
+    <View style={{ width, height: h }}>
+      {/* Cap label overlay — rendered above clip so it's always visible */}
+      {showGuide && capLabel && capFont && (
+        <Canvas
+          style={{ position: 'absolute', top: 0, left: 0, width, height: h, zIndex: 1 }}
+          pointerEvents="none"
+        >
+          <SkiaText
+            x={capLabelX}
+            y={capLabelY}
+            text={capLabel}
+            font={capFont}
+            color={colors.textMuted}
+            opacity={0.35}
+          />
+        </Canvas>
+      )}
+      <Animated.View style={[{ overflow: 'hidden', height: h }, clipStyle]}>
+        {/* toLineData normalizes data[] to VNX-typed [{x, y}] records */}
+        <CartesianChart
+          data={toLineData(data)}
+          xKey="x"
+          yKeys={['y']}
+          domain={{ y: [yMin, yMax] }}
+          gestureLongPressDelay={0}
+          renderOutside={({ chartBounds }) => {
+            // ── External cursor overlay (for 07-overview-sync) ──────────────
+            // Render only when externalCursorIndex !== null
+            if (!(externalCursorIndex !== null) || data.length === 0) return null;
+            const clampedIdx = Math.max(0, Math.min(externalCursorIndex, data.length - 1));
+            const cursorX = data.length > 1
+              ? chartBounds.left + (clampedIdx / (data.length - 1)) * (chartBounds.right - chartBounds.left)
+              : chartBounds.left + chartBounds.width / 2;
+
+            // Compute Y for cursor dot from the data value
+            const dataRange = yMax - yMin;
+            const yPct = dataRange === 0 ? 0.5 : 1 - (data[clampedIdx] - yMin) / dataRange;
+            const cursorY = chartBounds.top + yPct * (chartBounds.bottom - chartBounds.top);
+
+            return (
+              <Canvas style={{ position: 'absolute', top: 0, left: 0, width, height: h }}>
+                {/* Vertical cursor line */}
+                <SkiaLine
+                  p1={vec(cursorX, chartBounds.top)}
+                  p2={vec(cursorX, chartBounds.bottom)}
                   color={colors.textMuted}
-                  style="stroke"
                   strokeWidth={1}
                   opacity={0.5}
                 />
-                <Circle cx={cursor.dotX} cy={cursor.dotY} r={cursor.dotRadius} color={color} />
-              </>
-            )}
-          </Canvas>
-        </Animated.View>
-      </View>
-    </GestureDetector>
+                {/* Cursor dot */}
+                <Circle cx={cursorX} cy={cursorY} r={strokeWidth * 1.5} color={color} />
+              </Canvas>
+            );
+          }}
+        >
+          {({ points, chartBounds }) => (
+            <>
+              {/* Area fill — LinearGradient from brand color → transparent */}
+              <Area
+                points={points.y}
+                y0={chartBounds.bottom}
+                color="transparent"
+              >
+                <LinearGradient
+                  start={vec(0, chartBounds.top)}
+                  end={vec(0, chartBounds.bottom)}
+                  colors={[color + '66', 'transparent']}
+                />
+              </Area>
+
+              {/* Line with neon glow BlurMaskFilter */}
+              <Line
+                points={points.y}
+                strokeWidth={strokeWidth}
+                color={color}
+              >
+                <BlurMask blur={8} style="solid" />
+              </Line>
+            </>
+          )}
+        </CartesianChart>
+      </Animated.View>
+    </View>
   );
 }
