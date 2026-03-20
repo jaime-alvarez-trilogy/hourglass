@@ -36,6 +36,7 @@ import TrendSparkline from '@/src/components/TrendSparkline';
 import FadeInScreen from '@/src/components/FadeInScreen';
 import OverviewHeroCard from '@/src/components/OverviewHeroCard';
 import { computeEarningsPace } from '@/src/lib/overviewUtils';
+import { setTag } from '@/src/lib/sharedTransitions';
 import type { ScrubChangeCallback } from '@/src/hooks/useScrubGesture';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -278,6 +279,7 @@ export default function OverviewScreen() {
 
           {/* Earnings chart — target = max weekly earnings (hourlyRate × weeklyLimit) */}
           <Animated.View style={getEntryStyle(0)}>
+          <Animated.View {...setTag('home-earnings-card')}>
           <ChartSection
             label="WEEKLY EARNINGS"
             heroValue={`$${Math.round(heroEarnings).toLocaleString()}`}
@@ -291,6 +293,7 @@ export default function OverviewScreen() {
             externalCursorIndex={scrubWeekIndex}
             chartKey={`earnings-${chartKey}-${window}`}
           />
+          </Animated.View>
           </Animated.View>
 
           {/* Hours chart — target = weeklyLimit */}
