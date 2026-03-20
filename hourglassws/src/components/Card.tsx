@@ -17,6 +17,7 @@
 
 import React from 'react';
 import { View, ViewStyle } from 'react-native';
+import GlassCard from './GlassCard';
 
 // ─── Glass style constants (exported for test access) ─────────────────────────
 //
@@ -99,22 +100,16 @@ export default function Card({
     );
   }
 
-  // ── glass=true (default): flat dark-glass card (no BlurView) ────────────────
-  const glassStyle = elevated ? GLASS_ELEVATED : GLASS_BASE;
-
+  // ── glass=true (default): delegate to GlassCard (Skia BackdropFilter) ────────
+  // GlassCard provides genuine glass blur via Skia BackdropFilter — no UIVisualEffectView.
   return (
-    <View
+    <GlassCard
+      elevated={elevated}
       className={className}
+      style={style}
       testID={testID}
-      style={[OUTER_STYLE, {
-        backgroundColor: glassStyle.backgroundColor,
-        borderColor: glassStyle.borderColor,
-        borderWidth: glassStyle.borderWidth,
-      }, style]}
     >
-      <View style={INNER_STYLE}>
-        {children}
-      </View>
-    </View>
+      {children}
+    </GlassCard>
   );
 }
