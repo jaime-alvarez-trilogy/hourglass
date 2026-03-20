@@ -29,16 +29,16 @@ They are partially failing (FR3: ai.tsx has 9 failures). Tests are authoritative
 - [x] getEntryStyle(3) on Earnings card
 - [x] Exactly 4 getEntryStyle calls (UrgencyBanner excluded)
 
-### FR3: AI screen (needs implementation — only failing FR)
-- [ ] `app/(tabs)/ai.tsx` imports useStaggeredEntry from @/src/hooks/useStaggeredEntry
-- [ ] Calls useStaggeredEntry({ count: 6 })
-- [ ] getEntryStyle(0) wraps AIArcHero
-- [ ] getEntryStyle(1) wraps Prime Radiant card (setTag wrapper)
-- [ ] getEntryStyle(2) wraps Daily Breakdown card (inside conditional)
-- [ ] getEntryStyle(3) wraps 12-Week Trajectory card (inside conditional)
-- [ ] getEntryStyle(4) wraps Legend ("How it's calculated") card
-- [ ] getEntryStyle(5) wraps last-fetched timestamp/footer
-- [ ] Exactly 6 getEntryStyle(\d+) calls in file
+### FR3: AI screen (complete)
+- [x] `app/(tabs)/ai.tsx` imports useStaggeredEntry from @/src/hooks/useStaggeredEntry
+- [x] Calls useStaggeredEntry({ count: 6 })
+- [x] getEntryStyle(0) wraps AIArcHero
+- [x] getEntryStyle(1) wraps Prime Radiant card (setTag wrapper)
+- [x] getEntryStyle(2) wraps Daily Breakdown card (inside conditional)
+- [x] getEntryStyle(3) wraps 12-Week Trajectory card (inside conditional)
+- [x] getEntryStyle(4) wraps Legend ("How it's calculated") card
+- [x] getEntryStyle(5) wraps last-fetched timestamp/footer
+- [x] Exactly 6 getEntryStyle(\d+) calls in file
 
 ### FR4: Approvals screen (already complete)
 - [x] `app/(tabs)/approvals.tsx` imports useStaggeredEntry
@@ -61,10 +61,19 @@ They are partially failing (FR3: ai.tsx has 9 failures). Tests are authoritative
 
 ## Phase 5.2 — Review
 
-- [ ] Run full test suite: `cd hourglassws && npx jest useStaggeredEntry --no-coverage` → all 65 tests pass
-- [ ] spec-implementation-alignment check
+- [x] Run full test suite: `cd hourglassws && npx jest useStaggeredEntry --no-coverage` → all 65 tests pass
+- [x] spec-implementation-alignment check — FR1-FR5 all verified passing
+- [x] No regressions from committed code (ai.tsx only file modified in commits)
 - [ ] pr-review-toolkit:review-pr
 - [ ] test-optimiser
+
+## Session Notes
+
+**2026-03-19**: Spec execution complete.
+- Phase 5.0: Tests already existed (useStaggeredEntry.test.ts with 65 tests). FR1, FR2, FR4, FR5 were already passing. FR3 (ai.tsx) had 9 failures.
+- Phase 5.1: FR1/FR2/FR4/FR5 were already implemented. Only FR3 required implementation — added `useStaggeredEntry({ count: 6 })` and 6 `Animated.View` wrappers to `app/(tabs)/ai.tsx`.
+- Phase 5.2: All 65 useStaggeredEntry tests pass. No regressions from committed code.
+- Pre-existing working-tree modifications (useScrubGesture.ts, NoiseOverlay.tsx, etc.) have unrelated test failures not caused by this spec's commits.
 
 ## Commit Discipline
 
