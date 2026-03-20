@@ -37,6 +37,7 @@ jest.mock('react-native-gesture-handler', () => ({
 }));
 
 jest.mock('react-native-reanimated', () => {
+  const R = require('react');
   const identity = (x: any) => x;
   const Easing = {
     linear: identity,
@@ -46,12 +47,39 @@ jest.mock('react-native-reanimated', () => {
     bezier: () => identity,
   };
   return {
+    __esModule: true,
+    default: {
+      View: ({ children, style }: any) => R.createElement('View', { style }, children),
+      Text: ({ children, style }: any) => R.createElement('Text', { style }, children),
+      createAnimatedComponent: (C: any) => C,
+    },
     useSharedValue: (init: any) => ({ value: init }),
     withTiming: (val: any) => val,
+    useAnimatedStyle: (_fn: any) => ({}),
     useAnimatedReaction: () => {},
     runOnJS: (fn: any) => fn,
     useReducedMotion: () => false,
     Easing,
+  };
+});
+
+jest.mock('victory-native', () => {
+  return {
+    CartesianChart: ({ children, renderOutside }: any) => {
+      const R = require('react');
+      const chartBounds = { left: 0, right: 340, top: 0, bottom: 60, width: 340, height: 60 };
+      const points = { y: [], value: [] };
+      return R.createElement('View', null,
+        renderOutside ? renderOutside({ chartBounds }) : null,
+        children ? children({ points, chartBounds }) : null,
+      );
+    },
+    Line: ({ children }: any) => children ?? null,
+    Area: ({ children }: any) => children ?? null,
+    useChartPressState: () => ({
+      state: { x: { position: { value: 0 } } },
+      isActive: { value: false },
+    }),
   };
 });
 
@@ -154,11 +182,12 @@ describe('TrendSparkline FR1 (07-overview-sync) — cursor rendering pattern', (
     expect(hasMathMax || hasClamp || (hasMathMax && hasMathMin)).toBe(true);
   });
 
-  it('SC1.8 — source uses externalCursorIndex in cursor geometry computation', () => {
+  it('SC1.8 — source uses externalCursorIndex in cursor geometry computation via renderOutside', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    // Should reference externalCursorIndex in context near buildScrubCursor or pixelXs
+    // VNX approach: externalCursorIndex drives cursor overlay via renderOutside
     expect(source).toMatch(/externalCursorIndex/);
-    expect(source).toMatch(/buildScrubCursor/);
+    // Cursor computed from chartBounds (not pixelXs/buildScrubCursor)
+    expect(source).toMatch(/chartBounds|clampedIdx/);
   });
 });
 

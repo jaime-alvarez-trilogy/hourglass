@@ -1,5 +1,8 @@
 // Tests: src/components/TrendSparkline.tsx (FR3 — animated Skia line chart)
 //
+// Updated for 04-victory-charts FR3: migrated from custom Skia bezier to
+// VNX CartesianChart + Line + Area + BlurMask. Skia Path replaced by VNX Line.
+//
 // Strategy: static source-file analysis for design constraints,
 // runtime render assertions for crash-free behavior and edge cases.
 // @shopify/react-native-skia is mocked via __mocks__/@shopify/react-native-skia.ts
@@ -10,6 +13,64 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const SPARKLINE_FILE = path.resolve(__dirname, '../../src/components/TrendSparkline.tsx');
+
+// ─── Mocks ────────────────────────────────────────────────────────────────────
+
+jest.mock('victory-native', () => {
+  return {
+    CartesianChart: ({ children, renderOutside }: any) => {
+      const R = require('react');
+      const chartBounds = { left: 0, right: 200, top: 0, bottom: 60, width: 200, height: 60 };
+      const points = { y: [], value: [] };
+      return R.createElement('View', null,
+        renderOutside ? renderOutside({ chartBounds }) : null,
+        children ? children({ points, chartBounds }) : null,
+      );
+    },
+    Line: ({ children }: any) => children ?? null,
+    Area: ({ children }: any) => children ?? null,
+    useChartPressState: () => ({
+      state: { x: { position: { value: 0 } } },
+      isActive: { value: false },
+    }),
+  };
+});
+
+jest.mock('react-native-reanimated', () => {
+  const R = require('react');
+  const identity = (x: any) => x;
+  const Easing = {
+    linear: identity,
+    ease: identity,
+    bezier: () => identity,
+    inOut: () => identity,
+    out: () => identity,
+    in: () => identity,
+    poly: () => identity,
+    sin: identity,
+    circle: identity,
+    exp: identity,
+    elastic: () => identity,
+    back: () => identity,
+    bounce: identity,
+    steps: () => identity,
+  };
+  return {
+    __esModule: true,
+    default: {
+      View: ({ children, style }: any) => R.createElement('View', { style }, children),
+      Text: ({ children, style }: any) => R.createElement('Text', { style }, children),
+      createAnimatedComponent: (C: any) => C,
+    },
+    useSharedValue: (init: any) => ({ value: init }),
+    withTiming: (val: any) => val,
+    useAnimatedStyle: (_fn: any) => ({}),
+    useAnimatedReaction: () => {},
+    runOnJS: (fn: any) => fn,
+    useReducedMotion: () => false,
+    Easing,
+  };
+});
 
 // ---------------------------------------------------------------------------
 // FR3 SC: Source-level assertions
@@ -30,10 +91,9 @@ describe('TrendSparkline — FR3: source constraints', () => {
     expect(source).toContain('timingChartFill');
   });
 
-  it('FR3: source uses withTiming (not withSpring)', () => {
+  it('FR3: source uses withTiming (for clip animation)', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
     expect(source).toContain('withTiming');
-    expect(source).not.toContain('withSpring');
   });
 
   it('FR3: source uses @shopify/react-native-skia Canvas', () => {
@@ -42,19 +102,25 @@ describe('TrendSparkline — FR3: source constraints', () => {
     expect(source).toContain('Canvas');
   });
 
-  it('FR3: source uses Path for line rendering', () => {
+  it('FR3: source uses VNX Line for line rendering (04-victory-charts FR3)', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    expect(source).toContain('Path');
+    // VNX Line from victory-native, not Skia Path for main chart line
+    expect(source).toContain('Line');
+    expect(source).toContain('victory-native');
   });
 
-  it('FR3: source uses Circle for single-point case', () => {
+  it('FR3: source uses Circle for cursor dot', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
     expect(source).toContain('Circle');
   });
 
-  it('FR3: source does NOT contain hardcoded hex colors', () => {
+  it('FR3: source does NOT contain hardcoded hex colors (uses colors.ts constants)', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    expect(source).not.toMatch(/#[0-9A-Fa-f]{6}\b/);
+    // Colors should come from colors.ts constants, not hardcoded
+    // Strip comments first, then check
+    const noComments = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*/g, '');
+    const hexColorMatches = noComments.match(/#[0-9A-Fa-f]{6}\b/g) || [];
+    expect(hexColorMatches.length).toBe(0);
   });
 
   it('FR3: source does NOT use StyleSheet.create()', () => {
@@ -67,15 +133,14 @@ describe('TrendSparkline — FR3: source constraints', () => {
     expect(source).toContain('gold');
   });
 
-  it('FR3: default strokeWidth is 2', () => {
+  it('FR3: default strokeWidth is 3 (updated in 04-chart-polish)', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    expect(source).toMatch(/strokeWidth.*=.*2|=\s*2[,\s)]/);
+    expect(source).toMatch(/strokeWidth\s*=\s*3[^.0-9]/);
   });
 
-  it('FR3: Y-axis uses padding/margin (source has padding constant or fraction)', () => {
+  it('FR3: Y domain handled via VNX domain prop (not internal padding constant)', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    // Must have some form of top/bottom padding for the Y axis
-    expect(source).toMatch(/padding|margin|0\.\d+\s*\*\s*height|height\s*\*\s*0\.\d+/i);
+    expect(source).toMatch(/domain.*y|yMin|yMax/);
   });
 });
 

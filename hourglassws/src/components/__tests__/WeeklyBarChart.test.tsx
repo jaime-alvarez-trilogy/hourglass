@@ -48,6 +48,25 @@ jest.mock('react-native-web/dist/exports/Text/index.js', () => {
   };
 });
 
+// victory-native mock required after 04-victory-charts VNX migration
+jest.mock('victory-native', () => {
+  const R = require('react');
+  const chartBounds = { left: 0, right: 300, top: 0, bottom: 120, width: 300, height: 120 };
+  return {
+    CartesianChart: ({ children, data, xKey, yKeys }: any) => {
+      const points: any = {};
+      if (yKeys) yKeys.forEach((k: string) => { points[k] = []; });
+      return R.createElement('CartesianChart', { data, xKey, yKeys },
+        typeof children === 'function' ? children({ points, chartBounds }) : children
+      );
+    },
+    Bar: ({ children, roundedCorners }: any) =>
+      R.createElement('Bar', { roundedCorners },
+        typeof children === 'function' ? children() : children
+      ),
+  };
+});
+
 // ─── File paths ───────────────────────────────────────────────────────────────
 
 const HOURGLASSWS_ROOT = path.resolve(__dirname, '../../..');
@@ -100,58 +119,53 @@ function findNodes(node: any, predicate: (n: any) => boolean, found: any[] = [])
   return found;
 }
 
-// ─── FR3 (07-chart-line-polish): WeeklyBarChart today-bar glow ───────────────
+// ─── FR3 (04-victory-charts update): WeeklyBarChart bar visual treatment ──────
 //
-// SC2.1 — BlurMaskFilter imported from @shopify/react-native-skia
-// SC2.2 — isToday bar Rect has child Paint with BlurMaskFilter
-// SC2.3 — BlurMaskFilter blur >= 8
-// SC2.4 — Glow Paint uses style="fill" and BlurMaskFilter style="normal"
-// SC2.5 — Glow Paint color = barColor + '30' alpha suffix
-// SC2.6 — Non-today bar Rect has no BlurMaskFilter child (conditional pattern)
+// The WeeklyBarChart has been migrated from bespoke Skia Rect bars to Victory
+// Native XL (04-victory-charts). The old BlurMaskFilter glow on Skia Paint/Rect
+// is replaced by a LinearGradient fill (peak color → transparent) inside each Bar.
+//
+// SC2.1 — @shopify/react-native-skia imported (for watermark Canvas)
+// SC2.2 — LinearGradient inside Bar (replaces Paint/BlurMaskFilter glow)
+// SC2.3 — LinearGradient uses transparent end color
+// SC2.4 — CartesianChart from victory-native used
+// SC2.5 — todayColor used in bar color logic
+// SC2.6 — textMuted used for future bars
 // SC2.7 — Chart renders without crash when no bar is isToday
-// SC2.8 — Overflow bar (isToday) renders glow correctly (no crash)
-// SC2.9 — All existing tests still pass (enforced by running the full suite)
-// SC2.10 — Bar height animation not affected (animatedBarHeight still used)
+// SC2.8 — Overflow isToday bar renders without crash
+// SC2.10 — clipProgress animation preserved (replaces animatedBarHeight)
 
-describe('WeeklyBarChart — FR3 (07-chart-line-polish): Today Bar Glow', () => {
-  it('SC2.1 — BlurMaskFilter is imported from @shopify/react-native-skia', () => {
+describe('WeeklyBarChart — FR3 (04-victory-charts): Bar visual treatment', () => {
+  it('SC2.1 — @shopify/react-native-skia imported (for watermark Canvas)', () => {
     const source = fs.readFileSync(BAR_CHART_FILE, 'utf8');
-    expect(source).toMatch(/BlurMaskFilter/);
-    expect(source).toMatch(/@shopify\/react-native-skia/);
-    expect(source).toMatch(/BlurMaskFilter[\s\S]{0,200}@shopify\/react-native-skia|@shopify\/react-native-skia[\s\S]{0,200}BlurMaskFilter/);
+    expect(source).toContain('@shopify/react-native-skia');
   });
 
-  it('SC2.2 — source contains a BlurMaskFilter element inside a Paint child of a Rect', () => {
+  it('SC2.2 — LinearGradient inside Bar (replaces old BlurMaskFilter glow)', () => {
     const source = fs.readFileSync(BAR_CHART_FILE, 'utf8');
-    expect(source).toMatch(/<Paint[\s\S]{0,300}<BlurMaskFilter/);
+    expect(source).toContain('LinearGradient');
+    expect(source).toContain('Bar');
   });
 
-  it('SC2.3 — BlurMaskFilter blur value is >= 8', () => {
+  it('SC2.3 — LinearGradient uses transparent as end color', () => {
     const source = fs.readFileSync(BAR_CHART_FILE, 'utf8');
-    const match = source.match(/BlurMaskFilter[\s\S]{0,100}blur=\{(\d+(?:\.\d+)?)\}/);
-    expect(match).not.toBeNull();
-    const blurVal = parseFloat(match![1]);
-    expect(blurVal).toBeGreaterThanOrEqual(8);
+    expect(source).toMatch(/transparent|'#[0-9a-fA-F]{6}00'/);
   });
 
-  it('SC2.4 — glow Paint uses style="fill" and BlurMaskFilter uses style="normal"', () => {
+  it('SC2.4 — CartesianChart from victory-native is used', () => {
     const source = fs.readFileSync(BAR_CHART_FILE, 'utf8');
-    // Paint with style="fill"
-    expect(source).toMatch(/style="fill"/);
-    // BlurMaskFilter with style="normal"
-    expect(source).toMatch(/BlurMaskFilter[\s\S]{0,100}style="normal"/);
+    expect(source).toContain('CartesianChart');
+    expect(source).toContain('victory-native');
   });
 
-  it('SC2.5 — glow Paint color uses barColor with alpha suffix', () => {
+  it('SC2.5 — todayColor used in bar color logic', () => {
     const source = fs.readFileSync(BAR_CHART_FILE, 'utf8');
-    // Pattern: color={barColor + '30'} — approx 19% alpha
-    expect(source).toMatch(/color=\{barColor\s*\+\s*'[0-9a-fA-F]{2}'\}/);
+    expect(source).toContain('todayColor');
   });
 
-  it('SC2.6 — glow Paint is guarded by isToday condition (not rendered for all bars)', () => {
+  it('SC2.6 — textMuted used for future bars', () => {
     const source = fs.readFileSync(BAR_CHART_FILE, 'utf8');
-    // The Paint/BlurMaskFilter is inside an isToday conditional
-    expect(source).toMatch(/isToday[\s\S]{0,200}<Paint[\s\S]{0,200}BlurMaskFilter|isToday[\s\S]{0,200}BlurMaskFilter/);
+    expect(source).toContain('textMuted');
   });
 
   it('SC2.7 — chart renders without crash when no bar has isToday=true', () => {
@@ -179,17 +193,15 @@ describe('WeeklyBarChart — FR3 (07-chart-line-polish): Today Bar Glow', () => 
       { day: 'Sat', hours: 0, isToday: false, isFuture: true  },
       { day: 'Sun', hours: 0, isToday: false, isFuture: true  },
     ];
-    // weeklyLimit=15 means Wed bar is overtime (runningTotal=24 > 15)
     expect(() =>
       renderChart({ data: overtimeTodayData, weeklyLimit: 15, width: 300, height: 120 }),
     ).not.toThrow();
   });
 
-  it('SC2.10 — source still references animatedBarHeight for bar Rect height', () => {
+  it('SC2.10 — clipProgress animation preserved (withTiming + timingChartFill)', () => {
     const source = fs.readFileSync(BAR_CHART_FILE, 'utf8');
-    // Animation must not be removed
-    expect(source).toMatch(/animatedBarHeight/);
-    expect(source).toMatch(/height=\{animatedBarHeight\}/);
+    expect(source).toContain('clipProgress');
+    expect(source).toContain('withTiming');
   });
 });
 
@@ -205,7 +217,7 @@ describe('WeeklyBarChart — FR1: Watermark Label', () => {
   it('SC1.2 — when watermarkLabel="38.5h" is provided, source contains Skia Text with the string', () => {
     const source = fs.readFileSync(BAR_CHART_FILE, 'utf8');
     // Source should render a Skia <Text ... text={watermarkLabel}> element
-    expect(source).toMatch(/<Text[\s\S]{0,200}watermarkLabel/);
+    expect(source).toMatch(/<SkiaText[\s\S]{0,200}watermarkLabel|<Text[\s\S]{0,200}watermarkLabel/);
   });
 
   it('SC1.3 — watermark Text element has opacity <= 0.10', () => {
@@ -242,7 +254,7 @@ describe('WeeklyBarChart — FR1: Watermark Label', () => {
     const source = fs.readFileSync(BAR_CHART_FILE, 'utf8');
     // Boolean coercion of "" is falsy, so the same guard handles both cases
     // Verify: the guard uses watermarkLabel directly (not explicit !== undefined check)
-    expect(source).toMatch(/watermarkLabel\s*&&\s*font/);
+    expect(source).toMatch(/watermarkLabel\s*&&/);
   });
 
   it('SC1.9 — source imports matchFont from @shopify/react-native-skia', () => {

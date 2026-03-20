@@ -20,6 +20,26 @@ import * as fs from 'fs';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
+jest.mock('victory-native', () => {
+  return {
+    CartesianChart: ({ children, renderOutside }: any) => {
+      const R = require('react');
+      const chartBounds = { left: 0, right: 300, top: 0, bottom: 60, width: 300, height: 60 };
+      const points = { y: [], value: [] };
+      return R.createElement('View', null,
+        renderOutside ? renderOutside({ chartBounds }) : null,
+        children ? children({ points, chartBounds }) : null,
+      );
+    },
+    Line: ({ children }: any) => children ?? null,
+    Area: ({ children }: any) => children ?? null,
+    useChartPressState: () => ({
+      state: { x: { position: { value: 0 } } },
+      isActive: { value: false },
+    }),
+  };
+});
+
 jest.mock('react-native-web/dist/exports/View/index.js', () => {
   const R = require('react');
   return {
@@ -71,77 +91,69 @@ function renderSparkline(props: {
   return tree;
 }
 
-// ─── FR1 (07-chart-line-polish): TrendSparkline line glow ────────────────────
+// ─── FR1 (04-victory-charts FR3 / 07-chart-line-polish): TrendSparkline VNX ──
 //
-// SC1.1 — BlurMaskFilter imported from @shopify/react-native-skia
-// SC1.2 — Data line Path has strokeWidth 2.5
-// SC1.3 — Data line Path has a child Paint with BlurMaskFilter child
-// SC1.4 — Glow Paint BlurMaskFilter blur >= 6
-// SC1.5 — Glow Paint strokeWidth > line strokeWidth
-// SC1.6 — Glow Paint color = lineColor + '40' alpha suffix
-// SC1.7 — Guide line (showGuide=true) has no BlurMaskFilter child
+// Note: 04-victory-charts FR3 migrated TrendSparkline from custom Skia bezier to VNX.
+// The old Skia Paint+BlurMaskFilter approach was replaced by VNX Line + BlurMask child.
+//
+// SC1.1 — BlurMask imported from @shopify/react-native-skia (VNX glow approach)
+// SC1.2 — strokeWidth prop defaults to 3 (used on VNX Line)
+// SC1.3 — VNX Line has BlurMask child (not Paint+BlurMaskFilter)
+// SC1.4 — BlurMask blur value is >= 6
+// SC1.5 — VNX Area fill uses LinearGradient with color alpha
+// SC1.6 — Area LinearGradient colors uses color + '66' alpha suffix
+// SC1.7 — Source does NOT contain BlurMaskFilter (old Skia paint approach)
 // SC1.8 — Empty data renders without crash
 // SC1.9 — width=0 renders without crash (returns null before canvas)
-// SC1.10 — Scrub gesture (externalCursorIndex) unaffected by render changes
+// SC1.10 — externalCursorIndex prop still accepted and renders without crash
 
-describe('TrendSparkline — FR1 (07-chart-line-polish): Line Glow', () => {
-  it('SC1.1 — BlurMaskFilter is imported from @shopify/react-native-skia', () => {
+describe('TrendSparkline — FR1 (04-victory-charts): VNX Line Glow', () => {
+  it('SC1.1 — BlurMask is imported from @shopify/react-native-skia', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    expect(source).toMatch(/BlurMaskFilter/);
+    expect(source).toMatch(/BlurMask/);
     expect(source).toMatch(/@shopify\/react-native-skia/);
-    // Both in same import statement
-    expect(source).toMatch(/BlurMaskFilter[\s\S]{0,200}@shopify\/react-native-skia|@shopify\/react-native-skia[\s\S]{0,200}BlurMaskFilter/);
+    // BlurMask appears in the import
+    expect(source).toMatch(/@shopify\/react-native-skia[\s\S]{0,300}BlurMask|BlurMask[\s\S]{0,300}@shopify\/react-native-skia/);
   });
 
-  it('SC1.2 — data line Path has strokeWidth 2.5 (hardcoded or as default prop)', () => {
+  it('SC1.2 — strokeWidth prop defaults to 3', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    // strokeWidth={2.5} on the main line Path, or strokeWidth = 2.5 as default
-    expect(source).toMatch(/strokeWidth[=\s:]*\{?2\.5\}?|strokeWidth\s*=\s*2\.5/);
+    expect(source).toMatch(/strokeWidth\s*=\s*3[^.0-9]/);
   });
 
-  it('SC1.3 — source contains a BlurMaskFilter element inside a Paint child of the data line', () => {
+  it('SC1.3 — source contains BlurMask as child of VNX Line element', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    // Paint wrapping a BlurMaskFilter
-    expect(source).toMatch(/<Paint[\s\S]{0,300}<BlurMaskFilter/);
+    // VNX Line wrapping BlurMask
+    expect(source).toMatch(/<Line[\s\S]{0,200}<BlurMask/);
   });
 
-  it('SC1.4 — BlurMaskFilter blur value is >= 6', () => {
+  it('SC1.4 — BlurMask blur value is >= 6', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    // blur={8} or blur={6} or higher
-    const match = source.match(/BlurMaskFilter[\s\S]{0,100}blur=\{(\d+(?:\.\d+)?)\}/);
+    // blur={8} from VNX Line + BlurMask
+    const match = source.match(/BlurMask[\s\S]{0,100}blur=\{(\d+(?:\.\d+)?)\}/);
     expect(match).not.toBeNull();
     const blurVal = parseFloat(match![1]);
     expect(blurVal).toBeGreaterThanOrEqual(6);
   });
 
-  it('SC1.5 — glow Paint strokeWidth is greater than the line strokeWidth (2.5)', () => {
+  it('SC1.5 — VNX Area fill uses LinearGradient', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    // The Paint child should have a strokeWidth > 2.5 (e.g. 10)
-    // Look for Paint with large strokeWidth near BlurMaskFilter
-    const match = source.match(/<Paint[\s\S]{0,200}strokeWidth=\{(\d+(?:\.\d+)?)\}[\s\S]{0,200}<BlurMaskFilter/);
-    if (match) {
-      const paintStrokeWidth = parseFloat(match[1]);
-      expect(paintStrokeWidth).toBeGreaterThan(2.5);
-    } else {
-      // Also accept strokeWidth before BlurMaskFilter within Paint block
-      const match2 = source.match(/strokeWidth=\{(\d+(?:\.\d+)?)\}[\s\S]{0,100}<BlurMaskFilter/);
-      expect(match2).not.toBeNull();
-      const paintStrokeWidth = parseFloat(match2![1]);
-      expect(paintStrokeWidth).toBeGreaterThan(2.5);
-    }
+    expect(source).toMatch(/<Area[\s\S]{0,300}LinearGradient/);
   });
 
-  it('SC1.6 — glow Paint color uses lineColor/color prop with alpha suffix', () => {
+  it('SC1.6 — Area LinearGradient colors uses color + \'66\' alpha suffix', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    // Pattern: color={lineColor + '40'} or color={color + '40'}
-    expect(source).toMatch(/color=\{(?:lineColor|color)\s*\+\s*'[0-9a-fA-F]{2}'\}/);
+    expect(source).toMatch(/color\s*\+\s*'66'/);
   });
 
-  it('SC1.7 — guide line (Line element) does NOT have a BlurMaskFilter child', () => {
+  it('SC1.7 — source does NOT import BlurMaskFilter (old pre-VNX paint approach)', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    // The <Line> elements should not contain BlurMaskFilter
-    // Verify: no <Line ... <BlurMaskFilter> pattern
-    expect(source).not.toMatch(/<Line[\s\S]{0,300}<BlurMaskFilter/);
+    // BlurMaskFilter may appear in comments but should NOT be imported or used in JSX
+    const importLines = source.split('\n').filter(l => l.match(/^import\s/));
+    const hasBlurMaskFilterImport = importLines.some(l => l.includes('BlurMaskFilter'));
+    expect(hasBlurMaskFilterImport).toBe(false);
+    // Also: no JSX element <BlurMaskFilter
+    expect(source).not.toMatch(/<BlurMaskFilter/);
   });
 
   it('SC1.8 — empty data renders without crash', () => {
@@ -180,16 +192,17 @@ describe('TrendSparkline — FR3: Cap Label', () => {
     expect(source).toMatch(/capLabel\s*\?\s*:\s*string/);
   });
 
-  it('SC3.2 — source imports matchFont and Text from @shopify/react-native-skia', () => {
+  it('SC3.2 — source imports matchFont and Text (or SkiaText) from @shopify/react-native-skia', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
     expect(source).toContain('matchFont');
-    expect(source).toMatch(/Text.*@shopify\/react-native-skia|@shopify\/react-native-skia[\s\S]{0,200}Text/);
+    // Text may be aliased as SkiaText in the import
+    expect(source).toMatch(/Text[\s\S]{0,400}@shopify\/react-native-skia|@shopify\/react-native-skia[\s\S]{0,400}Text/);
   });
 
-  it('SC3.3 — when showGuide && capLabel provided, source contains Skia Text with capLabel', () => {
+  it('SC3.3 — when showGuide && capLabel provided, source contains Skia Text (SkiaText) with capLabel', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    // Source should render a Skia <Text ... text={capLabel}> guarded by showGuide && capLabel
-    expect(source).toMatch(/<Text[\s\S]{0,300}capLabel/);
+    // Source should render a Skia <SkiaText ... text={capLabel}> or <Text ... capLabel>
+    expect(source).toMatch(/<SkiaText[\s\S]{0,300}capLabel|<Text[\s\S]{0,300}capLabel/);
   });
 
   it('SC3.4 — cap label opacity <= 0.40', () => {
@@ -242,26 +255,28 @@ describe('TrendSparkline — FR3: Cap Label', () => {
   });
 });
 
-// ─── FR1 + FR2 (04-chart-polish): TrendSparkline 3px + 3-layer glow ──────────
+// ─── FR1 + FR2 (04-victory-charts): TrendSparkline VNX glow (updated) ───────
+//
+// Note: 04-victory-charts FR3 migrated from custom Skia 3-layer glow (strokeWidth=14/7/2.5)
+// to VNX Line + single BlurMask blur={8}. The 3-layer approach is no longer present.
 //
 // FR1:
-//   SC-FR1.1 — strokeWidth prop defaults to 3 (not 2)
+//   SC-FR1.1 — strokeWidth prop defaults to 3
 //   SC-FR1.2 — explicit strokeWidth prop still accepted
 //
-// FR2:
-//   SC-FR2.1 — outer glow Paint has strokeWidth={14}
-//   SC-FR2.2 — outer glow BlurMask has blur={12}
-//   SC-FR2.3 — mid glow Paint exists with strokeWidth={7}
-//   SC-FR2.4 — mid glow BlurMask has blur={4}
-//   SC-FR2.5 — mid glow uses color + '80' (50% opacity variant)
-//   SC-FR2.6 — core line has no BlurMask child
-//   SC-FR2.7 — render with default strokeWidth does not crash
+// FR2 (VNX single-layer glow):
+//   SC-FR2.1 — VNX CartesianChart is used (replaces bespoke Skia chart)
+//   SC-FR2.2 — BlurMask blur={8} is the single glow layer
+//   SC-FR2.3 — source uses useChartPressState (replaces old gesture layer)
+//   SC-FR2.4 — useAnimatedReaction + runOnJS bridge onScrubChange
+//   SC-FR2.5 — Area uses color + '66' alpha (50% translucent area fill)
+//   SC-FR2.6 — source has at least 1 BlurMask
+//   SC-FR2.7 — renders without crash with default strokeWidth
 
-describe('TrendSparkline — FR1+FR2 (04-chart-polish): 3px + 3-layer glow', () => {
+describe('TrendSparkline — FR1+FR2 (04-victory-charts): VNX glow', () => {
   const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
 
-  it('SC-FR1.1 — strokeWidth prop defaults to 3 (not 2)', () => {
-    // Default value in function signature: strokeWidth = 3
+  it('SC-FR1.1 — strokeWidth prop defaults to 3', () => {
     expect(source).toMatch(/strokeWidth\s*=\s*3[^.0-9]/);
   });
 
@@ -280,35 +295,31 @@ describe('TrendSparkline — FR1+FR2 (04-chart-polish): 3px + 3-layer glow', () 
     }).not.toThrow();
   });
 
-  it('SC-FR2.1 — outer glow Paint has strokeWidth={14}', () => {
-    // Outer glow Paint (first Paint layer, wrapping BlurMask blur=12)
-    expect(source).toMatch(/strokeWidth=\{14\}/);
+  it('SC-FR2.1 — VNX CartesianChart is imported and used', () => {
+    expect(source).toContain('CartesianChart');
+    expect(source).toContain('victory-native');
   });
 
-  it('SC-FR2.2 — outer glow BlurMask has blur={12}', () => {
-    // BlurMask with blur=12 (was 8)
-    expect(source).toMatch(/BlurMask\s[^>]*blur=\{12\}/);
+  it('SC-FR2.2 — BlurMask blur={8} is the single glow layer on the VNX Line', () => {
+    expect(source).toMatch(/BlurMask[\s\S]{0,100}blur=\{8\}/);
   });
 
-  it('SC-FR2.3 — mid glow Paint exists with strokeWidth={7}', () => {
-    // Mid glow is the new layer
-    expect(source).toMatch(/strokeWidth=\{7\}/);
+  it('SC-FR2.3 — source uses useChartPressState (VNX gesture, replaces GestureDetector)', () => {
+    expect(source).toContain('useChartPressState');
   });
 
-  it('SC-FR2.4 — mid glow BlurMask has blur={4}', () => {
-    // BlurMask with blur=4 (new mid-glow layer)
-    expect(source).toMatch(/BlurMask\s[^>]*blur=\{4\}/);
+  it('SC-FR2.4 — useAnimatedReaction + runOnJS bridge onScrubChange', () => {
+    expect(source).toContain('useAnimatedReaction');
+    expect(source).toContain('runOnJS');
   });
 
-  it('SC-FR2.5 — mid glow uses color + "80" (50% opacity)', () => {
-    // color + '80' alpha suffix on the mid glow layer
-    expect(source).toMatch(/color\s*\+\s*'80'/);
+  it('SC-FR2.5 — Area fill uses color + \'66\' alpha suffix', () => {
+    expect(source).toMatch(/color\s*\+\s*'66'/);
   });
 
-  it('SC-FR2.6 — source has at least 2 distinct Paint layers with BlurMask (outer + mid)', () => {
-    // Count occurrences of BlurMask — should be >= 2 (outer glow + mid glow)
+  it('SC-FR2.6 — source has at least 1 BlurMask', () => {
     const blurMaskCount = (source.match(/BlurMask/g) || []).length;
-    expect(blurMaskCount).toBeGreaterThanOrEqual(2);
+    expect(blurMaskCount).toBeGreaterThanOrEqual(1);
   });
 
   it('SC-FR2.7 — renders without crash with default strokeWidth', () => {

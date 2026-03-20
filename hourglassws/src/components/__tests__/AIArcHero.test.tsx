@@ -26,20 +26,19 @@ jest.mock('expo-blur', () => {
   };
 });
 
-jest.mock('react-native-svg', () => {
-  const mockReact = require('react');
-  const wrap = (name: string) => ({ children, ...rest }: any) =>
-    mockReact.createElement(name, rest, children ?? null);
+// victory-native mock — CartesianChart passthrough
+jest.mock('victory-native', () => {
+  const R = require('react');
   return {
-    __esModule: true,
-    default: wrap('Svg'),
-    Svg: wrap('Svg'),
-    Defs: wrap('Defs'),
-    Path: wrap('Path'),
-    G: wrap('G'),
-    Circle: wrap('Circle'),
-    Line: wrap('Line'),
-    Text: wrap('SvgText'),
+    CartesianChart: ({ children }: any) =>
+      children ? children({ points: { value: [], y: [] }, chartBounds: { left: 0, right: 100, top: 0, bottom: 100 } }) : null,
+    Bar: ({ children }: any) => children ?? null,
+    Line: ({ children }: any) => children ?? null,
+    Area: ({ children }: any) => children ?? null,
+    useChartPressState: () => ({
+      state: { x: { position: { value: 0 } } },
+      isActive: { value: false },
+    }),
   };
 });
 
@@ -71,69 +70,66 @@ const DEFAULT_PROPS = {
   ambientColor: '#A78BFA',
 };
 
-// ─── FR1: Animation contract — source-level checks ───────────────────────────
+// ─── FR1 (04-victory-charts): Animation contract — source-level checks ───────
 //
-// These tests read the source file and assert the animation approach.
-// They catch regressions that render tests would miss (e.g. re-introducing
-// arcPath inside a worklet callback without breaking visible output).
+// FR4 of 04-victory-charts rebuilt AIArcHero from react-native-svg to Skia Canvas
+// + SweepGradient. Animation uses withSpring + useDerivedValue + Path.trim().
 
-describe('AIArcHero — FR1: safe animation contract (source-level)', () => {
+describe('AIArcHero — FR1: Skia animation contract (source-level)', () => {
   let source: string;
 
   beforeAll(() => {
     source = fs.readFileSync(COMPONENT_FILE, 'utf8');
   });
 
-  it('FR1.1 — useAnimatedProps does NOT call arcPath() inside worklet callback', () => {
-    // Extract the useAnimatedProps callback body and assert arcPath is not in it
-    // Pattern: useAnimatedProps(() => { ... }) — arcPath must not appear inside
-    const workletMatch = source.match(/useAnimatedProps\s*\(\s*\(\s*\)\s*=>\s*\(\s*\{([\s\S]*?)\}\s*\)\s*\)/);
-    if (workletMatch) {
-      expect(workletMatch[1]).not.toContain('arcPath');
-    }
-    // Also: arcPath must not appear on same line as useAnimatedProps assignment
-    const lines = source.split('\n');
-    const animatedPropsLines = lines.filter(l => l.includes('useAnimatedProps'));
-    animatedPropsLines.forEach(line => {
-      expect(line).not.toContain('arcPath(');
-    });
+  it('FR1.1 — arcPath is called in render scope (builds full arc SVG for Skia)', () => {
+    // arcPath is called in render to produce the SVG path string → Skia.Path.MakeFromSVGString
+    expect(source).toContain('arcPath(');
+    // Not inside a worklet — should not appear in useDerivedValue body calling arcPath
+    expect(source).not.toMatch(/useDerivedValue[\s\S]{0,100}arcPath\s*\(/);
   });
 
-  it('FR1.2 — withSpring is NOT present in source', () => {
-    expect(source).not.toContain('withSpring');
+  it('FR1.2 — withSpring IS present in source (replaces withTiming for arc animation)', () => {
+    expect(source).toContain('withSpring');
   });
 
-  it('FR1.3 — springPremium is NOT imported in source', () => {
+  it('FR1.3 — springPremium is NOT imported (uses inline spring config)', () => {
     expect(source).not.toContain('springPremium');
   });
 
-  it('FR1.4 — withTiming IS present in source', () => {
-    expect(source).toContain('withTiming');
+  it('FR1.4 — SweepGradient IS imported from @shopify/react-native-skia', () => {
+    expect(source).toContain('SweepGradient');
+    expect(source).toContain('@shopify/react-native-skia');
   });
 
-  it('FR1.5 — strokeDashoffset IS present in source', () => {
-    expect(source).toContain('strokeDashoffset');
+  it('FR1.5 — SweepGradient uses cyan→violet→magenta colors', () => {
+    // Gradient: #00C2FF → #A78BFA → #FF00FF
+    expect(source).toContain('#00C2FF');
+    expect(source).toContain('#A78BFA');
+    expect(source).toContain('#FF00FF');
   });
 
-  it('FR1.6 — strokeDasharray IS present in source', () => {
-    expect(source).toContain('strokeDasharray');
+  it('FR1.6 — useDerivedValue IS used (trims path on UI thread)', () => {
+    expect(source).toContain('useDerivedValue');
   });
 
-  it('FR1.7 — timingChartFill IS imported in source', () => {
-    expect(source).toContain('timingChartFill');
+  it('FR1.7 — path.trim() IS called inside useDerivedValue (arc trimming)', () => {
+    // useDerivedValue callback calls .trim(0, sweepProgress.value, false)
+    expect(source).toMatch(/\.trim\s*\(\s*0/);
   });
 
-  it('FR1.8 — useAnimatedProps returns strokeDashoffset (not d attribute)', () => {
-    // useAnimatedProps callback should return strokeDashoffset
-    expect(source).toMatch(/useAnimatedProps.*strokeDashoffset/s);
+  it('FR1.8 — strokeDashoffset is NOT in any import statement (Skia trim replaces it)', () => {
+    // strokeDashoffset may appear in a comment but NOT in actual code/imports
+    const importLines = source.split('\n').filter(l => l.match(/^import\s/) || l.match(/strokeDashoffset\s*=/));
+    const hasStrokeDashoffsetImportOrAssign = importLines.some(l => l.includes('strokeDashoffset'));
+    expect(hasStrokeDashoffsetImportOrAssign).toBe(false);
   });
 
-  it('FR1.9 — arcPath is called in render scope (outside useAnimatedProps)', () => {
-    // arcPath should be called somewhere in the component (for fullArcPath)
-    expect(source).toContain('arcPath(');
-    // And source should NOT have arcPath inside useAnimatedProps
-    // (already covered by FR1.1, but belt-and-suspenders)
-    expect(source).not.toMatch(/useAnimatedProps\s*\(\s*\(\)\s*=>\s*\(\s*\{\s*d:\s*arcPath/);
+  it('FR1.9 — react-native-svg is NOT in any import statement (replaced by Skia Canvas)', () => {
+    // May appear in comments but NOT imported
+    const importLines = source.split('\n').filter(l => l.match(/^import\s/));
+    const hasSvgImport = importLines.some(l => l.includes('react-native-svg'));
+    expect(hasSvgImport).toBe(false);
   });
 });
 
@@ -299,9 +295,11 @@ describe('AIArcHero — FR3: props interface and visual output', () => {
     expect(source).toContain('ProgressBar');
   });
 
-  it('FR3.15 — source uses react-native-svg Path for arc rendering', () => {
+  it('FR3.15 — source uses Skia Canvas + Path for arc rendering (04-victory-charts FR4)', () => {
     const source = fs.readFileSync(COMPONENT_FILE, 'utf8');
-    expect(source).toContain('react-native-svg');
+    // Migrated from react-native-svg to Skia Canvas
+    expect(source).toContain('@shopify/react-native-skia');
+    expect(source).toContain('Canvas');
     expect(source).toContain('Path');
   });
 });
@@ -376,6 +374,15 @@ describe('AIArcHero — source structure (exports + hooks)', () => {
 
   it('source does NOT import AIRingChart', () => {
     expect(source).not.toContain('AIRingChart');
+  });
+
+  it('source uses withSpring for arc animation (04-victory-charts FR4)', () => {
+    expect(source).toContain('withSpring');
+  });
+
+  it('source imports Skia from @shopify/react-native-skia (for Path.MakeFromSVGString)', () => {
+    expect(source).toContain('Skia');
+    expect(source).toContain('MakeFromSVGString');
   });
 });
 

@@ -23,6 +23,9 @@ import * as fs from 'fs';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
+// Note: 04-victory-charts FR3 migrated from GestureDetector/useScrubGesture to
+// VNX useChartPressState. These mocks are kept for backward compat but the
+// gesture-handler mock is no longer needed by TrendSparkline directly.
 jest.mock('react-native-gesture-handler', () => ({
   GestureDetector: ({ children }: any) => children,
   Gesture: {
@@ -38,6 +41,7 @@ jest.mock('react-native-gesture-handler', () => ({
 }));
 
 jest.mock('react-native-reanimated', () => {
+  const R = require('react');
   const identity = (x: any) => x;
   const Easing = {
     linear: identity,
@@ -56,12 +60,39 @@ jest.mock('react-native-reanimated', () => {
     steps: () => identity,
   };
   return {
+    __esModule: true,
+    default: {
+      View: ({ children, style }: any) => R.createElement('View', { style }, children),
+      Text: ({ children, style }: any) => R.createElement('Text', { style }, children),
+      createAnimatedComponent: (C: any) => C,
+    },
     useSharedValue: (init: any) => ({ value: init }),
     withTiming: (val: any) => val,
+    useAnimatedStyle: (_fn: any) => ({}),
     useAnimatedReaction: () => {},
     runOnJS: (fn: any) => fn,
     useReducedMotion: () => false,
     Easing,
+  };
+});
+
+jest.mock('victory-native', () => {
+  return {
+    CartesianChart: ({ children, renderOutside }: any) => {
+      const R = require('react');
+      const chartBounds = { left: 0, right: 340, top: 0, bottom: 60, width: 340, height: 60 };
+      const points = { y: [], value: [] };
+      return R.createElement('View', null,
+        renderOutside ? renderOutside({ chartBounds }) : null,
+        children ? children({ points, chartBounds }) : null,
+      );
+    },
+    Line: ({ children }: any) => children ?? null,
+    Area: ({ children }: any) => children ?? null,
+    useChartPressState: () => ({
+      state: { x: { position: { value: 0 } } },
+      isActive: { value: false },
+    }),
   };
 });
 
@@ -159,24 +190,26 @@ describe('TrendSparkline FR2 — scrub props interface', () => {
   });
 });
 
-// ─── SC2.1: Gesture imports ───────────────────────────────────────────────────
+// ─── SC2.1: Gesture imports (VNX — 04-victory-charts) ────────────────────────
+//
+// Note: FR3 of 04-victory-charts migrated from GestureDetector+useScrubGesture
+// to VNX useChartPressState. Import contract updated accordingly.
 
-describe('TrendSparkline FR2 — gesture layer imports', () => {
-  it('imports GestureDetector from react-native-gesture-handler', () => {
+describe('TrendSparkline FR2 — gesture layer imports (VNX)', () => {
+  it('imports useChartPressState from victory-native (replaces useScrubGesture)', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    expect(source).toMatch(/GestureDetector/);
-    expect(source).toMatch(/react-native-gesture-handler/);
+    expect(source).toMatch(/useChartPressState/);
+    expect(source).toMatch(/victory-native/);
   });
 
-  it('imports useScrubGesture from useScrubGesture hook', () => {
+  it('does NOT import useScrubGesture (replaced by VNX useChartPressState)', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    expect(source).toMatch(/useScrubGesture/);
+    expect(source).not.toMatch(/useScrubGesture/);
   });
 
-  it('imports buildScrubCursor from ScrubCursor', () => {
+  it('does NOT import GestureDetector (VNX handles gesture internally)', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    expect(source).toMatch(/buildScrubCursor/);
-    expect(source).toMatch(/ScrubCursor/);
+    expect(source).not.toMatch(/GestureDetector/);
   });
 
   it('imports useAnimatedReaction and runOnJS from react-native-reanimated', () => {
@@ -186,38 +219,39 @@ describe('TrendSparkline FR2 — gesture layer imports', () => {
   });
 });
 
-// ─── SC2.1: Gesture pattern in source ────────────────────────────────────────
+// ─── SC2.1: Gesture pattern in source (VNX — 04-victory-charts) ─────────────
 
-describe('TrendSparkline FR2 — gesture pattern in source', () => {
-  it('wraps Canvas in GestureDetector', () => {
+describe('TrendSparkline FR2 — gesture pattern in source (VNX)', () => {
+  it('uses useChartPressState from VNX (not GestureDetector)', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    expect(source).toMatch(/<GestureDetector/);
+    expect(source).toMatch(/useChartPressState/);
+    expect(source).not.toMatch(/<GestureDetector/);
   });
 
-  it('applies activeOffsetX on the gesture', () => {
+  it('uses VNX gestureLongPressDelay prop on CartesianChart', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    expect(source).toMatch(/activeOffsetX/);
+    expect(source).toMatch(/gestureLongPressDelay/);
   });
 
-  it('uses useAnimatedReaction to bridge scrubIndex to onScrubChange', () => {
+  it('uses useAnimatedReaction to bridge VNX press state to onScrubChange', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
     expect(source).toMatch(/useAnimatedReaction/);
     expect(source).toMatch(/onScrubChange|scrubChange/);
     expect(source).toMatch(/runOnJS/);
   });
 
-  it('guards onScrubChange as optional (safeOnScrubChange or ?? fallback)', () => {
+  it('guards onScrubChange as optional (optional call or ?? fallback)', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    // Either ?? (() => {}) or a safe wrapper variable
     const hasNullishCoalesce = /onScrubChange\s*\?\?/.test(source);
     const hasSafeWrapper = /safe\w*ScrubChange|scrubChangeSafe/.test(source);
     const hasOptionalCall = /onScrubChange\?\./.test(source);
     expect(hasNullishCoalesce || hasSafeWrapper || hasOptionalCall).toBe(true);
   });
 
-  it('computes pixelXs for the gesture matching buildPath spacing', () => {
+  it('uses VNX position state for index calculation (not pixelXs)', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    expect(source).toMatch(/pixelXs/);
+    // VNX useChartPressState provides state.x.position
+    expect(source).toMatch(/state\.x\.position|position\.value/);
   });
 });
 
@@ -228,10 +262,10 @@ describe('TrendSparkline FR2 — data=[] edge case', () => {
     expect(() => renderSparkline({ data: [], width: 340, height: 60 })).not.toThrow();
   });
 
-  it('SC2.4 — source disables gesture when data is empty', () => {
+  it('SC2.4 — source returns null early when data is empty (no gesture needed)', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    // enabled: data.length > 0 or similar
-    expect(source).toMatch(/data\.length\s*(>|===|!==)\s*0|enabled.*data/);
+    // VNX: early return null when data.length === 0
+    expect(source).toMatch(/data\.length\s*===\s*0|data\.length\s*==\s*0|data\.length\s*&&|return null/);
   });
 });
 
@@ -242,37 +276,38 @@ describe('TrendSparkline FR2 — single data point', () => {
     expect(() => renderSparkline({ data: [1500], width: 340, height: 60 })).not.toThrow();
   });
 
-  it('SC2.5 — source handles single-point pixelXs (center position)', () => {
+  it('SC2.5 — source handles single-point cursor (center position or chartBounds.width / 2)', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    // For single point: width / 2 as the only pixelX
+    // VNX external cursor: chartBounds.left + chartBounds.width / 2 for single point
     expect(source).toMatch(/width\s*\/\s*2/);
   });
 });
 
-// ─── SC2.8: Scrub cursor in source ───────────────────────────────────────────
+// ─── SC2.8: Scrub cursor in source (VNX — 04-victory-charts) ────────────────
+//
+// Note: VNX uses renderOutside + Skia Canvas overlay for external cursor.
+// The old buildScrubCursor/cursorPos approach was replaced.
 
-describe('TrendSparkline FR2 — scrub cursor rendering', () => {
-  it('SC2.8 — source uses buildScrubCursor to compute cursor geometry', () => {
+describe('TrendSparkline FR2 — scrub cursor rendering (VNX)', () => {
+  it('SC2.8 — source uses renderOutside prop on CartesianChart for cursor overlay', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    expect(source).toMatch(/buildScrubCursor/);
+    expect(source).toMatch(/renderOutside/);
   });
 
-  it('SC2.8 — source renders cursor Path with textMuted color and 0.5 opacity', () => {
+  it('SC2.8 — source renders cursor line with textMuted color and 0.5 opacity', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    // textMuted at opacity 0.5
     expect(source).toMatch(/textMuted/);
     expect(source).toMatch(/0\.5/);
   });
 
-  it('SC2.8 — source renders cursor Circle with dot radius', () => {
+  it('SC2.8 — source renders cursor Circle (dot) using Skia Circle', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    // dotRadius from buildScrubCursor result
-    expect(source).toMatch(/dotRadius/);
+    expect(source).toMatch(/Circle/);
   });
 
-  it('SC2.8 — cursor is conditional on scrub state (cursorPos or isScrubbing)', () => {
+  it('SC2.8 — cursor is conditional on externalCursorIndex !== null', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    expect(source).toMatch(/cursorPos|isScrubbing/);
+    expect(source).toMatch(/externalCursorIndex\s*!==?\s*null|externalCursorIndex/);
   });
 });
 

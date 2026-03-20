@@ -1,5 +1,10 @@
 // Tests: src/components/WeeklyBarChart.tsx (FR2 — animated Skia bar chart)
 //
+// Updated for 04-victory-charts FR2: migrated from custom Skia Rect bars to
+// VNX CartesianChart + Bar with LinearGradient fill.
+// withDelay stagger replaced by clipProgress withTiming entry animation.
+// OVERTIME_WHITE_GOLD (#FFF8E7) is a spec-mandated design constant (not a hex violation).
+//
 // Strategy: static source-file analysis for design constraints,
 // runtime render assertions for crash-free behavior.
 // @shopify/react-native-skia is mocked via __mocks__/@shopify/react-native-skia.ts
@@ -21,6 +26,56 @@ const SAMPLE_DATA = [
   { day: 'Sun', hours: 0, isToday: false, isFuture: true },
 ];
 
+// ─── Mocks ────────────────────────────────────────────────────────────────────
+
+jest.mock('victory-native', () => {
+  return {
+    CartesianChart: ({ children }: any) => {
+      const R = require('react');
+      const chartBounds = { left: 0, right: 300, top: 0, bottom: 120 };
+      const points = { value: [] };
+      return children ? children({ points, chartBounds }) : null;
+    },
+    Bar: ({ children }: any) => children ?? null,
+  };
+});
+
+jest.mock('react-native-reanimated', () => {
+  const R = require('react');
+  const identity = (x: any) => x;
+  const Easing = {
+    linear: identity,
+    ease: identity,
+    bezier: () => identity,
+    inOut: () => identity,
+    out: () => identity,
+    in: () => identity,
+    poly: () => identity,
+    sin: identity,
+    circle: identity,
+    exp: identity,
+    elastic: () => identity,
+    back: () => identity,
+    bounce: identity,
+    steps: () => identity,
+  };
+  return {
+    __esModule: true,
+    default: {
+      View: ({ children, style }: any) => R.createElement('View', { style }, children),
+      Text: ({ children, style }: any) => R.createElement('Text', { style }, children),
+      createAnimatedComponent: (C: any) => C,
+    },
+    useSharedValue: (init: any) => ({ value: init }),
+    withTiming: (val: any) => val,
+    useAnimatedStyle: (_fn: any) => ({}),
+    useAnimatedReaction: () => {},
+    runOnJS: (fn: any) => fn,
+    useReducedMotion: () => false,
+    Easing,
+  };
+});
+
 // ---------------------------------------------------------------------------
 // FR2 SC: Source-level assertions
 // ---------------------------------------------------------------------------
@@ -41,9 +96,11 @@ describe('WeeklyBarChart — FR2: source constraints', () => {
     expect(source).toMatch(/from ['"]@\/src\/lib\/reanimated-presets['"]/);
   });
 
-  it('FR2: source uses withDelay for stagger animation', () => {
+  it('FR2: source uses clipProgress withTiming entry animation (04-victory-charts FR2)', () => {
     const source = fs.readFileSync(WEEKLY_BAR_FILE, 'utf8');
-    expect(source).toContain('withDelay');
+    // VNX migration: withDelay stagger replaced by clipProgress clip animation
+    expect(source).toContain('clipProgress');
+    expect(source).toContain('withTiming');
   });
 
   it('FR2: source uses withTiming (not withSpring)', () => {
@@ -52,20 +109,27 @@ describe('WeeklyBarChart — FR2: source constraints', () => {
     expect(source).not.toContain('withSpring');
   });
 
-  it('FR2: source uses @shopify/react-native-skia Canvas', () => {
+  it('FR2: source uses @shopify/react-native-skia Canvas (for watermark overlay)', () => {
     const source = fs.readFileSync(WEEKLY_BAR_FILE, 'utf8');
     expect(source).toContain('@shopify/react-native-skia');
     expect(source).toContain('Canvas');
   });
 
-  it('FR2: source uses Rect for bar rendering', () => {
+  it('FR2: source uses VNX Bar for bar rendering (04-victory-charts FR2)', () => {
     const source = fs.readFileSync(WEEKLY_BAR_FILE, 'utf8');
-    expect(source).toContain('Rect');
+    // VNX migration: Skia Rect replaced by VNX Bar
+    expect(source).toContain('Bar');
+    expect(source).toContain('victory-native');
   });
 
-  it('FR2: source does NOT contain hardcoded hex colors', () => {
+  it('FR2: source does NOT contain hardcoded hex colors except OVERTIME_WHITE_GOLD design constant', () => {
     const source = fs.readFileSync(WEEKLY_BAR_FILE, 'utf8');
-    expect(source).not.toMatch(/#[0-9A-Fa-f]{6}\b/);
+    // Strip comments first, then check
+    const noComments = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*/g, '');
+    const hexMatches = noComments.match(/#[0-9A-Fa-f]{6}\b/g) || [];
+    // Only allowed hex: OVERTIME_WHITE_GOLD #FFF8E7 (spec-mandated design constant)
+    const disallowedHex = hexMatches.filter(h => h.toUpperCase() !== '#FFF8E7');
+    expect(disallowedHex).toEqual([]);
   });
 
   it('FR2: source does NOT use StyleSheet.create()', () => {
@@ -73,11 +137,11 @@ describe('WeeklyBarChart — FR2: source constraints', () => {
     expect(source).not.toContain('StyleSheet.create(');
   });
 
-  it('FR2: stagger delay uses Math.min(index * 50, 300) pattern', () => {
+  it('FR2: overtime coloring uses running cumulative total (runningTotal > weeklyLimit)', () => {
     const source = fs.readFileSync(WEEKLY_BAR_FILE, 'utf8');
-    // Should contain 50 and 300 as stagger constants
-    expect(source).toMatch(/\b50\b/);
-    expect(source).toMatch(/\b300\b/);
+    // The overtime logic: runningTotal exceeds weeklyLimit → OVERTIME_WHITE_GOLD
+    expect(source).toMatch(/runningTotal/);
+    expect(source).toMatch(/weeklyLimit/);
   });
 });
 
