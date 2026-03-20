@@ -5,6 +5,7 @@ const React = require('react');
 
 module.exports = {
   __esModule: true,
-  default: ({ children, maskElement }: any) =>
-    React.createElement('MaskedView', { maskElement }, children),
+  default: ({ children, maskElement: _maskElement, ...rest }: any) =>
+    // maskElement is a React element — drop it from props to avoid circular JSON serialisation
+    React.createElement('MaskedView', rest, children),
 };
