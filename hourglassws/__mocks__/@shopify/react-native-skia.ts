@@ -22,8 +22,15 @@ function makeMockPath() {
 }
 
 module.exports = {
-  Canvas: ({ children, width, height, style }: any) =>
-    React.createElement('Canvas', { width, height, style }, children),
+  Canvas: ({ children, width, height, style, onLayout }: any) =>
+    React.createElement('Canvas', { width, height, style, onLayout }, children),
+
+  // BackdropFilter — renders as host element so render tree contains "BackdropFilter"
+  BackdropFilter: ({ children, filter }: any) =>
+    React.createElement('BackdropFilter', { filter }, children),
+
+  // Blur — ImageFilter used inside BackdropFilter
+  Blur: (_props: any) => null,
 
   Rect: (_props: any) => null,
   Path: (_props: any) => null,
