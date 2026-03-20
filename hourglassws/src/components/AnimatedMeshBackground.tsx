@@ -22,7 +22,6 @@ import {
   Rect,
   RadialGradient,
   vec,
-  BlendMode,
   Paint,
 } from '@shopify/react-native-skia';
 import {
@@ -126,7 +125,7 @@ export function AnimatedMeshBackground({
   panelState,
   earningsPace,
   aiPct,
-}: AnimatedMeshBackgroundProps): JSX.Element {
+}: AnimatedMeshBackgroundProps): React.JSX.Element {
   const { width: w, height: h } = useWindowDimensions();
 
   // FR2: Single time SharedValue drives all orbital positions on the UI thread
@@ -184,7 +183,7 @@ export function AnimatedMeshBackground({
           r={nodeRadius}
           colors={NODE_A_COLORS}
         />
-        <Paint blendMode={BlendMode.Screen} />
+        <Paint blendMode="screen" />
       </Circle>
 
       {/* FR4: Node B — Cyan orbital, BlendMode.Screen */}
@@ -198,7 +197,7 @@ export function AnimatedMeshBackground({
           r={nodeRadius}
           colors={NODE_B_COLORS}
         />
-        <Paint blendMode={BlendMode.Screen} />
+        <Paint blendMode="screen" />
       </Circle>
 
       {/* FR4: Node C — Status-driven orbital, BlendMode.Screen */}
@@ -212,7 +211,7 @@ export function AnimatedMeshBackground({
           r={nodeRadius}
           colors={nodeCColors}
         />
-        <Paint blendMode={BlendMode.Screen} />
+        <Paint blendMode="screen" />
       </Circle>
     </Canvas>
   );

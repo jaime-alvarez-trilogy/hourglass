@@ -123,7 +123,7 @@ interface AmbientBackgroundProps {
 // that use this wrapper should migrate to passing panelState/earningsPace/aiPct props
 // directly to AnimatedMeshBackground in a future cleanup.
 
-export default function AmbientBackground({ color: _color, intensity: _intensity }: AmbientBackgroundProps): JSX.Element {
+export default function AmbientBackground({ color: _color, intensity: _intensity }: AmbientBackgroundProps): React.JSX.Element {
   // Delegate to AnimatedMeshBackground — no props needed as the animated mesh
   // always renders with its own color nodes. Node C will be idle (#0D0C14) since
   // no panelState signal is passed, but the violet + cyan orbital nodes remain active.
