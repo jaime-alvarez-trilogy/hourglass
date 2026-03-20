@@ -3,31 +3,24 @@
 // FR2 (01-ambient-layer): AMBIENT_COLORS constant + getAmbientColor() pure function
 // FR5 (01-ambient-layer): Reanimated color transition (fade-through-opacity pattern)
 //
+// @deprecated (02-animated-mesh): Default export delegates to AnimatedMeshBackground.
+//   The named exports (AMBIENT_COLORS, getAmbientColor, AmbientSignal) are preserved
+//   for backward compatibility — screens that call getAmbientColor() directly continue
+//   to work without changes. Only the visual rendering has changed (animated mesh vs SVG).
+//
 // Design system: FEATURE.md "Hero Glass System — The Three-Layer Stack"
-//   Layer 1 = AmbientBackground (absolute, full-screen, behind all content)
-//   Soft radial gradient from top-center, color at 8% opacity, fades to transparent
-//   Animates smoothly between states via springPremium (same feel as PanelGradient)
+//   Layer 1 = AmbientBackground / AnimatedMeshBackground (absolute, full-screen, behind all content)
 //
 // Architecture:
-//   - color=null (idle) → empty pointerEvents=none View (no gradient, touch-safe)
-//   - color=hex → Animated.View wrapping SVG RadialGradient
-//   - useWindowDimensions: radius = 70% of screen width (responsive)
+//   - Default export: AnimatedMeshBackground (re-exported for zero import-site changes)
+//   - Named exports: AMBIENT_COLORS, getAmbientColor, AmbientSignal (preserved)
 //   - No StyleSheet.create — inline styles consistent with project convention
 //   - StyleSheet.absoluteFill is a read-only constant (not StyleSheet.create)
 
-import React, { useEffect, useRef } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
-import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
-import { springPremium } from '@/src/lib/reanimated-presets';
+import React from 'react';
 import { colors } from '@/src/lib/colors';
 import type { PanelState } from '@/src/lib/panelState';
+import AnimatedMeshBackgroundComponent from '@/src/components/AnimatedMeshBackground';
 
 // ─── FR2: AMBIENT_COLORS — exported for tests ─────────────────────────────────
 //
@@ -116,78 +109,23 @@ interface AmbientBackgroundProps {
    * Gradient opacity multiplier (0–1), default 1.0.
    * Final center stop opacity = 0.08 × intensity.
    * Use to dim the ambient layer for screens with brighter hero cards.
+   * @deprecated Not used by AnimatedMeshBackground — provided for API compatibility only.
    */
   intensity?: number;
 }
 
-// Stable SVG fill style — same pattern as PanelGradient.tsx
-const SVG_FILL_STYLE = { position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0 };
-
 // ─── FR1 + FR5: AmbientBackground component ──────────────────────────────────
+//
+// @deprecated Use AnimatedMeshBackground directly for new code.
+// This wrapper accepts the old { color, intensity } interface and delegates to
+// AnimatedMeshBackground. The `color` and `intensity` props are intentionally ignored
+// since AnimatedMeshBackground drives its own orbital color animation — the screens
+// that use this wrapper should migrate to passing panelState/earningsPace/aiPct props
+// directly to AnimatedMeshBackground in a future cleanup.
 
-export default function AmbientBackground({ color, intensity = 1 }: AmbientBackgroundProps): JSX.Element {
-  const { width } = useWindowDimensions();
-  // FR5: start at 0 for mount animation
-  const opacity = useSharedValue(0);
-  // Track mount state without reading opacity.value on the JS thread.
-  // Reading a SharedValue from useEffect (JS thread) triggers WorkletRuntime::executeSync
-  // which deadlocks when a concurrent worklet (e.g. useAnimatedProps) holds the mutex.
-  const mounted = useRef(false);
-
-  // FR5: animate on color change — fade-through-opacity pattern (mirrors PanelGradient)
-  useEffect(() => {
-    if (!mounted.current) {
-      // Mount or transition from null: fade in with springPremium
-      mounted.current = true;
-      opacity.value = withSpring(1, springPremium);
-    } else {
-      // State change: brief dip to near-zero then spring back to 1
-      opacity.value = withSequence(
-        withTiming(0, { duration: 120 }),
-        withSpring(1, springPremium),
-      );
-    }
-  }, [color]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-  }));
-
-  // Idle state: render empty touch-safe view (no SVG, no visual)
-  if (color === null) {
-    return <View pointerEvents="none" style={StyleSheet.absoluteFill} />;
-  }
-
-  // Radial gradient radius: 70% of screen width (covers top half of screen at full opacity)
-  const gradientRadius = width * 0.7;
-
-  return (
-    <Animated.View
-      pointerEvents="none"
-      style={[StyleSheet.absoluteFill, animatedStyle]}
-    >
-      <Svg
-        width="100%"
-        height="100%"
-        style={SVG_FILL_STYLE}
-        preserveAspectRatio="none"
-      >
-        <Defs>
-          <RadialGradient
-            id="ambientGrad"
-            cx="50%"
-            cy="0%"
-            r={`${gradientRadius}px`}
-            gradientUnits="userSpaceOnUse"
-          >
-            {/* Inner stop: 8% opacity at top-center — subtle but colorful enough for BlurView */}
-            <Stop offset="0%" stopColor={color} stopOpacity={0.08 * intensity} />
-            {/* Outer stop: fades to transparent */}
-            <Stop offset="100%" stopColor={color} stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
-        <Rect width="100%" height="100%" fill="url(#ambientGrad)" />
-      </Svg>
-    </Animated.View>
-  );
+export default function AmbientBackground({ color: _color, intensity: _intensity }: AmbientBackgroundProps): JSX.Element {
+  // Delegate to AnimatedMeshBackground — no props needed as the animated mesh
+  // always renders with its own color nodes. Node C will be idle (#0D0C14) since
+  // no panelState signal is passed, but the violet + cyan orbital nodes remain active.
+  return React.createElement(AnimatedMeshBackgroundComponent, {});
 }

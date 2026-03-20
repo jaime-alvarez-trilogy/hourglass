@@ -5,6 +5,22 @@
 
 const React = require('react');
 
+/** Shared mock path object factory — includes trim() for 04-victory-charts FR4 */
+function makeMockPath() {
+  return {
+    moveTo: jest.fn().mockReturnThis(),
+    lineTo: jest.fn().mockReturnThis(),
+    cubicTo: jest.fn().mockReturnThis(),
+    quadTo: jest.fn().mockReturnThis(),
+    addArc: jest.fn().mockReturnThis(),
+    arcTo: jest.fn().mockReturnThis(),
+    close: jest.fn().mockReturnThis(),
+    copy: jest.fn(function() { return makeMockPath(); }),
+    reset: jest.fn().mockReturnThis(),
+    trim: jest.fn().mockReturnThis(),
+  };
+}
+
 module.exports = {
   Canvas: ({ children, width, height, style }: any) =>
     React.createElement('Canvas', { width, height, style }, children),
@@ -18,6 +34,21 @@ module.exports = {
   Paint: (_props: any) => null,
   Fill: (_props: any) => null,
   RoundedRect: (_props: any) => null,
+
+  // Paint effects — null in test environment
+  SweepGradient: (_props: any) => null,
+  LinearGradient: (_props: any) => null,
+  RadialGradient: (_props: any) => null,
+  BlurMask: (_props: any) => null,
+  BlurMaskFilter: (_props: any) => null,
+
+  // Blend modes — used by AnimatedMeshBackground (02-animated-mesh)
+  BlendMode: {
+    Screen: 'screen',
+    Multiply: 'multiply',
+    Overlay: 'overlay',
+    SrcOver: 'src-over',
+  },
 
   // Geometry helpers
   vec: (x: number, y: number) => ({ x, y }),
@@ -38,30 +69,12 @@ module.exports = {
 
   Skia: {
     // Path supports both Skia.Path() (legacy factory) and Skia.Path.Make() (canonical API)
+    // MakeFromSVGString added for 04-victory-charts FR4 (AIArcHero Skia rebuild)
     Path: Object.assign(
-      () => ({
-        moveTo: jest.fn().mockReturnThis(),
-        lineTo: jest.fn().mockReturnThis(),
-        cubicTo: jest.fn().mockReturnThis(),
-        quadTo: jest.fn().mockReturnThis(),
-        addArc: jest.fn().mockReturnThis(),
-        arcTo: jest.fn().mockReturnThis(),
-        close: jest.fn().mockReturnThis(),
-        copy: jest.fn().mockReturnThis(),
-        reset: jest.fn().mockReturnThis(),
-      }),
+      () => makeMockPath(),
       {
-        Make: () => ({
-          moveTo: jest.fn().mockReturnThis(),
-          lineTo: jest.fn().mockReturnThis(),
-          cubicTo: jest.fn().mockReturnThis(),
-          quadTo: jest.fn().mockReturnThis(),
-          addArc: jest.fn().mockReturnThis(),
-          arcTo: jest.fn().mockReturnThis(),
-          close: jest.fn().mockReturnThis(),
-          copy: jest.fn().mockReturnThis(),
-          reset: jest.fn().mockReturnThis(),
-        }),
+        Make: () => makeMockPath(),
+        MakeFromSVGString: (_svgStr: string) => makeMockPath(),
       },
     ),
     XYWHRect: jest.fn((x: number, y: number, w: number, h: number) => ({ x, y, w, h })),

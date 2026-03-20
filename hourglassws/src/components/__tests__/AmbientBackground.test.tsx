@@ -101,6 +101,9 @@ describe('AmbientBackground — FR1: component render', () => {
 });
 
 // ─── FR1: Source file structure checks ──────────────────────────────────────
+// Note: Updated in 02-animated-mesh — AmbientBackground now delegates to AnimatedMeshBackground.
+// SVG imports and Reanimated animation code have moved to AnimatedMeshBackground.tsx.
+// These source checks verify the new compat-wrapper structure.
 
 describe('AmbientBackground — FR1: source file checks', () => {
   let source: string;
@@ -113,31 +116,32 @@ describe('AmbientBackground — FR1: source file checks', () => {
       .replace(/\/\*[\s\S]*?\*\//g, '');
   });
 
-  it('FR1.7 — source has pointerEvents="none" on root element', () => {
-    expect(source).toContain('pointerEvents="none"');
+  it('FR1.7 — source delegates to AnimatedMeshBackground (02-animated-mesh)', () => {
+    // AmbientBackground now wraps AnimatedMeshBackground
+    expect(source).toContain('AnimatedMeshBackground');
   });
 
-  it('FR1.8 — source uses StyleSheet.absoluteFill for positioning', () => {
-    expect(source).toContain('StyleSheet.absoluteFill');
+  it('FR1.8 — source contains @deprecated annotation', () => {
+    expect(source).toContain('@deprecated');
   });
 
   it('FR1.9 — source does NOT use StyleSheet.create', () => {
     expect(noComments).not.toContain('StyleSheet.create');
   });
 
-  it('FR1.10 — source imports from react-native-svg', () => {
-    expect(source).toContain('react-native-svg');
+  it('FR1.10 — source preserves AMBIENT_COLORS export', () => {
+    expect(source).toContain('AMBIENT_COLORS');
   });
 
-  it('FR1.11 — source uses RadialGradient SVG element', () => {
-    expect(source).toContain('RadialGradient');
+  it('FR1.11 — source preserves getAmbientColor export', () => {
+    expect(source).toContain('getAmbientColor');
   });
 
-  it('FR1.12 — source uses useWindowDimensions for responsive radius', () => {
-    expect(source).toContain('useWindowDimensions');
+  it('FR1.12 — source preserves AmbientSignal type export', () => {
+    expect(source).toContain('AmbientSignal');
   });
 
-  it('FR1.13 — default export is AmbientBackground', () => {
+  it('FR1.13 — default export is AmbientBackground function', () => {
     expect(source).toContain('export default function AmbientBackground');
   });
 });
@@ -282,48 +286,51 @@ describe('AMBIENT_COLORS — FR2: constant structure', () => {
   });
 });
 
-// ─── FR5: Reanimated animation — source checks ───────────────────────────────
+// ─── FR5: Deprecation + delegation — source checks ───────────────────────────
+// Note: Updated in 02-animated-mesh — animation logic moved to AnimatedMeshBackground.tsx.
+// These checks verify the compat wrapper structure rather than the old animation implementation.
 
-describe('AmbientBackground — FR5: animation source checks', () => {
+describe('AmbientBackground — FR5: deprecation + delegation source checks', () => {
   let source: string;
 
   beforeAll(() => {
     source = fs.readFileSync(AMBIENT_FILE, 'utf8');
   });
 
-  it('FR5.1 — source imports springPremium', () => {
-    expect(source).toContain('springPremium');
+  it('FR5.1 — source has @deprecated annotation (02-animated-mesh)', () => {
+    expect(source).toContain('@deprecated');
   });
 
-  it('FR5.2 — source imports withSequence from react-native-reanimated', () => {
-    expect(source).toContain('withSequence');
+  it('FR5.2 — source imports AnimatedMeshBackground (delegation target)', () => {
+    expect(source).toContain('AnimatedMeshBackground');
   });
 
-  it('FR5.3 — source imports withTiming from react-native-reanimated', () => {
-    expect(source).toContain('withTiming');
+  it('FR5.3 — source still exports getAmbientColor (compat — screens import this)', () => {
+    expect(source).toContain('getAmbientColor');
   });
 
-  it('FR5.4 — source imports withSpring from react-native-reanimated', () => {
-    expect(source).toContain('withSpring');
+  it('FR5.4 — source still exports AMBIENT_COLORS (compat — screens import this)', () => {
+    expect(source).toContain('AMBIENT_COLORS');
   });
 
-  it('FR5.5 — source imports useSharedValue from react-native-reanimated', () => {
-    expect(source).toContain('useSharedValue');
+  it('FR5.5 — source still exports AmbientSignal type (compat)', () => {
+    expect(source).toContain('AmbientSignal');
   });
 
-  it('FR5.6 — source imports useAnimatedStyle from react-native-reanimated', () => {
-    expect(source).toContain('useAnimatedStyle');
+  it('FR5.6 — default export function accepts color prop (backward compat interface)', () => {
+    expect(source).toContain('color');
   });
 
-  it('FR5.7 — source uses useSharedValue(0) for mount opacity start', () => {
-    expect(source).toContain('useSharedValue(0)');
+  it('FR5.7 — default export function accepts intensity prop (backward compat interface)', () => {
+    expect(source).toContain('intensity');
   });
 
-  it('FR5.8 — source uses useEffect for animation trigger', () => {
-    expect(source).toContain('useEffect');
+  it('FR5.8 — source does NOT contain react-native-svg import (SVG replaced by Skia)', () => {
+    expect(source).not.toContain("from 'react-native-svg'");
   });
 
-  it('FR5.9 — source uses Animated.View (Reanimated animated container)', () => {
-    expect(source).toContain('Animated.View');
+  it('FR5.9 — source does NOT contain Animated.View (animation moved to AnimatedMeshBackground)', () => {
+    // The compat wrapper no longer manages its own Reanimated animation
+    expect(source).not.toContain('Animated.View');
   });
 });
