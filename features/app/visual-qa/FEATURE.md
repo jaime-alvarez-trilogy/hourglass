@@ -51,4 +51,4 @@ Six targeted bug fixes surfaced from live testing on device. Four are new render
 
 | Date | Spec | Description |
 |------|------|-------------|
-| 2026-03-23 | [09-chart-visual-fixes](specs/09-chart-visual-fixes/spec.md) | Spec and checklist created for 6 visual bug fixes: TrendSparkline clipping, WeeklyBarChart collapse, Home mesh wiring, DailyAIRow padding, SweepGradient angles, ProgressBar flex fill |
+| 2026-03-23 | [09-chart-visual-fixes](specs/09-chart-visual-fixes/spec.md) | Spec, implementation and tests complete. FR1: TrendSparkline safeData+domainPadding. FR2: WeeklyBarChart domainPadding top/bottom=0. FR3: index.tsx AmbientBackground→AnimatedMeshBackground. FR4: DailyAIRow px-1→px-4. FR5/FR6: verified already present. |
