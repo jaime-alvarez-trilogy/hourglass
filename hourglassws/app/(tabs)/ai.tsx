@@ -33,26 +33,13 @@ import TrendSparkline from '@/src/components/TrendSparkline';
 import { DailyAIRow } from '@/src/components/DailyAIRow';
 import { computeAICone } from '@/src/lib/aiCone';
 import { colors } from '@/src/lib/colors';
+import { classifyAIPct, type AITier } from '@/src/lib/aiTier';
 import { setTag } from '@/src/lib/sharedTransitions';
 import Animated from 'react-native-reanimated';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
 const CONTENT_STYLE = { padding: 16, paddingTop: 56, gap: 12 } as const;
-
-// ─── AI Trajectory helpers ────────────────────────────────────────────────────
-
-interface AITier {
-  label: string;
-  color: string;
-}
-
-function classifyAIPct(avg: number): AITier {
-  if (avg >= 75) return { label: 'AI Leader', color: colors.cyan };
-  if (avg >= 50) return { label: 'Consistent Progress', color: colors.success };
-  if (avg >= 30) return { label: 'Building Momentum', color: colors.warning };
-  return { label: 'Getting Started', color: colors.textMuted };
-}
 
 /** Compare first half vs second half of the series to detect trend direction. */
 function trendDirection(aiPct: number[]): 'up' | 'down' | 'flat' {
