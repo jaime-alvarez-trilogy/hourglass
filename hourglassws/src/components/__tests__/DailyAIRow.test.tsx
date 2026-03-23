@@ -211,9 +211,11 @@ describe('DailyAIRow — SC3.4–SC3.9: glass wrapper (source checks)', () => {
     expect(source).toMatch(/setDims|dims/);
   });
 
-  it('SC3.9 — source does NOT use BackdropFilter (would SIGKILL when nested in GlassCard)', () => {
-    expect(source).not.toContain('BackdropFilter');
-    expect(source).not.toContain('BlurView');
+  it('SC3.9 — source does NOT import or use BackdropFilter (would SIGKILL when nested in GlassCard)', () => {
+    // Remove comment lines before checking — BackdropFilter may appear in explanatory comments
+    const codeOnly = source.split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
+    expect(codeOnly).not.toContain('BackdropFilter');
+    expect(codeOnly).not.toContain('BlurView');
   });
 
   it('SC3.10 — source uses RoundedRect for Skia inner shadow shape', () => {
