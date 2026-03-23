@@ -233,9 +233,10 @@ export default function TrendSparkline({
           xKey="x"
           yKeys={['y']}
           domain={{ y: [domainYMin, domainYMax] }}
-          // domainPadding right: 10 — gives the BlurMask glow (blur=8) headroom at the
-          // right canvas edge so it isn't hard-clipped by VNX's internal Skia clip group.
-          domainPadding={{ left: 0, right: 10 }}
+          // domainPadding left+right: 10 — gives the BlurMask glow (blur=8) headroom at
+          // both canvas edges so neither edge clips the glow of the first/last data point.
+          // (10-mesh-color-overhaul FR5: was { left: 0, right: 10 } — left glow clipped)
+          domainPadding={{ left: 10, right: 10 }}
           // activeOffsetX activates on horizontal swipe (works inside ScrollView without
           // requiring a precise long-press on the tiny 72px chart strip).
           chartPressConfig={{ pan: { activeOffsetX: [-5, 5] } }}

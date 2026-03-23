@@ -37,6 +37,16 @@ export const colors = {
 
   // Special states
   overtimeWhiteGold: '#FFF8E7', // Overtime achievement — warm white-gold, near-white (01-overtime-display)
+
+  // Mesh color tokens — desaturated dark-mode-safe palette (10-mesh-color-overhaul)
+  // These replace saturated semantic tokens in PANEL_STATE_COLORS and AI tier classification.
+  dustyBlue:     '#556B8E', // Idle mesh ambient — calm week-start state (was null/invisible)
+  desatCoral:    '#F87171', // Critical state — desaturated vs #F43F5E, no vibration on dark bg
+  warnAmber:     '#FCD34D', // Behind-pace state — softer than #F59E0B warning
+  successGreen:  '#4ADE80', // On-track state — softer than #10B981 success
+  champagneGold: '#C89F5D', // Crushed-it state — muted vs #E8C97A gold
+  luxuryGold:    '#CEA435', // Overtime state — rich gold vs #FFF8E7 white-gold
+  infoBlue:      '#60A5FA', // AI Leader tier — replaces cyan #00C2FF for tier-aware arc
 } as const;
 
 export type ColorKey = keyof typeof colors;

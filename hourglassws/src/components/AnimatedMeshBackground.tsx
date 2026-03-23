@@ -35,16 +35,17 @@ import type { PanelState } from '@/src/lib/panelState';
 
 // ─── Color resolution (inlined to avoid circular import with AmbientBackground) ─
 
-// Status color map — mirrors AMBIENT_COLORS.panelState in AmbientBackground.tsx
-// These must stay in sync with that file's AMBIENT_COLORS constant.
-const PANEL_STATE_COLORS: Record<PanelState, string | null> = {
-  onTrack:     colors.success,           // #10B981
-  behind:      colors.warning,           // #F59E0B
-  critical:    colors.critical,          // #F43F5E
-  crushedIt:   colors.gold,              // #E8C97A
-  aheadOfPace: colors.gold,              // #E8C97A
-  overtime:    colors.overtimeWhiteGold, // #FFF8E7
-  idle:        null,
+// Status color map — desaturated dark-mode-safe palette (10-mesh-color-overhaul)
+// Replaces saturated semantic tokens with curated values that don't vibrate on dark surfaces.
+// idle changes from null → dusty blue so week-start mesh is visible.
+const PANEL_STATE_COLORS: Record<PanelState, string> = {
+  idle:        colors.dustyBlue,      // #556B8E — calm ambient for week start (was null)
+  onTrack:     colors.successGreen,   // #4ADE80 (was colors.success #10B981)
+  behind:      colors.warnAmber,      // #FCD34D (was colors.warning #F59E0B)
+  critical:    colors.desatCoral,     // #F87171 (was colors.critical #F43F5E)
+  crushedIt:   colors.champagneGold,  // #C89F5D (was colors.gold #E8C97A)
+  aheadOfPace: colors.successGreen,   // #4ADE80 (was colors.gold #E8C97A)
+  overtime:    colors.luxuryGold,     // #CEA435 (was colors.overtimeWhiteGold #FFF8E7)
 };
 
 function resolveEarningsPaceColor(ratio: number): string {
@@ -168,8 +169,9 @@ export function AnimatedMeshBackground({
   // 08-dark-glass-polish: bumped from 0.15 → 0.22 for more visible light bloom behind glass
   const nodeCColors: [string, string] = [hexToRgba(nodeCHex, 0.22), 'transparent'];
 
-  // FR4: Circle radius — large enough for nodes to overlap and create mesh intersections
-  const nodeRadius = w * 0.7;
+  // FR4: Circle radius — expanded to w*1.2 so gradient falloffs extend beyond screen edges
+  // (10-mesh-color-overhaul FR1: was w*0.7 — created visible blob edges inside viewport)
+  const nodeRadius = w * 1.2;
 
   return (
     <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
