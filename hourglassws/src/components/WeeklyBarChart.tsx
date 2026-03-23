@@ -14,11 +14,13 @@
  */
 
 import React, { useEffect } from 'react';
-import { CartesianChart, Bar } from 'victory-native';
+import { View } from 'react-native';
+import { CartesianChart } from 'victory-native';
 import {
   Canvas,
   Text as SkiaText,
   LinearGradient,
+  RoundedRect,
   matchFont,
   vec,
 } from '@shopify/react-native-skia';
@@ -77,16 +79,25 @@ export default function WeeklyBarChart({
     clipProgress.value = withTiming(1, timingChartFill);
   }, []);
 
-  const clipStyle = useAnimatedStyle(() => ({
-    width: clipProgress.value * width,
-  }));
+  // Once fully revealed, return {} so the Animated.View has no width constraint.
+  // This removes the overflow:hidden clip on the touch/hit-test area, enabling
+  // gesture interactions (scrub) on the full chart. Any floating-point imprecision
+  // in withTiming(1) would otherwise leave a 1px clip on the right edge.
+  // Once fully revealed, remove overflow:hidden so gestures work on the full chart.
+  // overflow:hidden is only needed during the clip animation; after completion it would
+  // block touches on the absolute-positioned inner View if width ever collapses to 0.
+  const clipStyle = useAnimatedStyle(() => {
+    const p = clipProgress.value;
+    if (p >= 0.99) return { width }; // exact prop width — no overflow:hidden
+    return { overflow: 'hidden' as const, width: p * width };
+  });
 
   if (data.length === 0 || width === 0) return null;
 
   const h = height > 0 ? height : 120;
 
   // Max Y domain
-  const resolvedMax = maxHours ?? Math.max(8, ...data.map((d) => d.hours));
+  const resolvedMax = Math.max(maxHours ?? 8, ...data.map((d) => d.hours));
 
   // ── Compute per-bar colors (overtime logic requires running cumulative total) ──
   let runningTotal = 0;
@@ -117,58 +128,91 @@ export default function WeeklyBarChart({
   const watermarkY = h / 2 + WATERMARK_FONT_SIZE / 3;
 
   return (
-    <Animated.View style={[{ overflow: 'hidden', height: h }, clipStyle]}>
-      {/* Watermark canvas — rendered behind the bar chart */}
-      {watermarkLabel && watermarkFont && (
-        <Canvas
-          style={{ position: 'absolute', top: 0, left: 0, width, height: h, zIndex: 0 }}
-        >
-          <SkiaText
-            x={watermarkX}
-            y={watermarkY}
-            text={watermarkLabel}
-            font={watermarkFont}
-            color={colors.textPrimary}
-            opacity={0.07}
-          />
-        </Canvas>
-      )}
-
-      {/* toBarData normalizes data[] to VNX-typed BarDatum records */}
-      {/* Overtime colors are merged in after toBarData runs */}
-      {(() => {
-        const chartData = toBarData(rawValues, todayIndex, todayColor).map((d, i) => ({
-          ...d,
-          color: derivedColors[i],
-        }));
-        return (
-          <CartesianChart
-            data={chartData}
-            xKey="day"
-            yKeys={['value']}
-            domain={{ y: [0, resolvedMax] }}
+    // Clip container: animates width 0 → W to reveal chart left-to-right.
+    // CartesianChart is inside an absolute View at full `width` so its layout
+    // is stable — it always measures W and renders bars at correct positions.
+    // Without this, CartesianChart re-layouts at every intermediate clip width,
+    // causing an "unfolding" effect instead of a clean left-to-right reveal.
+    <Animated.View style={[{ height: h }, clipStyle]}>
+      <View style={{ position: 'absolute', top: 0, left: 0, width, height: h }}>
+        {/* Watermark canvas — rendered behind the bar chart */}
+        {watermarkLabel && watermarkFont && (
+          <Canvas
+            style={{ position: 'absolute', top: 0, left: 0, width, height: h, zIndex: 0 }}
           >
-            {({ points, chartBounds }) => (
-              <>
-                {chartData.map((datum) => (
-                  <Bar
-                    key={datum.day}
-                    points={points.value}
-                    chartBounds={chartBounds}
-                    roundedCorners={{ topLeft: 4, topRight: 4 }}
-                  >
-                    <LinearGradient
-                      start={vec(0, 0)}
-                      end={vec(0, h)}
-                      colors={[datum.color, 'transparent']}
-                    />
-                  </Bar>
-                ))}
-              </>
-            )}
-          </CartesianChart>
-        );
-      })()}
+            <SkiaText
+              x={watermarkX}
+              y={watermarkY}
+              text={watermarkLabel}
+              font={watermarkFont}
+              color={colors.textPrimary}
+              opacity={0.07}
+            />
+          </Canvas>
+        )}
+
+        {/* Per-bar RoundedRect with LinearGradient — each bar gets its own gradient. */}
+        {/* VNX's Bar component applies one gradient to ALL bars in a series, so it   */}
+        {/* cannot produce per-bar color gradients. Using Skia RoundedRect directly   */}
+        {/* inside CartesianChart's render prop gives full per-bar control.           */}
+        {(() => {
+          const chartData = toBarData(rawValues, todayIndex, todayColor);
+          // cellW: width of one bar cell in pixels, used to set proportional X domainPadding.
+          // Computed from the outer `width` prop — chartBounds width equals this after layout.
+          // Guard against zero width to avoid division-by-zero on first render.
+          const cellW = chartData.length > 0 && width > 0 ? width / chartData.length : 1;
+          return (
+            <CartesianChart
+              data={chartData}
+              xKey="day"
+              yKeys={['value']}
+              domain={{ y: [0, resolvedMax] }}
+              // domainPadding:
+              //   top/bottom: 0  — suppresses VNX's internal vertical axis compression that
+              //                    causes low-value bars (e.g. 1.8h in a 120px canvas) to
+              //                    render at sub-pixel height after VNX's heuristic shrink.
+              //   left/right: cellW*0.35 — prevents first/last bar edges from clipping at
+              //                    the canvas boundary (matches 65% bar width + 35% gap design).
+              domainPadding={{ left: cellW * 0.35, right: cellW * 0.35, top: 0, bottom: 0 }}
+            >
+              {({ points, chartBounds }) => {
+                const n = chartData.length;
+                const cellW = n > 0 ? (chartBounds.right - chartBounds.left) / n : 0;
+                const barW = cellW * 0.65; // 65% of cell width; rest is gap between bars
+                return (
+                  <>
+                    {points.value.map((point, i) => {
+                      if (point.y === null || point.y === undefined) return null;
+                      const barX = point.x - barW / 2;
+                      const barTop = point.y;
+                      const barBottom = chartBounds.bottom;
+                      const barH = Math.max(0, barBottom - barTop);
+                      if (barH === 0) return null;
+                      const barColor = derivedColors[i] ?? colors.textMuted;
+                      return (
+                        <RoundedRect
+                          key={i}
+                          x={barX}
+                          y={barTop}
+                          width={barW}
+                          height={barH}
+                          r={4}
+                        >
+                          <LinearGradient
+                            start={vec(0, barTop)}
+                            end={vec(0, barBottom)}
+                            colors={[barColor, 'transparent']}
+                          />
+                        </RoundedRect>
+                      );
+                    })}
+                  </>
+                );
+              }}
+            </CartesianChart>
+          );
+        })()}
+      </View>
     </Animated.View>
   );
 }

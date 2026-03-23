@@ -85,7 +85,7 @@ export function DailyAIRow({ item }: DailyAIRowProps) {
 
       {/* Row content */}
       <View
-        className={`flex-row items-center py-2.5 px-1${item.isToday ? ' bg-surface' : ''}`}
+        className={`flex-row items-center py-2.5 px-4${item.isToday ? ' bg-surface' : ''}`}
       >
         <Text
           className={`flex-1 text-sm font-mono${item.isToday ? ' text-success' : ' text-textPrimary'}`}

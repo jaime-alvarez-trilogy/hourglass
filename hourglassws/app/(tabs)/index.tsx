@@ -30,7 +30,7 @@ import { computeAICone } from '@/src/lib/aiCone';
 import { getUrgencyLevel, getWeekLabels } from '@/src/lib/hours';
 import { setTag } from '@/src/lib/sharedTransitions';
 import { colors } from '@/src/lib/colors';
-import AmbientBackground, { getAmbientColor } from '@/src/components/AmbientBackground';
+import AnimatedMeshBackground from '@/src/components/AnimatedMeshBackground';
 import FadeInScreen from '@/src/components/FadeInScreen';
 import { AnimatedPressable } from '@/src/components/AnimatedPressable';
 import PanelGradient from '@/src/components/PanelGradient';
@@ -167,6 +167,12 @@ export default function HoursDashboard() {
   const basePanelState = computePanelState(data?.total ?? 0, weeklyLimit, daysElapsed);
   // Dev override: force overtime panel for UI testing
   const panelState: PanelState = config?.devOvertimePreview ? 'overtime' : basePanelState;
+
+  // earningsPaceSignal: 0.0–1.0 signal passed to AnimatedMeshBackground Node C.
+  // Drives the status-semantic mesh color: critical=red (1.0), behind=amber (0.5), else=off (0.0).
+  const earningsPaceSignal = panelState === 'critical' ? 1.0
+    : panelState === 'behind' ? 0.5
+    : 0.0;
   const urgencyLevel = data ? getUrgencyLevel(data.timeRemaining) : 'none';
 
   const earningsTrend = earningsHistoryTrend;
@@ -192,7 +198,9 @@ export default function HoursDashboard() {
     <FadeInScreen>
     <SafeAreaView className="flex-1 bg-background">
       {/* FR1 (02-home-hero-ambient): Fixed ambient backdrop — outside ScrollView, does not scroll */}
-      <AmbientBackground color={getAmbientColor({ type: 'panelState', state: panelState })} />
+      {/* 09-chart-visual-fixes FR3: AmbientBackground replaced with AnimatedMeshBackground     */}
+      {/* directly — the old wrapper silently discarded its color prop (08-dark-glass-polish).   */}
+      <AnimatedMeshBackground earningsPace={earningsPaceSignal} />
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ padding: 16, paddingTop: 8, gap: 12 }}
@@ -301,7 +309,7 @@ export default function HoursDashboard() {
 
         {/* ── Zone 2: Weekly Chart ──────────────────────────────────────── */}
         <Animated.View style={getEntryStyle(1)}>
-        <Card>
+        <Card borderAccentColor={TODAY_BAR_COLORS[panelState]}>
           <SectionLabel className="mb-3">THIS WEEK</SectionLabel>
 
           {isLoading && !data ? (
@@ -341,7 +349,7 @@ export default function HoursDashboard() {
         {coneData && (
           <Animated.View style={getEntryStyle(2)}>
           <Animated.View {...setTag('home-ai-card')}>
-          <Card>
+          <Card borderAccentColor={colors.cyan}>
             <SectionLabel className="mb-2">AI TRAJECTORY</SectionLabel>
             <View
               style={{ height: 100 }}
@@ -363,7 +371,7 @@ export default function HoursDashboard() {
         {/* ── Zone 3: Earnings ─────────────────────────────────────────── */}
         <Animated.View style={getEntryStyle(3)}>
         <Animated.View {...setTag('home-earnings-card')}>
-        <Card>
+        <Card borderAccentColor={colors.gold}>
           <SectionLabel className="mb-2">EARNINGS</SectionLabel>
 
           {isLoading && !data ? (
