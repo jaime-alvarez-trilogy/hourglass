@@ -5,7 +5,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { APP_HISTORY_KEY } from '../../lib/aiAppBreakdown';
+import {
+  loadAppHistory,
+  mergeAppBreakdown,
+  APP_HISTORY_KEY,
+} from '../../lib/aiAppBreakdown';
 import type { AppBreakdownEntry, AppHistoryCache } from '../../lib/aiAppBreakdown';
 
 const MockAsyncStorage = AsyncStorage as jest.Mocked<typeof AsyncStorage> & { _reset: () => void };
@@ -80,20 +84,16 @@ describe('FR7: useAppBreakdown — AsyncStorage data path', () => {
   });
 
   it('SC7.8 — loadAppHistory is called with APP_HISTORY_KEY', async () => {
-    // Call loadAppHistory directly to verify the key is correct
-    const { loadAppHistory } = await import('../../lib/aiAppBreakdown');
     await loadAppHistory();
     expect(MockAsyncStorage.getItem).toHaveBeenCalledWith(APP_HISTORY_KEY);
   });
 
   it('SC7.9 — loadAppHistory returns {} when cache is empty', async () => {
-    const { loadAppHistory } = await import('../../lib/aiAppBreakdown');
     const result = await loadAppHistory();
     expect(result).toEqual({});
   });
 
   it('SC7.10 — loadAppHistory returns cache when populated', async () => {
-    const { loadAppHistory } = await import('../../lib/aiAppBreakdown');
     const cache: AppHistoryCache = {
       '2026-03-16': [makeEntry('Cursor', 3, 0, 2)],
       '2026-03-09': [makeEntry('Slack', 1, 0, 5)],
@@ -105,9 +105,7 @@ describe('FR7: useAppBreakdown — AsyncStorage data path', () => {
     expect(result['2026-03-09']).toHaveLength(1);
   });
 
-  it('SC7.11 — aggregated12w merges all weeks via mergeAppBreakdown', async () => {
-    // Verify the merge logic by calling it directly
-    const { mergeAppBreakdown } = await import('../../lib/aiAppBreakdown');
+  it('SC7.11 — aggregated12w merges all weeks via mergeAppBreakdown', () => {
     const weeks: AppHistoryCache = {
       '2026-03-16': [makeEntry('Cursor', 3, 0, 2), makeEntry('Slack', 1, 0, 4)],
       '2026-03-09': [makeEntry('Cursor', 2, 0, 1), makeEntry('Chrome', 4, 0, 0)],
@@ -125,8 +123,7 @@ describe('FR7: useAppBreakdown — AsyncStorage data path', () => {
     expect(chrome?.aiSlots).toBe(4);
   });
 
-  it('SC7.12 — aggregated12w is [] on empty cache', async () => {
-    const { mergeAppBreakdown } = await import('../../lib/aiAppBreakdown');
+  it('SC7.12 — aggregated12w is [] on empty cache', () => {
     const aggregate = Object.values({} as AppHistoryCache).reduce<AppBreakdownEntry[]>(
       (acc, entries) => mergeAppBreakdown(acc, entries),
       [],
