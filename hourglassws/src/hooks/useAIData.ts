@@ -17,6 +17,13 @@ import {
   shouldRefetchDay,
   getMondayOfWeek,
 } from '../lib/ai';
+import {
+  extractAppBreakdown,
+  mergeAppBreakdown,
+  loadAppHistory,
+  saveAppHistory,
+} from '../lib/aiAppBreakdown';
+import type { AppBreakdownEntry } from '../lib/aiAppBreakdown';
 import { AuthError, NetworkError } from '../api/errors';
 import type { TagData, AIWeekData } from '../lib/ai';
 import { loadWeeklyHistory, mergeWeeklySnapshot, saveWeeklyHistory } from '../lib/weeklyHistory';
@@ -210,7 +217,7 @@ export function useAIData(): UseAIDataResult {
             credentials,
             config.useQA,
           );
-          return { date, tagData: countDiaryTags(slots) };
+          return { date, tagData: countDiaryTags(slots), slots };
         }),
       );
 
@@ -218,6 +225,20 @@ export function useAIData(): UseAIDataResult {
       for (const { date, tagData } of results) {
         weekCache[date] = tagData;
       }
+
+      // FR5 (11-app-data-layer): fire-and-forget app breakdown write.
+      // Does not affect AI% state — failures are silently caught.
+      const weekBreakdown = results.reduce<AppBreakdownEntry[]>(
+        (acc, { slots }) => mergeAppBreakdown(acc, extractAppBreakdown(slots)),
+        [],
+      );
+      loadAppHistory().then(hist => {
+        const existing = hist[currentMonday] ?? [];
+        return saveAppHistory({
+          ...hist,
+          [currentMonday]: mergeAppBreakdown(existing, weekBreakdown),
+        });
+      }).catch(() => {});
 
       // Save merged cache
       const newLastFetchedAt = new Date().toISOString();
@@ -229,6 +250,35 @@ export function useAIData(): UseAIDataResult {
       setData(freshData);
       setLastFetchedAt(newLastFetchedAt);
       setIsLoading(false);
+
+      // Fallback: if previousWeekPercent is still undefined (first run / data wipe),
+      // fetch last week's work diary to compute it. Fire-and-forget, silent failure.
+      if (previousWeekPercent === undefined) {
+        const prevMonday = addDays(getMondayOfWeek(today), -7);
+        const prevSunday = addDays(getMondayOfWeek(today), -1);
+        const prevDays = dateRange(prevMonday, prevSunday);
+        Promise.all(
+          prevDays.map(date =>
+            fetchWorkDiary(config.assignmentId, date, credentials, config.useQA)
+              .then(slots => countDiaryTags(slots))
+              .catch(() => null),
+          ),
+        ).then(results => {
+          let totalSlots = 0, aiSlots = 0, noTagSlots = 0;
+          for (const td of results) {
+            if (!td) continue;
+            totalSlots += td.total;
+            aiSlots += td.aiUsage;
+            noTagSlots += td.noTags;
+          }
+          const tagged = totalSlots - noTagSlots;
+          if (tagged > 0) {
+            const pct = (aiSlots / tagged) * 100;
+            AsyncStorage.setItem(PREV_WEEK_KEY, String(pct)).catch(() => {});
+            setPreviousWeekPercent(pct);
+          }
+        }).catch(() => {});
+      }
 
       // FR4 (06-ai-tab): On Monday, persist current week's midpoint AI% as the
       // previous week value so next week's delta badge has a reference point.
