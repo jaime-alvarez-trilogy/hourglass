@@ -797,3 +797,62 @@ describe('AITab — layout structure', () => {
     expect(source).not.toContain('AIProgressBar');
   });
 });
+
+// ─── FR4 (12-app-breakdown-ui): AppBreakdownCard integration ─────────────────
+// Tests that ai.tsx is correctly wired with AppBreakdownCard, useAppBreakdown,
+// generateGuidance, and that stagger count is bumped to 7.
+
+describe('AITab — FR4 (12-app-breakdown-ui): AppBreakdownCard integration', () => {
+  it('FR4.1 — ai.tsx source imports AppBreakdownCard', () => {
+    const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
+    expect(source).toMatch(/AppBreakdownCard/);
+  });
+
+  it('FR4.2 — ai.tsx source imports useAppBreakdown', () => {
+    const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
+    expect(source).toMatch(/useAppBreakdown/);
+  });
+
+  it('FR4.3 — ai.tsx source imports generateGuidance', () => {
+    const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
+    expect(source).toMatch(/generateGuidance/);
+  });
+
+  it('FR4.4 — ai.tsx useStaggeredEntry count is 7 (bumped from 6)', () => {
+    const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
+    expect(source).toMatch(/useStaggeredEntry\s*\(\s*\{\s*count\s*:\s*7\s*\}/);
+  });
+
+  it('FR4.5 — ai.tsx source uses getEntryStyle(3) for AppBreakdownCard', () => {
+    const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
+    expect(source).toMatch(/getEntryStyle\s*\(\s*3\s*\)/);
+  });
+
+  it('FR4.6 — ai.tsx source uses getEntryStyle(4) for Trajectory card (was 3)', () => {
+    const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
+    expect(source).toMatch(/getEntryStyle\s*\(\s*4\s*\)/);
+  });
+
+  it('FR4.7 — ai.tsx source calls useAppBreakdown() and destructures aggregated12w and currentWeek', () => {
+    const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
+    expect(source).toMatch(/aggregated12w/);
+    expect(source).toMatch(/currentWeek/);
+  });
+
+  it('FR4.8 — ai.tsx source guards AppBreakdownCard on aggregated12w.length > 0', () => {
+    const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
+    expect(source).toMatch(/aggregated12w\.length\s*>\s*0|aggregated12w\.length\s*&&/);
+  });
+
+  it('FR4.9 — ai.tsx source slices aggregated12w to 8 entries before passing to AppBreakdownCard', () => {
+    const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
+    expect(source).toMatch(/aggregated12w\.slice\s*\(\s*0\s*,\s*8\s*\)/);
+  });
+
+  it('FR4.10 — ai.tsx source passes generateGuidance result to AppBreakdownCard guidance prop', () => {
+    const source = fs.readFileSync(AI_TAB_PATH, 'utf8');
+    // generateGuidance(...) is called and result passed as guidance prop
+    expect(source).toMatch(/generateGuidance\s*\(/);
+    expect(source).toMatch(/guidance\s*=/);
+  });
+});
