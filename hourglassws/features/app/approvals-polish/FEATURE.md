@@ -30,6 +30,13 @@ Both specs are independent and can be implemented in parallel.
 
 ### 01-glass-swipe-card
 - `src/components/ApprovalCard.tsx` — glass surface + glow swipe
+- `__tests__/glass-swipe-card.test.tsx` — 84 tests covering FR1-FR5
+- `__tests__/approval-card.test.tsx` — updated for new implementation contracts
+- `src/components/__tests__/ApprovalCard.colorSemantics.test.tsx` — updated color tokens
+- `__mocks__/expo-linear-gradient.ts` — new mock (renders as plain View)
+- `__mocks__/fileMock.js` — new stub for binary assets (.png)
+- `__mocks__/react-native-gesture-handler.ts` — extended with failOffsetY, onStart, onEnd
+- `jest.config.js` — added moduleNameMapper for .png and expo-linear-gradient
 
 ### 02-requests-mesh
 - `app/(tabs)/approvals.tsx` — add AnimatedMeshBackground
@@ -37,8 +44,9 @@ Both specs are independent and can be implemented in parallel.
 ## Changelog
 
 ### 01-glass-swipe-card
-- **Status**: Spec complete
+- **Status**: Complete
 - **Date**: 2026-03-24
+- **Commits**: test(FR1-FR5): `7b227d4`, feat(FR1-FR5): `e32795a`, docs: see below
 - **Spec**: [specs/01-glass-swipe-card/spec.md](specs/01-glass-swipe-card/spec.md)
 
 ### 02-requests-mesh
