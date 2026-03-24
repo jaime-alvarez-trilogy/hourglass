@@ -47,9 +47,29 @@ const START_ANGLE = 135;   // degrees — 7 o'clock position
 const SWEEP = 270;         // degrees — full track sweep
 const STROKE_WIDTH = 6;
 
-// ─── Sweep gradient colors ────────────────────────────────────────────────────
-
-const GRADIENT_COLORS = ['#00C2FF', '#A78BFA', '#FF00FF'] as const;
+// ─── Sweep gradient ───────────────────────────────────────────────────────────
+//
+// Full-circle mapping (no start/end) with stops at key angular positions of the arc.
+// This avoids the Skia clamping artifact that appears at high fill percentages:
+//
+//   BUG (with start=135, end=405):
+//     At >83% fill the arc crosses 360°. Pixels past 360° normalize to e.g. 34°,
+//     which is BEFORE the gradient start (135°). Skia clamps to the first color (cyan),
+//     creating a sudden cyan dot at the end cap.
+//
+//   FIX: Map the gradient to the full circle (0°–360°). Place stops at positions
+//     corresponding to the arc's key angles so the wrap-around region stays magenta.
+//
+//   Position math (full circle = 360°):
+//     0°   =  0.000 → magenta (wrap-around region start)
+//    45°   =  0.125 → magenta (arc end at 100% fill; wrap-around region end)
+//   135°   =  0.375 → cyan    (arc START)
+//   270°   =  0.750 → violet  (arc TOP, halfway)
+//   360°   =  1.000 → magenta (arc crosses here for >83% fill)
+//
+//   Result: end cap at any fill % lands in the 0°–45° region → always magenta. ✓
+const GRADIENT_COLORS = ['#FF00FF', '#FF00FF', '#00C2FF', '#A78BFA', '#FF00FF'] as const;
+const GRADIENT_POSITIONS = [0, 0.125, 0.375, 0.75, 1.0] as const;
 
 // ─── arcPath — pure SVG path string generator (preserved for backward compat) ─
 //
@@ -178,8 +198,7 @@ export default function AIArcHero({
               <SweepGradient
                 c={{ x: cx, y: cy }}
                 colors={[...GRADIENT_COLORS]}
-                start={START_ANGLE}
-                end={START_ANGLE + SWEEP}
+                positions={[...GRADIENT_POSITIONS]}
               />
             </Path>
           </Canvas>

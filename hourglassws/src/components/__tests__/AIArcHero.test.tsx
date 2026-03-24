@@ -421,29 +421,32 @@ describe('getAmbientColor — aiPct signal boundaries', () => {
   });
 });
 
-// ─── FR (09-chart-visual-fixes FR5): SweepGradient start/end angles ──────────
+// ─── FR (09/10): SweepGradient full-circle mapping (end-cap clamping fix) ────
 //
-// SC-09FR5.1 — SweepGradient has start={135} (START_ANGLE)
-// SC-09FR5.2 — SweepGradient has end={405} (START_ANGLE + SWEEP = 135 + 270)
+// SC-09FR5.1 — SweepGradient uses GRADIENT_POSITIONS (start/end removed)
+// SC-09FR5.2 — GRADIENT_POSITIONS maps arc key angles to full-circle fractions
 // SC-09FR5.3 — SweepGradient c prop uses cx=cy=size/2
-// SC-09FR5.4 — gradient colors unchanged: cyan→violet→magenta
+// SC-09FR5.4 — gradient colors contain cyan, violet, magenta
 
-describe('AIArcHero — 09FR5: SweepGradient start/end angles', () => {
+describe('AIArcHero — 09FR5: SweepGradient arc color mapping', () => {
   let source: string;
 
   beforeAll(() => {
     source = fs.readFileSync(COMPONENT_FILE, 'utf8');
   });
 
-  it('SC-09FR5.1 — SweepGradient has start={START_ANGLE} where START_ANGLE=135', () => {
-    // Either start={135} literal or start={START_ANGLE} with START_ANGLE=135
-    expect(source).toMatch(/START_ANGLE\s*=\s*135/);
-    expect(source).toMatch(/start\s*=\s*\{START_ANGLE\}|start\s*=\s*\{135\}/);
+  it('SC-09FR5.1 — SweepGradient uses GRADIENT_POSITIONS for full-circle mapping (no start/end)', () => {
+    // start/end removed: high fill% arc crosses 360°, pixels at e.g. 34° were clamped
+    // to first gradient color (cyan). Full-circle positions keep wrap-around region magenta.
+    expect(source).toContain('GRADIENT_POSITIONS');
+    expect(source).toMatch(/positions=\{\[\.\.\.GRADIENT_POSITIONS\]\}/);
   });
 
-  it('SC-09FR5.2 — SweepGradient has end={START_ANGLE + SWEEP} where SWEEP=270 → end=405', () => {
-    expect(source).toMatch(/SWEEP\s*=\s*270/);
-    expect(source).toMatch(/end\s*=\s*\{START_ANGLE\s*\+\s*SWEEP\}|end\s*=\s*\{405\}/);
+  it('SC-09FR5.2 — GRADIENT_POSITIONS maps arc key angles to full-circle fractions', () => {
+    // 135°/360=0.375 (arc start=cyan), 270°/360=0.75 (arc top=violet), 0 and 1.0 (magenta)
+    expect(source).toMatch(/0\.375/);
+    expect(source).toMatch(/0\.75/);
+    expect(source).toMatch(/0\.125/);
   });
 
   it('SC-09FR5.3 — SweepGradient c prop uses { x: cx, y: cy } centered on canvas', () => {
