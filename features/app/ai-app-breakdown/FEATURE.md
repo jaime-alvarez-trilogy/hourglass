@@ -71,5 +71,5 @@ extractAppBreakdown(slots) → AppBreakdownEntry[]
 ### Specs
 | Spec | Description | Status |
 |------|-------------|--------|
-| 11-app-data-layer | Types, extraction logic, AsyncStorage cache, hooks | pending |
+| 11-app-data-layer | Types, extraction logic, AsyncStorage cache, hooks | spec-complete |
 | 12-app-breakdown-ui | AppBreakdownCard, guidance chips, ai.tsx wiring | pending |
