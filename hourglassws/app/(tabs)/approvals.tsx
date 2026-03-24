@@ -31,8 +31,10 @@ import SkeletonLoader from '@/src/components/SkeletonLoader'
 import FadeInScreen from '@/src/components/FadeInScreen'
 import { useStaggeredEntry } from '@/src/hooks/useStaggeredEntry'
 import { AnimatedPressable } from '@/src/components/AnimatedPressable'
+import AnimatedMeshBackground from '@/src/components/AnimatedMeshBackground'
 import { colors } from '@/src/lib/colors'
 import type { ApprovalItem } from '@/src/lib/approvals'
+import type { PanelState } from '@/src/lib/panelState'
 
 export default function ApprovalsScreen() {
   const { config } = useConfig()
@@ -105,11 +107,18 @@ export default function ApprovalsScreen() {
   const showTeamSkeletons = isManager && teamLoading && items.length === 0
   const showMySkeletons = myLoading && entries.length === 0
 
+  // ─── Mesh background signal ─────────────────────────────────────────────────
+  // critical (coral glow) when manager has pending approvals; null (idle) otherwise.
+
+  const meshPanelState: PanelState | null =
+    isManager && items.length > 0 ? 'critical' : null
+
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <FadeInScreen>
-      <View className="flex-1 bg-background">
+      <View className="flex-1">
+        <AnimatedMeshBackground panelState={meshPanelState} />
         {/* Header */}
         <View className="flex-row items-center justify-between px-4 pt-14 pb-3 bg-surface border-b border-border">
           <View className="flex-row items-center gap-2">
