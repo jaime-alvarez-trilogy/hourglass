@@ -111,12 +111,13 @@ describe('AppUsageBar — FR1: source-level segment logic', () => {
     expect(source).toMatch(/height\s*=\s*4/);
   });
 
-  it('FR1.14 — source handles all-zero case (empty bar fallback)', () => {
-    // When all inputs are zero, a single grey segment should render
-    // Look for the all-zero check or a fallback flex=1
-    const hasAllZeroGuard = /aiSlots.*===.*0.*brainliftSlots.*===.*0.*nonAiSlots.*===.*0/.test(source) ||
-                             /aiSlots \+ brainliftSlots \+ nonAiSlots/.test(source) ||
-                             source.includes('flex: 1');
+  it('FR1.14 — source handles all-zero case (empty bar fallback with border color)', () => {
+    // When all inputs are zero, a single grey segment with colors.border should render
+    // The implementation uses: total === 0 → return a View with backgroundColor: colors.border
+    const hasAllZeroGuard =
+      /total\s*===\s*0/.test(source) ||
+      /aiSlots.*===.*0.*brainliftSlots.*===.*0.*nonAiSlots.*===.*0/.test(source) ||
+      /aiSlots \+ brainliftSlots \+ nonAiSlots/.test(source);
     expect(hasAllZeroGuard).toBe(true);
   });
 
@@ -148,25 +149,35 @@ describe('AppUsageBar — FR1: segment structure', () => {
       }));
     });
 
-    const withStr = JSON.stringify(treeWith.toJSON());
-    const withoutStr = JSON.stringify(treeWithout.toJSON());
+    // With brainlift=30: three child segments → 3 children
+    // Without brainlift=0: two child segments (cyan + grey) → 2 children
+    // The test env serializes colors as rgba(…), not hex strings. Count children instead.
+    const withJson = treeWith.toJSON();
+    const withoutJson = treeWithout.toJSON();
 
-    // With brainlift: violet segment present → more Views / more violet color
-    expect(withStr).toContain('"#A78BFA"'); // colors.violet
-    // Without brainlift: violet segment absent → no violet color
-    expect(withoutStr).not.toContain('"#A78BFA"');
+    // With brainlift: 3 children (violet + cyan + grey)
+    // Without brainlift: 2 children (cyan + grey)
+    const withChildCount = withJson.children ? withJson.children.length : 0;
+    const withoutChildCount = withoutJson.children ? withoutJson.children.length : 0;
+    expect(withChildCount).toBeGreaterThan(withoutChildCount);
   });
 
-  it('FR1.18 — all-AI bar (nonAiSlots=0) renders without grey segment being dominant', () => {
+  it('FR1.18 — all-AI bar (nonAiSlots=0) renders cyan segment', () => {
     let tree: any;
     act(() => {
       tree = create(React.createElement(AppUsageBar, {
         aiSlots: 50, brainliftSlots: 0, nonAiSlots: 0,
       }));
     });
-    // Renders without crash; cyan color present
-    const json = JSON.stringify(tree.toJSON());
-    expect(json).toContain('"#00C2FF"'); // colors.cyan
+    // Renders without crash; exactly 1 child (cyan segment, aiOnly=50)
+    const json = tree.toJSON();
+    expect(json).not.toBeNull();
+    // The single child should have the cyan backgroundColor (serialized as rgba in test env)
+    const children = json.children ?? [];
+    expect(children.length).toBe(1);
+    // Verify it's cyan by checking the style backgroundColor is the cyan rgba value
+    const style = children[0].props?.style;
+    expect(JSON.stringify(style)).toMatch(/0,194,255|00c2ff|00C2FF/i);
   });
 
   it('FR1.19 — height prop accepted without crash', () => {

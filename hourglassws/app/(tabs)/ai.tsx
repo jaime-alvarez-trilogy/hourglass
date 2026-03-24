@@ -4,6 +4,7 @@
 // FR4 (04-ai-hero-arc): AmbientBackground wiring — full-screen ambient behind ScrollView
 // FR5 (04-ai-hero-arc): AIArcHero replaces two-card ring hero + standalone BrainLift card
 // FR1 (04-ai-tab-screen): Data-gated loading — ActivityIndicator while data=null, no stagger
+// FR4 (12-app-breakdown-ui): AppBreakdownCard inserted between Daily Breakdown and Trajectory
 
 import React, { useMemo, useState } from 'react';
 import {
@@ -31,8 +32,11 @@ import AmbientBackground, { getAmbientColor } from '@/src/components/AmbientBack
 import AnimatedMeshBackground from '@/src/components/AnimatedMeshBackground';
 import TrendSparkline from '@/src/components/TrendSparkline';
 import { DailyAIRow } from '@/src/components/DailyAIRow';
+import AppBreakdownCard from '@/src/components/AppBreakdownCard';
 import { computeAICone } from '@/src/lib/aiCone';
 import { colors } from '@/src/lib/colors';
+import { generateGuidance } from '@/src/lib/appGuidance';
+import { useAppBreakdown } from '@/src/hooks/useAppBreakdown';
 import { classifyAIPct, type AITier } from '@/src/lib/aiTier';
 import { setTag } from '@/src/lib/sharedTransitions';
 import Animated from 'react-native-reanimated';
@@ -60,7 +64,10 @@ export default function AIScreen() {
   const { data, isLoading, lastFetchedAt, error, refetch, previousWeekPercent } = useAIData();
   const { config } = useConfig();
   const chartKey = useFocusKey();
-  const { getEntryStyle } = useStaggeredEntry({ count: 6 });
+  const { getEntryStyle } = useStaggeredEntry({ count: 7 });
+
+  // App breakdown — reads ai_app_history cache from AsyncStorage (no API calls).
+  const { aggregated12w, currentWeek } = useAppBreakdown();
 
   // 12-week AI trajectory — reads persisted history only (no API calls).
   // Deliberately avoids useOverviewData which spins up a second useAIData instance,
@@ -243,9 +250,19 @@ export default function AIScreen() {
             </Animated.View>
           )}
 
+          {/* App Breakdown Card — FR4 (12-app-breakdown-ui) */}
+          {aggregated12w.length > 0 && (
+            <Animated.View style={getEntryStyle(3)}>
+              <AppBreakdownCard
+                entries={aggregated12w.slice(0, 8)}
+                guidance={generateGuidance(aggregated12w, currentWeek)}
+              />
+            </Animated.View>
+          )}
+
           {/* 12-Week AI Trajectory Card */}
           {hasTrajectory && (
-            <Animated.View style={getEntryStyle(3)}>
+            <Animated.View style={getEntryStyle(4)}>
             <Card borderAccentColor={colors.cyan}>
               <SectionLabel className="mb-2">12-WEEK TRAJECTORY</SectionLabel>
 
@@ -309,7 +326,7 @@ export default function AIScreen() {
           )}
 
           {/* Legend Card */}
-          <Animated.View style={getEntryStyle(4)}>
+          <Animated.View style={getEntryStyle(5)}>
           <Card>
             <Text className="text-sm font-semibold text-textPrimary mb-1">How it&apos;s calculated</Text>
             <Text className="text-sm text-textSecondary leading-5">
@@ -327,7 +344,7 @@ export default function AIScreen() {
           </Animated.View>
 
           {/* Last fetched timestamp */}
-          <Animated.View style={getEntryStyle(5)}>
+          <Animated.View style={getEntryStyle(6)}>
           {lastFetchedAt && (
             <Text className="text-xs text-textMuted text-center mt-1" testID="last-fetched">
               Updated {new Date(lastFetchedAt).toLocaleTimeString()}
