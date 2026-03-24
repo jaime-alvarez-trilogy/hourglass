@@ -62,4 +62,6 @@ Spec 02 is blocked by 01 because both touch `app/(tabs)/index.tsx` and
 - **Tests**: 35 passing (ApprovalUrgencyCard + ScreenIntegration suites)
 
 ### 02-mesh-urgency-signal
-- **Status**: Pending
+- **Status**: Spec ready (2026-03-24)
+- **Spec**: [spec.md](specs/02-mesh-urgency-signal/spec.md)
+- **Checklist**: [checklist.md](specs/02-mesh-urgency-signal/checklist.md)
