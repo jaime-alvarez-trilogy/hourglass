@@ -21,6 +21,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { useRouter } from 'expo-router';
 import { useConfig } from '@/src/hooks/useConfig';
 import { useOverviewData } from '@/src/hooks/useOverviewData';
 import { useHoursData } from '@/src/hooks/useHoursData';
@@ -38,6 +39,8 @@ import FadeInScreen from '@/src/components/FadeInScreen';
 import OverviewHeroCard from '@/src/components/OverviewHeroCard';
 import { computeEarningsPace } from '@/src/lib/overviewUtils';
 import { setTag } from '@/src/lib/sharedTransitions';
+import { ApprovalUrgencyCard } from '@/src/components/ApprovalUrgencyCard';
+import { useApprovalItems } from '@/src/hooks/useApprovalItems';
 import type { ScrubChangeCallback } from '@/src/hooks/useScrubGesture';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -137,8 +140,13 @@ function ChartSection({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function OverviewScreen() {
+  const router = useRouter();
   const chartKey = useFocusKey();
   const { config } = useConfig();
+
+  // Approval urgency card (01-approval-urgency-card)
+  const { items: approvalItems } = useApprovalItems();
+  const isManager = config?.isManager === true || config?.devManagerView === true;
   // 08-dark-glass-polish: count 4→3 because Hours+AI% share one stagger row
   const { getEntryStyle } = useStaggeredEntry({ count: 3 });
 
@@ -235,6 +243,14 @@ export default function OverviewScreen() {
           className="flex-1"
           contentContainerStyle={{ padding: 16, paddingTop: 8, gap: 12 }}
         >
+          {/* ── Approval urgency card (01-approval-urgency-card) ──────────── */}
+          {isManager && approvalItems.length > 0 && (
+            <ApprovalUrgencyCard
+              pendingCount={approvalItems.length}
+              onPress={() => router.push('/(tabs)/approvals')}
+            />
+          )}
+
           {/* Hero card — period totals + window toggle (replaces standalone header) */}
           <OverviewHeroCard
             totalEarnings={totalEarnings}

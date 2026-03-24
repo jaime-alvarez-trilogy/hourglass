@@ -42,6 +42,8 @@ import Card from '@/src/components/Card';
 import SectionLabel from '@/src/components/SectionLabel';
 import SkeletonLoader from '@/src/components/SkeletonLoader';
 import { UrgencyBanner } from '@/src/components/UrgencyBanner';
+import { ApprovalUrgencyCard } from '@/src/components/ApprovalUrgencyCard';
+import { useApprovalItems } from '@/src/hooks/useApprovalItems';
 import type { PanelState } from '@/src/lib/panelState';
 import type { DailyHours } from '@/src/components/WeeklyBarChart';
 import type { DailyEntry } from '@/src/lib/hours';
@@ -155,6 +157,10 @@ export default function HoursDashboard() {
   const chartKey = useFocusKey();
   const { getEntryStyle } = useStaggeredEntry({ count: 4 });
 
+  // Approval urgency card (01-approval-urgency-card)
+  const { items: approvalItems } = useApprovalItems();
+  const isManager = config?.isManager === true || config?.devManagerView === true;
+
   const weeklyLimit = config?.weeklyLimit ?? 40;
 
   // AI Trajectory compact card (FR2 03-ai-tab-integration)
@@ -212,6 +218,14 @@ export default function HoursDashboard() {
           />
         }
       >
+        {/* ── Approval urgency card (01-approval-urgency-card) ──────────── */}
+        {isManager && approvalItems.length > 0 && (
+          <ApprovalUrgencyCard
+            pendingCount={approvalItems.length}
+            onPress={() => router.push('/(tabs)/approvals')}
+          />
+        )}
+
         {/* ── Header ────────────────────────────────────────────────────── */}
         <View className="flex-row items-center justify-between mb-2">
           <View className="flex-row items-center gap-2">
