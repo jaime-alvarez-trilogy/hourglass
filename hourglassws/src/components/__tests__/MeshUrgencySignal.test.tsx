@@ -143,57 +143,74 @@ beforeAll(() => {
 });
 
 describe('FR4: AnimatedMeshBackground — floor glow node render', () => {
-  it('SC4.1 — renders without error when pendingApprovals > 0', () => {
-    expect(() => {
-      act(() => {
-        create(React.createElement(AnimatedMeshBackground, { pendingApprovals: 3 }));
-      });
-    }).not.toThrow();
-  });
+  // Helper: count SkiaCircle nodes anywhere in the rendered tree (recursive)
+  function countSkiaCircles(node: any): number {
+    if (!node) return 0;
+    if (typeof node !== 'object') return 0;
+    let count = node.type === 'SkiaCircle' ? 1 : 0;
+    if (Array.isArray(node.children)) {
+      for (const child of node.children) {
+        count += countSkiaCircles(child);
+      }
+    }
+    return count;
+  }
 
-  it('SC4.2 — renders without error when pendingApprovals=0', () => {
-    expect(() => {
-      act(() => {
-        create(React.createElement(AnimatedMeshBackground, { pendingApprovals: 0 }));
-      });
-    }).not.toThrow();
-  });
-
-  it('SC4.3 — renders without error when pendingApprovals=null', () => {
-    expect(() => {
-      act(() => {
-        create(React.createElement(AnimatedMeshBackground, { pendingApprovals: null }));
-      });
-    }).not.toThrow();
-  });
-
-  it('SC4.4 — renders without error when pendingApprovals is undefined', () => {
-    expect(() => {
-      act(() => {
-        create(React.createElement(AnimatedMeshBackground, {}));
-      });
-    }).not.toThrow();
-  });
-
-  it('SC4.5 — renders without error with panelState + pendingApprovals together', () => {
-    expect(() => {
-      act(() => {
-        create(
-          React.createElement(AnimatedMeshBackground, {
-            panelState: 'critical',
-            pendingApprovals: 2,
-          }),
-        );
-      });
-    }).not.toThrow();
-  });
-
-  it('SC4.6 — renders non-null output when pendingApprovals > 0', () => {
+  it('SC4.1 — pendingApprovals > 0 renders 4 Circle nodes (A+B+C+floor glow)', () => {
     let tree: any;
     act(() => {
-      tree = create(React.createElement(AnimatedMeshBackground, { pendingApprovals: 2 }));
+      tree = create(React.createElement(AnimatedMeshBackground, { pendingApprovals: 3 }));
     });
-    expect(tree.toJSON()).not.toBeNull();
+    expect(countSkiaCircles(tree.toJSON())).toBe(4);
+  });
+
+  it('SC4.2 — pendingApprovals=0 renders 3 Circle nodes (no floor glow)', () => {
+    let tree: any;
+    act(() => {
+      tree = create(React.createElement(AnimatedMeshBackground, { pendingApprovals: 0 }));
+    });
+    expect(countSkiaCircles(tree.toJSON())).toBe(3);
+  });
+
+  it('SC4.3 — pendingApprovals=null renders 3 Circle nodes (no floor glow)', () => {
+    let tree: any;
+    act(() => {
+      tree = create(React.createElement(AnimatedMeshBackground, { pendingApprovals: null }));
+    });
+    expect(countSkiaCircles(tree.toJSON())).toBe(3);
+  });
+
+  it('SC4.4 — pendingApprovals undefined renders 3 Circle nodes (no floor glow)', () => {
+    let tree: any;
+    act(() => {
+      tree = create(React.createElement(AnimatedMeshBackground, {}));
+    });
+    expect(countSkiaCircles(tree.toJSON())).toBe(3);
+  });
+
+  it('SC4.5 — panelState + pendingApprovals > 0 renders 4 Circle nodes', () => {
+    let tree: any;
+    act(() => {
+      tree = create(
+        React.createElement(AnimatedMeshBackground, {
+          panelState: 'critical',
+          pendingApprovals: 2,
+        }),
+      );
+    });
+    expect(countSkiaCircles(tree.toJSON())).toBe(4);
+  });
+
+  it('SC4.6 — floor node appears only when pendingApprovals > 0 (delta = 1 Circle)', () => {
+    let withGlow: any;
+    let withoutGlow: any;
+    act(() => {
+      withGlow = create(React.createElement(AnimatedMeshBackground, { pendingApprovals: 1 }));
+    });
+    act(() => {
+      withoutGlow = create(React.createElement(AnimatedMeshBackground, { pendingApprovals: 0 }));
+    });
+    expect(countSkiaCircles(withGlow.toJSON()) - countSkiaCircles(withoutGlow.toJSON())).toBe(1);
   });
 });
 
