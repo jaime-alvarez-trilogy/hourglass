@@ -373,45 +373,49 @@ export async function readWidgetData(): Promise<WidgetData | null> {
 //
 // Self-contained JS function string evaluated in the widget extension's JSContext.
 // The JSContext loads ExpoWidgets.bundle first, which exposes SwiftUI helpers as
-// globals: VStack, HStack, Text, Spacer, ZStack, and modifier functions:
-// background(color), padding({all}), foregroundStyle(color), font({size, weight}).
+// globals: VStack, HStack, Text, Spacer, ZStack, Circle, RoundedRectangle, Capsule,
+// LinearGradient, ContainerBackground, and modifier functions:
+// foregroundStyle(color), font({size,weight}), frame({width?,height?}),
+// padding({all}), background(color), opacity(val).
 //
 // Rules for this string:
 //   - No imports, no require() — use only globals
 //   - No closed-over variables from the outer bundle scope
 //   - Must be a function expression (wrapped in parens by createWidgetContext)
+//   - ES5 only: var, function declarations, no arrow functions, no const/let
 //
 // The native WidgetObject stores this string in UserDefaults (App Group shared
 // storage). The widget extension reads it, evaluates it, and calls the function
 // with (props: WidgetData, env: { widgetFamily: string }) each render cycle.
 //
+// 02-ios-visual: Full brand redesign — mesh bg simulation, glass panels,
+// pace badge, week delta text, brainliftTarget-driven progress bars.
+//
 const WIDGET_LAYOUT_JS = `(function(props, env) {
-  // ── Brand palette ──────────────────────────────────────────────────────────
-  var BG       = '#0D0C14';
-  var GOLD     = '#E8C97A';   // earnings only
-  var CYAN     = '#00C2FF';   // AI % only
-  var VIOLET   = '#A78BFA';   // BrainLift only
-  var WHITE    = '#FFFFFF';   // primary values
-  var LABEL    = '#8B949E';   // secondary labels
-  var MUTED    = '#484F58';   // subdued caps / sublabels
+  // ── 1. Brand palette (02-ios-visual) ───────────────────────────────────────
+  var BG             = '#0D0C14';
+  var GOLD           = '#E8C97A';   // earnings only
+  var GOLD_BRIGHT    = '#FFDF89';   // crushed_it badge/mesh only
+  var CYAN           = '#00C2FF';   // AI % only
+  var VIOLET         = '#A78BFA';   // BrainLift only
+  var TEXT_PRIMARY   = '#E0E0E0';   // primary values — never #FFFFFF
+  var TEXT_SECONDARY = '#A0A0A0';   // secondary metadata
+  var TEXT_MUTED     = '#757575';   // timestamps, labels
+  var TRACK_COLOR    = '#2F2E41';   // progress bar track
+  var SURFACE_TOP    = '#1A1928';   // glass panel gradient top
+  var SURFACE_BTM    = '#131220';   // glass panel gradient bottom
+  var BORDER_TOP     = '#3D3B54';   // glass border gradient top
 
-  // Hours colour tracks urgency state
+  // Hours color tracks urgency state
   var HOURS_COLOR = {
     none:     '#10B981',
     low:      '#10B981',
     high:     '#F59E0B',
     critical: '#F43F5E',
-    expired:  '#484F58'
+    expired:  '#757575'
   };
-  var hoursColor = HOURS_COLOR[props.urgency] || HOURS_COLOR.none;
 
-  // ── 08-widget-enhancements: action mode ────────────────────────────────────
-  var hasApprovals = props.approvalItems && props.approvalItems.length > 0;
-  var hasRequests  = props.myRequests && props.myRequests.length > 0;
-  var actionMode   = hasApprovals || hasRequests;
-  var bg           = props.actionBg || BG;
-
-  // Badge colours for category / status labels
+  // Badge colors for approval category / request status labels
   var BADGE_COLORS = {
     MANUAL:   '#00C2FF',
     OVERTIME: '#A78BFA',
@@ -420,359 +424,508 @@ const WIDGET_LAYOUT_JS = `(function(props, env) {
     REJECTED: '#F43F5E'
   };
 
-  // Items to show in action mode (approvals for manager, requests for contributor)
-  var actionItems = hasApprovals ? props.approvalItems : (props.myRequests || []);
+  // Pace badge label and color maps
+  var PACE_COLORS = {
+    crushed_it: '#FFDF89',
+    on_track:   '#10B981',
+    behind:     '#F59E0B',
+    critical:   '#F43F5E'
+  };
+  var PACE_LABELS = {
+    crushed_it: 'CRUSHED IT',
+    on_track:   'ON TRACK',
+    behind:     'BEHIND PACE',
+    critical:   'CRITICAL'
+  };
 
-  var family   = (env && env.widgetFamily) || 'systemMedium';
-  var fill     = frame({ maxWidth: 9999, maxHeight: 9999 });
+  // ── 2. Derived state ────────────────────────────────────────────────────────
+  var hoursColor   = HOURS_COLOR[props.urgency] || HOURS_COLOR.none;
+  var hasApprovals = props.approvalItems && props.approvalItems.length > 0;
+  var hasRequests  = props.myRequests && props.myRequests.length > 0;
+  var actionMode   = hasApprovals || hasRequests;
+  var actionItems  = hasApprovals ? props.approvalItems : (props.myRequests || []);
+  var family       = (env && env.widgetFamily) || 'systemMedium';
+  var fillFrame    = frame({ maxWidth: 9999, maxHeight: 9999 });
 
-  // ── Shared: action-mode item row ───────────────────────────────────────────
-  // Renders one approval or request row
+  // ── 3. buildMeshBg(urgency, paceBadge) ─────────────────────────────────────
+  // Simulates the app's orbital mesh background with 3 overlapping Circle nodes.
+  // Node A: violet (always); Node B: cyan (always); Node C: urgency/pace state color.
+  function buildMeshBg(urgency, paceBadge) {
+    var nodeCColor = '#10B981';
+    var nodeCOpacity = 0.14;
+    if (urgency === 'critical') {
+      nodeCColor = '#F43F5E'; nodeCOpacity = 0.20;
+    } else if (urgency === 'high') {
+      nodeCColor = '#F59E0B'; nodeCOpacity = 0.16;
+    } else if (paceBadge === 'crushed_it') {
+      nodeCColor = GOLD_BRIGHT; nodeCOpacity = 0.14;
+    }
+    return ZStack({
+      children: [
+        Rectangle({ modifiers: [foregroundStyle(BG), fillFrame] }),
+        Circle({ modifiers: [foregroundStyle('#A78BFA'), opacity(0.12),
+          frame({ width: 120, height: 120 }), offset({ x: -50, y: -40 })] }),
+        Circle({ modifiers: [foregroundStyle('#00C2FF'), opacity(0.10),
+          frame({ width: 100, height: 100 }), offset({ x: 60, y: 30 })] }),
+        Circle({ modifiers: [foregroundStyle(nodeCColor), opacity(nodeCOpacity),
+          frame({ width: 90, height: 90 }), offset({ x: 0, y: 50 })] })
+      ]
+    });
+  }
+
+  // ── 4. buildGlassPanel(children) ───────────────────────────────────────────
+  // Simulates frosted glass: gradient fill + border overlay + content.
+  function buildGlassPanel(children) {
+    return ZStack({
+      alignment: 'leading',
+      children: [
+        RoundedRectangle({
+          cornerRadius: 12,
+          modifiers: [
+            foregroundStyle(LinearGradient({
+              colors: [SURFACE_TOP, SURFACE_BTM],
+              startPoint: 'topLeading',
+              endPoint: 'bottomTrailing'
+            })),
+            opacity(0.85)
+          ]
+        }),
+        RoundedRectangle({
+          cornerRadius: 12,
+          modifiers: [
+            foregroundStyle(LinearGradient({
+              colors: [BORDER_TOP, SURFACE_TOP],
+              startPoint: 'topLeading',
+              endPoint: 'bottomTrailing'
+            })),
+            frame({ maxWidth: 9999, maxHeight: 9999 })
+          ]
+        }),
+        VStack({
+          alignment: 'leading',
+          spacing: 2,
+          modifiers: [padding({ all: 10 })],
+          children: children
+        })
+      ]
+    });
+  }
+
+  // ── 5. buildPaceBadge(badge) ────────────────────────────────────────────────
+  // Returns Capsule background + label Text for known badges; null for 'none'/unknown.
+  function buildPaceBadge(badge) {
+    if (!badge || badge === 'none' || !PACE_COLORS[badge]) { return null; }
+    var badgeColor = PACE_COLORS[badge];
+    var badgeLabel = PACE_LABELS[badge];
+    return ZStack({
+      children: [
+        Capsule({ modifiers: [foregroundStyle(badgeColor), opacity(0.20),
+          frame({ height: 20 })] }),
+        Text({
+          modifiers: [foregroundStyle(badgeColor), font({ size: 10, weight: 'semibold' }),
+            padding({ all: 4 })],
+          children: badgeLabel
+        })
+      ]
+    });
+  }
+
+  // ── 6. buildDeltaText(delta, color) ─────────────────────────────────────────
+  // Returns a colored Text with the delta string, or null if delta is empty/falsy.
+  function buildDeltaText(delta, color) {
+    if (!delta) { return null; }
+    return Text({
+      modifiers: [foregroundStyle(color), font({ size: 11 })],
+      children: delta
+    });
+  }
+
+  // ── 7. buildProgressBar(value, targetStr, color, barWidth) ──────────────────
+  // Renders a filled + track RoundedRectangle pair.
+  // targetStr: e.g. "5h" — parseFloat strips the "h" suffix automatically.
+  function buildProgressBar(value, targetStr, color, barWidth) {
+    var target = parseFloat(targetStr) || 5;
+    var fillPct = Math.min(value / target, 1.0);
+    var filled = Math.max(4, Math.round(fillPct * barWidth));
+    var track = Math.max(4, barWidth - filled);
+    return HStack({
+      spacing: 3,
+      children: [
+        RoundedRectangle({ cornerRadius: 2,
+          modifiers: [foregroundStyle(color), frame({ width: filled, height: 5 })] }),
+        RoundedRectangle({ cornerRadius: 2,
+          modifiers: [foregroundStyle(TRACK_COLOR), frame({ width: track, height: 5 })] })
+      ]
+    });
+  }
+
+  // ── 8. buildItemRow(item) ───────────────────────────────────────────────────
+  // Action-mode row: name/memo · hours · category/status badge. Glass panel wrapped.
   function buildItemRow(item) {
     var badgeKey = item.category || item.status || 'MANUAL';
-    var badgeColor = BADGE_COLORS[badgeKey] || MUTED;
-    return HStack({
-      spacing: 6,
-      children: [
-        Text({
-          modifiers: [foregroundStyle(WHITE), font({ size: 12 })],
-          children: item.name || item.memo || ''
-        }),
-        Spacer({}),
-        Text({
-          modifiers: [foregroundStyle(hoursColor), font({ size: 12, weight: 'semibold' })],
-          children: item.hours || ''
-        }),
-        Text({
-          modifiers: [foregroundStyle(badgeColor), font({ size: 11 })],
-          children: badgeKey
-        })
-      ]
-    });
-  }
-
-  // ── systemSmall ────────────────────────────────────────────────────────────
-  // No mode switch — small widget unchanged
-  if (family === 'systemSmall') {
-    return VStack({
-      alignment: 'leading',
-      spacing: 2,
-      modifiers: [background(BG), padding({ all: 14 }), fill],
-      children: [
-        Text({
-          modifiers: [foregroundStyle(hoursColor), font({ size: 36, weight: 'bold' })],
-          children: props.hoursDisplay
-        }),
-        Text({
-          modifiers: [foregroundStyle(MUTED), font({ size: 11 })],
-          children: 'this week'
-        }),
-        Spacer({}),
-        Text({
-          modifiers: [foregroundStyle(GOLD), font({ size: 20, weight: 'semibold' })],
-          children: props.earnings
-        }),
-        Text({
-          modifiers: [foregroundStyle(LABEL), font({ size: 12 })],
-          children: props.hoursRemaining
-        })
-      ]
-    });
-  }
-
-  // ── systemLarge ────────────────────────────────────────────────────────────
-  if (family === 'systemLarge') {
-    // Action mode: compact hero + item list
-    if (actionMode) {
-      var largeItems = actionItems.slice(0, 4);
-      var moreCount = (props.pendingCount || actionItems.length) - 4;
-      var itemChildren = largeItems.map(function(item) { return buildItemRow(item); });
-      if (moreCount > 0) {
-        itemChildren.push(
-          HStack({
-            children: [
-              Spacer({}),
-              Text({
-                modifiers: [foregroundStyle(MUTED), font({ size: 11 })],
-                children: '+' + moreCount + ' more'
-              })
-            ]
-          })
-        );
-      }
-      return VStack({
-        alignment: 'leading',
-        spacing: 12,
-        modifiers: [background(bg), padding({ all: 18 }), fill],
+    var badgeColor = BADGE_COLORS[badgeKey] || TEXT_MUTED;
+    return buildGlassPanel([
+      HStack({
+        spacing: 6,
         children: [
-          // Mini hero
-          HStack({
-            spacing: 6,
-            children: [
-              Text({
-                modifiers: [foregroundStyle(hoursColor), font({ size: 18, weight: 'bold' })],
-                children: props.hoursDisplay
-              }),
-              Text({
-                modifiers: [foregroundStyle(MUTED), font({ size: 16 })],
-                children: ' · '
-              }),
-              Text({
-                modifiers: [foregroundStyle(GOLD), font({ size: 16, weight: 'semibold' })],
-                children: props.earnings
-              })
-            ]
+          Text({
+            modifiers: [foregroundStyle(TEXT_PRIMARY), font({ size: 12 })],
+            children: item.name || item.memo || ''
+          }),
+          Spacer({}),
+          Text({
+            modifiers: [foregroundStyle(hoursColor), font({ size: 12, weight: 'semibold' })],
+            children: item.hours || ''
+          }),
+          Text({
+            modifiers: [foregroundStyle(badgeColor), font({ size: 11 })],
+            children: badgeKey
           })
-        ].concat(itemChildren)
+        ]
+      })
+    ]);
+  }
+
+  // ── 9. buildSmall(p) ────────────────────────────────────────────────────────
+  // systemSmall: mesh bg + hours hero + earnings + remaining + pace badge.
+  // Manager urgency mode: pendingCount hero when isManager + high/critical + pending > 0.
+  function buildSmall(p) {
+    var pg = p.paceBadge;
+    var urg = p.urgency || 'none';
+    var hColor = HOURS_COLOR[urg] || HOURS_COLOR.none;
+    var badgeNode = buildPaceBadge(pg);
+    var isUrgentMgr = p.isManager && (urg === 'high' || urg === 'critical') && p.pendingCount > 0;
+
+    var heroText = isUrgentMgr
+      ? Text({ modifiers: [foregroundStyle(hColor), font({ size: 36, weight: 'bold' })],
+          children: String(p.pendingCount) })
+      : Text({ modifiers: [foregroundStyle(hColor), font({ size: 32, weight: 'bold' })],
+          children: p.hoursDisplay });
+
+    var subLabel = isUrgentMgr
+      ? Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 11 })], children: 'pending' })
+      : Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 11 })], children: 'this week' });
+
+    var bottomRow = isUrgentMgr
+      ? Text({ modifiers: [foregroundStyle(hColor), font({ size: 12 })], children: 'review now' })
+      : Text({ modifiers: [foregroundStyle(hColor), font({ size: 12 })], children: p.hoursRemaining });
+
+    var contentChildren = [
+      heroText,
+      subLabel,
+      Spacer({}),
+      Text({ modifiers: [foregroundStyle(GOLD), font({ size: 20, weight: 'bold' })], children: p.earnings }),
+      bottomRow
+    ];
+    if (badgeNode) { contentChildren.push(badgeNode); }
+
+    return ZStack({
+      children: [
+        buildMeshBg(urg, pg),
+        VStack({
+          alignment: 'leading',
+          spacing: 2,
+          modifiers: [padding({ all: 14 }), fillFrame],
+          children: contentChildren
+        })
+      ]
+    });
+  }
+
+  // ── 10. buildMedium(p) ──────────────────────────────────────────────────────
+  // systemMedium hours mode: mesh + dual glass panels + stats row + delta + badge.
+  // Action mode: mesh + glass item rows.
+  function buildMedium(p) {
+    var pg = p.paceBadge;
+    var urg = p.urgency || 'none';
+    var hColor = HOURS_COLOR[urg] || HOURS_COLOR.none;
+    var badgeNode = buildPaceBadge(pg);
+    var deltaHours = buildDeltaText(p.weekDeltaHours, hColor);
+
+    if (actionMode) {
+      var medItems = actionItems.slice(0, 2);
+      var medRows = medItems.map(function(item) { return buildItemRow(item); });
+      var mgCount = p.pendingCount || actionItems.length;
+      var headerChildren = [
+        Text({ modifiers: [foregroundStyle(hColor), font({ size: 16, weight: 'bold' })],
+          children: p.hoursDisplay }),
+        Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 14 })], children: ' · ' }),
+        Text({ modifiers: [foregroundStyle(GOLD), font({ size: 14, weight: 'semibold' })],
+          children: p.earnings })
+      ];
+      if (badgeNode) { headerChildren.push(Spacer({})); headerChildren.push(badgeNode); }
+      return ZStack({
+        children: [
+          buildMeshBg(urg, pg),
+          VStack({
+            alignment: 'leading',
+            spacing: 10,
+            modifiers: [padding({ all: 14 }), fillFrame],
+            children: [HStack({ spacing: 6, children: headerChildren })].concat(medRows)
+          })
+        ]
+      });
+      void mgCount;
+    }
+
+    // Hours mode
+    var hoursPanel = buildGlassPanel([
+      Text({ modifiers: [foregroundStyle(hColor), font({ size: 32, weight: 'bold' })],
+        children: p.hoursDisplay }),
+      Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 11 })], children: 'this week' }),
+      deltaHours || Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 1 })], children: '' })
+    ]);
+
+    var earningsPanel = buildGlassPanel([
+      Text({ modifiers: [foregroundStyle(GOLD), font({ size: 20, weight: 'bold' })],
+        children: p.earnings }),
+      Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 11 })], children: 'earned' })
+    ]);
+
+    var statsRow = HStack({
+      children: [
+        VStack({ alignment: 'leading', spacing: 1, children: [
+          Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 10 })], children: 'TODAY' }),
+          Text({ modifiers: [foregroundStyle(TEXT_PRIMARY), font({ size: 13, weight: 'semibold' })],
+            children: p.today })
+        ]}),
+        Spacer({}),
+        VStack({ alignment: 'leading', spacing: 1, children: [
+          Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 10 })], children: 'AI USAGE' }),
+          Text({ modifiers: [foregroundStyle(CYAN), font({ size: 13, weight: 'semibold' })],
+            children: p.aiPct })
+        ]}),
+        Spacer({}),
+        VStack({ alignment: 'trailing', spacing: 1, children: [
+          Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 10 })], children: 'REMAINING' }),
+          Text({ modifiers: [foregroundStyle(hColor), font({ size: 13, weight: 'semibold' })],
+            children: p.hoursRemaining })
+        ]})
+      ]
+    });
+
+    var bottomChildren = [statsRow];
+    if (badgeNode) { bottomChildren.push(badgeNode); }
+
+    return ZStack({
+      children: [
+        buildMeshBg(urg, pg),
+        VStack({
+          alignment: 'leading',
+          spacing: 10,
+          modifiers: [padding({ all: 14 }), fillFrame],
+          children: [
+            HStack({ spacing: 8, children: [hoursPanel, earningsPanel] }),
+            Spacer({})
+          ].concat(bottomChildren)
+        })
+      ]
+    });
+  }
+
+  // ── 11. buildLarge(p) ───────────────────────────────────────────────────────
+  // systemLarge: full dashboard — hero panels, stats, badge, bar chart, progress bars.
+  // Action mode: mesh + glass item rows.
+  function buildLarge(p) {
+    var pg = p.paceBadge;
+    var urg = p.urgency || 'none';
+    var hColor = HOURS_COLOR[urg] || HOURS_COLOR.none;
+    var badgeNode = buildPaceBadge(pg);
+    var deltaHours = buildDeltaText(p.weekDeltaHours, hColor);
+    var deltaEarnings = buildDeltaText(p.weekDeltaEarnings, GOLD);
+
+    if (actionMode) {
+      var lgItems = actionItems.slice(0, 4);
+      var moreCount = (p.pendingCount || actionItems.length) - 4;
+      var lgRows = lgItems.map(function(item) { return buildItemRow(item); });
+      if (moreCount > 0) {
+        lgRows.push(HStack({ children: [
+          Spacer({}),
+          Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 11 })],
+            children: '+' + moreCount + ' more' })
+        ]}));
+      }
+      return ZStack({
+        children: [
+          buildMeshBg(urg, pg),
+          VStack({
+            alignment: 'leading',
+            spacing: 12,
+            modifiers: [padding({ all: 18 }), fillFrame],
+            children: [
+              HStack({ spacing: 6, children: [
+                Text({ modifiers: [foregroundStyle(hColor), font({ size: 18, weight: 'bold' })],
+                  children: p.hoursDisplay }),
+                Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 16 })],
+                  children: ' · ' }),
+                Text({ modifiers: [foregroundStyle(GOLD), font({ size: 16, weight: 'semibold' })],
+                  children: p.earnings })
+              ]})
+            ].concat(lgRows)
+          })
+        ]
       });
     }
 
-    // Bar chart — only days with hours > 0, bars fill toward right edge
-    var activeDays = (props.daily || []).filter(function(d) { return d.hours > 0; });
+    // Bar chart
+    var activeDays = (p.daily || []).filter(function(d) { return d.hours > 0; });
     var barRows = [];
     if (activeDays.length > 0) {
       var maxHours = Math.max.apply(null, activeDays.map(function(d) { return d.hours; }).concat([8]));
       barRows = activeDays.map(function(entry) {
         var barWidth = Math.max(4, Math.round((entry.hours / maxHours) * 220));
-        var barColor = entry.isToday ? hoursColor : '#3D3B54';
-        var valueColor = entry.isToday ? hoursColor : LABEL;
+        var barColor = entry.isToday ? hColor : '#3D3B54';
+        var valueColor = entry.isToday ? hColor : TEXT_SECONDARY;
         return HStack({
           spacing: 5,
           children: [
-            Text({
-              modifiers: [foregroundStyle(MUTED), font({ size: 11 }), frame({ width: 26 })],
-              children: entry.day
-            }),
-            RoundedRectangle({
-              cornerRadius: 3,
-              modifiers: [foregroundStyle(barColor), frame({ width: barWidth, height: 7 })]
-            }),
+            Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 11 }),
+              frame({ width: 26 })], children: entry.day }),
+            RoundedRectangle({ cornerRadius: 3,
+              modifiers: [foregroundStyle(barColor), frame({ width: barWidth, height: 7 })] }),
             Spacer({}),
-            Text({
-              modifiers: [foregroundStyle(valueColor), font({ size: 11 })],
-              children: entry.hours.toFixed(1) + 'h'
-            })
+            Text({ modifiers: [foregroundStyle(valueColor), font({ size: 11 })],
+              children: entry.hours.toFixed(1) + 'h' })
           ]
         });
       });
     }
 
-    // AI & BrainLift progress bars — parse "87%–91%" → midpoint
+    // AI progress bar
     var avgAIPct = 0;
-    var aiMatch = props.aiPct ? props.aiPct.match(/(\d+)[^\d]+(\d+)/) : null;
+    var aiMatch = p.aiPct ? p.aiPct.match(/(\d+)[^\d]+(\d+)/) : null;
     if (aiMatch) { avgAIPct = (parseFloat(aiMatch[1]) + parseFloat(aiMatch[2])) / 2; }
-    var aiBarWidth = Math.max(4, Math.round(Math.min(avgAIPct / 100, 1) * 190));
-    var aiTrackWidth = Math.max(4, 190 - aiBarWidth);
 
-    var blHours = parseFloat(props.brainlift) || 0;
-    var blBarWidth = Math.max(4, Math.round(Math.min(blHours / 5, 1) * 190));
-    var blTrackWidth = Math.max(4, 190 - blBarWidth);
+    // BrainLift progress bar — uses brainliftTarget from 01-data-extensions
+    var blHours = parseFloat(p.brainlift) || 0;
+    var blTarget = p.brainliftTarget || '5h';
 
-    // No explicit background — let Swift containerBackground handle it (avoids grey frame)
-    return VStack({
-      alignment: 'leading',
-      spacing: 0,
-      modifiers: [padding({ all: 14 }), fill],
+    // Hero panels
+    var hoursEarningsChildren = [
+      Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 11 })], children: 'this week' }),
+      deltaHours
+    ].filter(Boolean);
+    hoursEarningsChildren.unshift(
+      Text({ modifiers: [foregroundStyle(hColor), font({ size: 34, weight: 'bold' })],
+        children: p.hoursDisplay })
+    );
+
+    var earningsChildren = [
+      Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 11 })], children: 'earned' }),
+      deltaEarnings
+    ].filter(Boolean);
+    earningsChildren.unshift(
+      Text({ modifiers: [foregroundStyle(GOLD), font({ size: 26, weight: 'semibold' })],
+        children: p.earnings })
+    );
+
+    var hoursPanel = buildGlassPanel(hoursEarningsChildren);
+    var earningsPanel = buildGlassPanel(earningsChildren);
+
+    var statsRow = HStack({
       children: [
-        // ── Hero: hours left, earnings right ───────────────────────────────
-        HStack({
-          children: [
-            VStack({
-              alignment: 'leading',
-              spacing: 0,
-              children: [
-                Text({ modifiers: [foregroundStyle(hoursColor), font({ size: 34, weight: 'bold' })], children: props.hoursDisplay }),
-                Text({ modifiers: [foregroundStyle(MUTED), font({ size: 11 })], children: 'this week' })
-              ]
-            }),
-            Spacer({}),
-            VStack({
-              alignment: 'trailing',
-              spacing: 0,
-              children: [
-                Text({ modifiers: [foregroundStyle(GOLD), font({ size: 26, weight: 'semibold' })], children: props.earnings }),
-                Text({ modifiers: [foregroundStyle(MUTED), font({ size: 11 })], children: 'earned' })
-              ]
-            })
-          ]
-        }),
+        VStack({ alignment: 'leading', spacing: 1, children: [
+          Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 10 })], children: 'TODAY' }),
+          Text({ modifiers: [foregroundStyle(TEXT_PRIMARY), font({ size: 14, weight: 'semibold' })],
+            children: p.today }),
+          deltaHours || Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 1 })],
+            children: '' })
+        ]}),
         Spacer({}),
-        // ── Stats: 2-column pairs ───────────────────────────────────────────
-        HStack({
-          children: [
-            VStack({
-              alignment: 'leading',
-              spacing: 1,
-              children: [
-                Text({ modifiers: [foregroundStyle(MUTED), font({ size: 10 })], children: 'TODAY' }),
-                Text({ modifiers: [foregroundStyle(WHITE), font({ size: 14, weight: 'semibold' })], children: props.today })
-              ]
-            }),
-            Spacer({}),
-            VStack({
-              alignment: 'trailing',
-              spacing: 1,
-              children: [
-                Text({ modifiers: [foregroundStyle(MUTED), font({ size: 10 })], children: 'REMAINING' }),
-                Text({ modifiers: [foregroundStyle(hoursColor), font({ size: 14, weight: 'semibold' })], children: props.hoursRemaining })
-              ]
-            })
-          ]
-        }),
-        Spacer({ minLength: 6 }),
-        HStack({
-          children: [
-            VStack({
-              alignment: 'leading',
-              spacing: 1,
-              children: [
-                Text({ modifiers: [foregroundStyle(MUTED), font({ size: 10 })], children: 'AI USAGE' }),
-                Text({ modifiers: [foregroundStyle(CYAN), font({ size: 14, weight: 'semibold' })], children: props.aiPct })
-              ]
-            }),
-            Spacer({}),
-            VStack({
-              alignment: 'trailing',
-              spacing: 1,
-              children: [
-                Text({ modifiers: [foregroundStyle(MUTED), font({ size: 10 })], children: 'BRAINLIFT' }),
-                Text({ modifiers: [foregroundStyle(VIOLET), font({ size: 14, weight: 'semibold' })], children: props.brainlift })
-              ]
-            })
-          ]
-        }),
+        VStack({ alignment: 'leading', spacing: 1, children: [
+          Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 10 })], children: 'AI USAGE' }),
+          Text({ modifiers: [foregroundStyle(CYAN), font({ size: 14, weight: 'semibold' })],
+            children: p.aiPct })
+        ]}),
         Spacer({}),
-        // ── Daily bar chart ────────────────────────────────────────────────
-        VStack({ alignment: 'leading', spacing: 5, children: barRows }),
-        Spacer({}),
-        // ── AI progress bar ────────────────────────────────────────────────
-        HStack({
-          spacing: 5,
-          children: [
-            Text({ modifiers: [foregroundStyle(MUTED), font({ size: 10 }), frame({ width: 16 })], children: 'AI' }),
-            RoundedRectangle({ cornerRadius: 2, modifiers: [foregroundStyle(CYAN), frame({ width: aiBarWidth, height: 5 })] }),
-            RoundedRectangle({ cornerRadius: 2, modifiers: [foregroundStyle('#2A2A3A'), frame({ width: aiTrackWidth, height: 5 })] }),
-            Text({ modifiers: [foregroundStyle(CYAN), font({ size: 10 })], children: props.aiPct })
-          ]
-        }),
-        Spacer({ minLength: 4 }),
-        // ── BrainLift progress bar ─────────────────────────────────────────
-        HStack({
-          spacing: 5,
-          children: [
-            Text({ modifiers: [foregroundStyle(MUTED), font({ size: 10 }), frame({ width: 16 })], children: 'BL' }),
-            RoundedRectangle({ cornerRadius: 2, modifiers: [foregroundStyle(VIOLET), frame({ width: blBarWidth, height: 5 })] }),
-            RoundedRectangle({ cornerRadius: 2, modifiers: [foregroundStyle('#2A2A3A'), frame({ width: blTrackWidth, height: 5 })] }),
-            Text({ modifiers: [foregroundStyle(VIOLET), font({ size: 10 })], children: props.brainlift + ' / 5h' })
-          ]
+        VStack({ alignment: 'trailing', spacing: 1, children: [
+          Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 10 })], children: 'REMAINING' }),
+          Text({ modifiers: [foregroundStyle(hColor), font({ size: 14, weight: 'semibold' })],
+            children: p.hoursRemaining })
+        ]})
+      ]
+    });
+
+    var mainChildren = [
+      HStack({ children: [hoursPanel, Spacer({}), earningsPanel] }),
+      Spacer({}),
+      statsRow
+    ];
+    if (badgeNode) { mainChildren.push(badgeNode); }
+    mainChildren.push(Spacer({}));
+    if (barRows.length > 0) {
+      mainChildren.push(VStack({ alignment: 'leading', spacing: 5, children: barRows }));
+      mainChildren.push(Spacer({}));
+    }
+    // AI progress bar row
+    mainChildren.push(HStack({ spacing: 5, children: [
+      Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 10 }),
+        frame({ width: 16 })], children: 'AI' }),
+      buildProgressBar(avgAIPct, '100', CYAN, 190),
+      Text({ modifiers: [foregroundStyle(CYAN), font({ size: 10 })], children: p.aiPct })
+    ]}));
+    mainChildren.push(Spacer({ minLength: 4 }));
+    // BrainLift progress bar row
+    mainChildren.push(HStack({ spacing: 5, children: [
+      Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 10 }),
+        frame({ width: 16 })], children: 'BL' }),
+      buildProgressBar(blHours, blTarget, VIOLET, 190),
+      Text({ modifiers: [foregroundStyle(VIOLET), font({ size: 10 })],
+        children: p.brainlift + ' / ' + blTarget })
+    ]}));
+
+    return ZStack({
+      children: [
+        buildMeshBg(urg, pg),
+        VStack({
+          alignment: 'leading',
+          spacing: 0,
+          modifiers: [padding({ all: 14 }), fillFrame],
+          children: mainChildren
         })
       ]
     });
   }
 
-  // ── systemMedium (default) ─────────────────────────────────────────────────
-  // Action mode: compact hero + up to 2 item rows
-  if (actionMode) {
-    var medItems = actionItems.slice(0, 2);
-    var medItemRows = medItems.map(function(item) { return buildItemRow(item); });
-    return VStack({
-      alignment: 'leading',
-      spacing: 10,
-      modifiers: [background(bg), padding({ all: 14 }), fill],
-      children: [
-        // Mini hero
-        HStack({
-          spacing: 6,
-          children: [
-            Text({
-              modifiers: [foregroundStyle(hoursColor), font({ size: 16, weight: 'bold' })],
-              children: props.hoursDisplay
-            }),
-            Text({
-              modifiers: [foregroundStyle(MUTED), font({ size: 14 })],
-              children: ' · '
-            }),
-            Text({
-              modifiers: [foregroundStyle(GOLD), font({ size: 14, weight: 'semibold' })],
-              children: props.earnings
-            })
-          ]
-        })
-      ].concat(medItemRows)
-    });
+  // ── 12. buildAccessory(p, fam) ──────────────────────────────────────────────
+  // Lock screen complication sizes — cosmetic color updates only.
+  function buildAccessory(p, fam) {
+    var hColor = HOURS_COLOR[(p.urgency || 'none')] || HOURS_COLOR.none;
+    if (fam === 'accessoryCircular') {
+      return VStack({ alignment: 'center', spacing: 0, children: [
+        Text({ modifiers: [foregroundStyle(hColor), font({ size: 18, weight: 'bold' })],
+          children: p.hours || '0.0' }),
+        Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 10 })], children: 'h' })
+      ]});
+    }
+    if (fam === 'accessoryInline') {
+      return Text({
+        modifiers: [foregroundStyle(hColor)],
+        children: (p.hoursDisplay || '0h') + ' · ' + (p.earnings || '$0') + ' · AI ' + (p.aiPct || 'N/A')
+      });
+    }
+    // accessoryRectangular (default)
+    return HStack({ spacing: 4, children: [
+      Text({ modifiers: [foregroundStyle(hColor), font({ size: 13, weight: 'bold' })],
+        children: p.hoursDisplay || '0h' }),
+      Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 11 })], children: '·' }),
+      Text({ modifiers: [foregroundStyle(GOLD), font({ size: 13, weight: 'semibold' })],
+        children: p.earnings || '$0' }),
+      Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 11 })], children: '·' }),
+      Text({ modifiers: [foregroundStyle(CYAN), font({ size: 11 })],
+        children: 'AI ' + (p.aiPct || 'N/A') })
+    ]});
   }
 
-  // Hours mode (unchanged from 06-widgets)
-  return VStack({
-    alignment: 'leading',
-    spacing: 10,
-    modifiers: [background(BG), padding({ all: 14 }), fill],
-    children: [
-      HStack({
-        children: [
-          VStack({
-            alignment: 'leading',
-            spacing: 2,
-            children: [
-              Text({
-                modifiers: [foregroundStyle(hoursColor), font({ size: 36, weight: 'bold' })],
-                children: props.hoursDisplay
-              }),
-              Text({
-                modifiers: [foregroundStyle(MUTED), font({ size: 11 })],
-                children: 'this week'
-              })
-            ]
-          }),
-          Spacer({}),
-          VStack({
-            alignment: 'trailing',
-            spacing: 2,
-            children: [
-              Text({
-                modifiers: [foregroundStyle(GOLD), font({ size: 28, weight: 'semibold' })],
-                children: props.earnings
-              }),
-              Text({
-                modifiers: [foregroundStyle(MUTED), font({ size: 11 })],
-                children: 'earned'
-              })
-            ]
-          })
-        ]
-      }),
-      HStack({
-        children: [
-          VStack({
-            alignment: 'leading',
-            spacing: 2,
-            children: [
-              Text({ modifiers: [foregroundStyle(MUTED), font({ size: 10 })], children: 'TODAY' }),
-              Text({ modifiers: [foregroundStyle(WHITE), font({ size: 13, weight: 'semibold' })], children: props.today })
-            ]
-          }),
-          Spacer({}),
-          VStack({
-            alignment: 'leading',
-            spacing: 2,
-            children: [
-              Text({ modifiers: [foregroundStyle(MUTED), font({ size: 10 })], children: 'AI USAGE' }),
-              Text({ modifiers: [foregroundStyle(CYAN), font({ size: 13, weight: 'semibold' })], children: props.aiPct })
-            ]
-          }),
-          Spacer({}),
-          VStack({
-            alignment: 'trailing',
-            spacing: 2,
-            children: [
-              Text({ modifiers: [foregroundStyle(MUTED), font({ size: 10 })], children: 'REMAINING' }),
-              Text({ modifiers: [foregroundStyle(hoursColor), font({ size: 13, weight: 'semibold' })], children: props.hoursRemaining })
-            ]
-          })
-        ]
-      })
-    ]
-  });
+  // ── 13. Router ──────────────────────────────────────────────────────────────
+  if (family === 'systemSmall') { return buildSmall(props); }
+  if (family === 'systemLarge') { return buildLarge(props); }
+  if (family === 'accessoryRectangular' ||
+      family === 'accessoryCircular' ||
+      family === 'accessoryInline') {
+    return buildAccessory(props, family);
+  }
+  return buildMedium(props);
 })`;
 
 // ─── FR1: updateWidgetData ────────────────────────────────────────────────────
