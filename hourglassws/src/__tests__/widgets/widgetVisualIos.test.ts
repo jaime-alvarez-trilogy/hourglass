@@ -1,0 +1,458 @@
+/**
+ * Tests: 01-widget-visual-ios
+ *
+ * FR1: isFuture field in WidgetDailyEntry — buildDailyEntries() populates isFuture correctly
+ * FR2: iOS glass card layout — MediumWidget and LargeWidget hero row uses ZStack+RoundedRectangle cards
+ * FR3: iOS gradient background — all three widget sizes use ZStack with 2 Rectangle layers
+ * FR4: iOS Large bar chart — IosBarChart renders 7 columns with correct colours and heights
+ */
+
+// ─── Mock @expo/ui/swift-ui ────────────────────────────────────────────────────
+// Render primitives as simple host components exposing their props.
+jest.mock(
+  '@expo/ui/swift-ui',
+  () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mockReact = require('react');
+    function makeComp(name) {
+      return (props) =>
+        mockReact.createElement(name, { ...props }, props.children);
+    }
+    return {
+      VStack: makeComp('VStack'),
+      HStack: makeComp('HStack'),
+      ZStack: makeComp('ZStack'),
+      Text: makeComp('Text'),
+      Spacer: makeComp('Spacer'),
+      Rectangle: makeComp('Rectangle'),
+      RoundedRectangle: makeComp('RoundedRectangle'),
+    };
+  },
+  { virtual: true }
+);
+
+// Mock expo-widgets — iOS-only native module
+jest.mock('expo-widgets', () => ({ createWidget: (_name: string, fn: unknown) => fn }), { virtual: true });
+
+// Mock Platform so bridge runs Android path
+jest.mock('react-native', () => ({
+  Platform: { OS: 'android' },
+}));
+
+import React from 'react';
+import { create, act } from 'react-test-renderer';
+import { buildDailyEntries } from '../../widgets/bridge';
+import type { DailyEntry } from '../../lib/hours';
+
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Collect all nodes in a react-test-renderer tree matching the given type name */
+function collectNodes(tree: any, typeName: string, results: any[] = []): any[] {
+  if (!tree) return results;
+  if (tree.type === typeName) results.push(tree);
+  if (Array.isArray(tree.children)) {
+    for (const child of tree.children) {
+      collectNodes(child, typeName, results);
+    }
+  }
+  return results;
+}
+
+/** Build a minimal WidgetData fixture */
+function makeWidgetData(overrides: Record<string, unknown> = {}): any {
+  return {
+    hours: '32.5',
+    hoursDisplay: '32.5h',
+    earnings: '$1,300',
+    earningsRaw: 1300,
+    today: '6.2h',
+    hoursRemaining: '7.5h left',
+    aiPct: '71%–75%',
+    brainlift: '3.2h',
+    deadline: Date.now() + 5 * 24 * 60 * 60 * 1000,
+    urgency: 'none',
+    pendingCount: 0,
+    isManager: false,
+    cachedAt: Date.now(),
+    useQA: false,
+    daily: makeDailyFor('none'),
+    approvalItems: [],
+    myRequests: [],
+    actionBg: '',
+    paceBadge: 'on_track',
+    weekDeltaHours: '+2.1h',
+    weekDeltaEarnings: '+$84',
+    brainliftTarget: '5h',
+    todayDelta: '+1.2h',
+    ...overrides,
+  };
+}
+
+/** Build a 7-entry daily array for a given urgency context */
+function makeDailyFor(_urgency: string): any[] {
+  // Use a fixed Mon–Sun week with no isFuture entries
+  return [
+    { day: 'Mon', hours: 6.0, isToday: false, isFuture: false },
+    { day: 'Tue', hours: 7.5, isToday: false, isFuture: false },
+    { day: 'Wed', hours: 6.2, isToday: true,  isFuture: false },
+    { day: 'Thu', hours: 0,   isToday: false, isFuture: true  },
+    { day: 'Fri', hours: 0,   isToday: false, isFuture: true  },
+    { day: 'Sat', hours: 0,   isToday: false, isFuture: true  },
+    { day: 'Sun', hours: 0,   isToday: false, isFuture: true  },
+  ];
+}
+
+function renderWidget(el: React.ReactElement): any {
+  let renderer: any;
+  act(() => {
+    renderer = create(el);
+  });
+  return renderer.toJSON();
+}
+
+// ─── FR1: isFuture in buildDailyEntries ───────────────────────────────────────
+
+describe('FR1 — buildDailyEntries isFuture', () => {
+  // Use a fixed "today": Wednesday 2026-03-18
+  const TODAY = new Date('2026-03-18T12:00:00');
+
+  it('FR1.1 — entry with date = yesterday (2026-03-17) → isFuture: false', () => {
+    const daily: DailyEntry[] = [{ date: '2026-03-17', hours: 6.0, isToday: false }];
+    const result = buildDailyEntries(daily, TODAY);
+    const tue = result.find((e) => e.day === 'Tue')!;
+    expect(tue.isFuture).toBe(false);
+  });
+
+  it('FR1.2 — entry with date = today (2026-03-18) → isFuture: false', () => {
+    const daily: DailyEntry[] = [{ date: '2026-03-18', hours: 6.0, isToday: true }];
+    const result = buildDailyEntries(daily, TODAY);
+    const wed = result.find((e) => e.day === 'Wed')!;
+    expect(wed.isFuture).toBe(false);
+  });
+
+  it('FR1.3 — entry with date = tomorrow (2026-03-19) → isFuture: true', () => {
+    const daily: DailyEntry[] = [{ date: '2026-03-19', hours: 0, isToday: false }];
+    const result = buildDailyEntries(daily, TODAY);
+    const thu = result.find((e) => e.day === 'Thu')!;
+    expect(thu.isFuture).toBe(true);
+  });
+
+  it('FR1.4 — entry with date = next Sunday (2026-03-22) → isFuture: true', () => {
+    const daily: DailyEntry[] = [{ date: '2026-03-22', hours: 0, isToday: false }];
+    const result = buildDailyEntries(daily, TODAY);
+    const sun = result.find((e) => e.day === 'Sun')!;
+    expect(sun.isFuture).toBe(true);
+  });
+
+  it('FR1.5 — gap-filled entry for a future day (Thu) → isFuture: true', () => {
+    // Only Mon–Wed provided; Thu–Sun are gap-filled
+    const daily: DailyEntry[] = [
+      { date: '2026-03-16', hours: 7.0, isToday: false }, // Mon
+      { date: '2026-03-17', hours: 7.5, isToday: false }, // Tue
+      { date: '2026-03-18', hours: 6.2, isToday: true  }, // Wed
+    ];
+    const result = buildDailyEntries(daily, TODAY);
+    expect(result.find((e) => e.day === 'Thu')!.isFuture).toBe(true);
+    expect(result.find((e) => e.day === 'Fri')!.isFuture).toBe(true);
+    expect(result.find((e) => e.day === 'Sat')!.isFuture).toBe(true);
+    expect(result.find((e) => e.day === 'Sun')!.isFuture).toBe(true);
+  });
+
+  it('FR1.6 — gap-filled entry for a past day (Mon) → isFuture: false', () => {
+    // Only Tue–Wed provided; Mon is gap-filled but is in the past
+    const daily: DailyEntry[] = [
+      { date: '2026-03-17', hours: 7.5, isToday: false }, // Tue
+      { date: '2026-03-18', hours: 6.2, isToday: true  }, // Wed
+    ];
+    const result = buildDailyEntries(daily, TODAY);
+    expect(result.find((e) => e.day === 'Mon')!.isFuture).toBe(false);
+  });
+
+  it('FR1.7 — full week: only days after today have isFuture: true', () => {
+    const daily: DailyEntry[] = [
+      { date: '2026-03-16', hours: 7.0, isToday: false }, // Mon
+      { date: '2026-03-17', hours: 7.5, isToday: false }, // Tue
+      { date: '2026-03-18', hours: 6.2, isToday: true  }, // Wed
+      { date: '2026-03-19', hours: 0,   isToday: false }, // Thu
+      { date: '2026-03-20', hours: 0,   isToday: false }, // Fri
+      { date: '2026-03-21', hours: 0,   isToday: false }, // Sat
+      { date: '2026-03-22', hours: 0,   isToday: false }, // Sun
+    ];
+    const result = buildDailyEntries(daily, TODAY);
+    expect(result.find((e) => e.day === 'Mon')!.isFuture).toBe(false);
+    expect(result.find((e) => e.day === 'Tue')!.isFuture).toBe(false);
+    expect(result.find((e) => e.day === 'Wed')!.isFuture).toBe(false);
+    expect(result.find((e) => e.day === 'Thu')!.isFuture).toBe(true);
+    expect(result.find((e) => e.day === 'Fri')!.isFuture).toBe(true);
+    expect(result.find((e) => e.day === 'Sat')!.isFuture).toBe(true);
+    expect(result.find((e) => e.day === 'Sun')!.isFuture).toBe(true);
+  });
+
+  it('FR1.8 — now at midnight exactly: today is not future', () => {
+    const midnight = new Date('2026-03-18T00:00:00');
+    const daily: DailyEntry[] = [{ date: '2026-03-18', hours: 0, isToday: true }];
+    const result = buildDailyEntries(daily, midnight);
+    expect(result.find((e) => e.day === 'Wed')!.isFuture).toBe(false);
+  });
+
+  it('FR1.9 — empty daily array still returns 7 entries each with isFuture: boolean', () => {
+    const result = buildDailyEntries([], TODAY);
+    expect(result).toHaveLength(7);
+    for (const entry of result) {
+      expect(typeof entry.isFuture).toBe('boolean');
+    }
+  });
+});
+
+// ─── iOS widget module handle ──────────────────────────────────────────────────
+
+let SmallWidgetFn: any;
+let MediumWidgetFn: any;
+let LargeWidgetFn: any;
+let IosBarChartFn: any;
+
+beforeAll(() => {
+  const mod = require('../../widgets/ios/HourglassWidget');
+  // The default export is the widget factory result; we also need internal components.
+  // Since they're not exported, we render via the main widget with widgetFamily prop.
+  SmallWidgetFn  = (props: any) => mod.default({ ...props, widgetFamily: 'systemSmall' });
+  MediumWidgetFn = (props: any) => mod.default({ ...props, widgetFamily: 'systemMedium' });
+  LargeWidgetFn  = (props: any) => mod.default({ ...props, widgetFamily: 'systemLarge' });
+  // IosBarChart is internal — test via LargeWidget render
+  IosBarChartFn  = mod.IosBarChart; // exported for testing (will be undefined until impl adds export)
+});
+
+// ─── FR2: iOS glass card layout ───────────────────────────────────────────────
+
+describe('FR2 — iOS glass card layout', () => {
+  it('FR2.1 — MediumWidget renders ZStack elements with RoundedRectangle in hero row', () => {
+    const tree = renderWidget(React.createElement(MediumWidgetFn, makeWidgetData()));
+    const roundedRects = collectNodes(tree, 'RoundedRectangle');
+    expect(roundedRects.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('FR2.2 — each glass card RoundedRectangle has cornerRadius >= 10', () => {
+    const tree = renderWidget(React.createElement(MediumWidgetFn, makeWidgetData()));
+    const roundedRects = collectNodes(tree, 'RoundedRectangle');
+    for (const rr of roundedRects) {
+      expect(rr.props.cornerRadius).toBeGreaterThanOrEqual(10);
+    }
+  });
+
+  it('FR2.3 — MediumWidget renders hoursDisplay text', () => {
+    const tree = renderWidget(React.createElement(MediumWidgetFn, makeWidgetData()));
+    const texts = collectNodes(tree, 'Text');
+    const textContent = texts.map((t: any) =>
+      Array.isArray(t.children) ? t.children.join('') : String(t.children ?? '')
+    );
+    expect(textContent.some((s: string) => s.includes('32.5h'))).toBe(true);
+  });
+
+  it('FR2.4 — MediumWidget renders earnings text', () => {
+    const tree = renderWidget(React.createElement(MediumWidgetFn, makeWidgetData()));
+    const texts = collectNodes(tree, 'Text');
+    const textContent = texts.map((t: any) =>
+      Array.isArray(t.children) ? t.children.join('') : String(t.children ?? '')
+    );
+    expect(textContent.some((s: string) => s.includes('$1,300'))).toBe(true);
+  });
+
+  it('FR2.5 — LargeWidget hero row has RoundedRectangle card elements', () => {
+    const tree = renderWidget(React.createElement(LargeWidgetFn, makeWidgetData()));
+    const roundedRects = collectNodes(tree, 'RoundedRectangle');
+    expect(roundedRects.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ─── FR3: iOS gradient background ─────────────────────────────────────────────
+
+describe('FR3 — iOS gradient background', () => {
+  it('FR3.1 — SmallWidget outer ZStack contains at least 2 Rectangle elements', () => {
+    const tree = renderWidget(React.createElement(SmallWidgetFn, makeWidgetData()));
+    const rects = collectNodes(tree, 'Rectangle');
+    expect(rects.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('FR3.2 — MediumWidget outer ZStack contains at least 2 Rectangle elements', () => {
+    const tree = renderWidget(React.createElement(MediumWidgetFn, makeWidgetData()));
+    const rects = collectNodes(tree, 'Rectangle');
+    expect(rects.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('FR3.3 — LargeWidget outer ZStack contains at least 2 Rectangle elements', () => {
+    const tree = renderWidget(React.createElement(LargeWidgetFn, makeWidgetData()));
+    const rects = collectNodes(tree, 'Rectangle');
+    expect(rects.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('FR3.4 — first Rectangle fill is #0D0C14 (base dark layer)', () => {
+    const tree = renderWidget(React.createElement(MediumWidgetFn, makeWidgetData({ urgency: 'none' })));
+    const rects = collectNodes(tree, 'Rectangle');
+    expect(rects[0].props.fill).toBe('#0D0C14');
+  });
+
+  it('FR3.5 — urgency "low" produces different second Rectangle fill than urgency "high"', () => {
+    const lowTree  = renderWidget(React.createElement(MediumWidgetFn, makeWidgetData({ urgency: 'low' })));
+    const highTree = renderWidget(React.createElement(MediumWidgetFn, makeWidgetData({ urgency: 'high' })));
+    const lowRects  = collectNodes(lowTree, 'Rectangle');
+    const highRects = collectNodes(highTree, 'Rectangle');
+    expect(lowRects[1].props.fill).not.toBe(highRects[1].props.fill);
+  });
+
+  it('FR3.6 — root content VStack does not have a background prop equal to a solid urgency colour', () => {
+    // The flat URGENCY_COLORS background should be removed from VStack
+    const tree = renderWidget(React.createElement(SmallWidgetFn, makeWidgetData({ urgency: 'none' })));
+    const vstacks = collectNodes(tree, 'VStack');
+    // None of the vstacks should have background='#1A1A2E' (the old solid colour)
+    for (const v of vstacks) {
+      expect(v.props.background).not.toBe('#1A1A2E');
+    }
+  });
+});
+
+// ─── FR4: iOS Large bar chart ─────────────────────────────────────────────────
+
+describe('FR4 — iOS Large bar chart', () => {
+  const accent = '#00FF88'; // urgency 'none' accent
+
+  function makeWeekData(overrides: Partial<{ daily: any[] }> = {}): any {
+    return makeWidgetData({
+      urgency: 'none',
+      daily: [
+        { day: 'Mon', hours: 6.0, isToday: false, isFuture: false },
+        { day: 'Tue', hours: 7.5, isToday: false, isFuture: false },
+        { day: 'Wed', hours: 6.2, isToday: true,  isFuture: false },
+        { day: 'Thu', hours: 0,   isToday: false, isFuture: true  },
+        { day: 'Fri', hours: 0,   isToday: false, isFuture: true  },
+        { day: 'Sat', hours: 0,   isToday: false, isFuture: true  },
+        { day: 'Sun', hours: 0,   isToday: false, isFuture: true  },
+      ],
+      ...overrides,
+    });
+  }
+
+  it('FR4.1 — LargeWidget renders exactly 7 day label Text nodes in bar chart', () => {
+    const tree = renderWidget(React.createElement(LargeWidgetFn, makeWeekData()));
+    const texts = collectNodes(tree, 'Text');
+    const dayLabels = texts.filter((t: any) => {
+      const content = Array.isArray(t.children) ? t.children.join('') : String(t.children ?? '');
+      return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].includes(content);
+    });
+    expect(dayLabels).toHaveLength(7);
+  });
+
+  it('FR4.2 — today bar (Wed) RoundedRectangle uses accent colour', () => {
+    const tree = renderWidget(React.createElement(LargeWidgetFn, makeWeekData()));
+    const roundedRects = collectNodes(tree, 'RoundedRectangle');
+    // At least one bar uses the accent colour (today bar)
+    const todayBar = roundedRects.find((rr: any) => rr.props.fill === accent);
+    expect(todayBar).toBeDefined();
+  });
+
+  it('FR4.3 — future bar RoundedRectangle uses muted colour #2F2E41', () => {
+    const tree = renderWidget(React.createElement(LargeWidgetFn, makeWeekData()));
+    const roundedRects = collectNodes(tree, 'RoundedRectangle');
+    // At least one bar uses the future/muted colour
+    const mutedBar = roundedRects.find((rr: any) => rr.props.fill === '#2F2E41');
+    expect(mutedBar).toBeDefined();
+  });
+
+  it('FR4.4 — past bar with hours uses colour #4A4A6A', () => {
+    const tree = renderWidget(React.createElement(LargeWidgetFn, makeWeekData()));
+    const roundedRects = collectNodes(tree, 'RoundedRectangle');
+    // Mon and Tue have hours and are past → should use #4A4A6A
+    const pastBar = roundedRects.find((rr: any) => rr.props.fill === '#4A4A6A');
+    expect(pastBar).toBeDefined();
+  });
+
+  it('FR4.5 — column with max hours has bar height close to MAX_BAR_HEIGHT (100pt, within 5%)', () => {
+    const tree = renderWidget(React.createElement(LargeWidgetFn, makeWeekData()));
+    const roundedRects = collectNodes(tree, 'RoundedRectangle');
+    // Filter to bars that have a height prop (chart bars, not glass card borders)
+    const barHeights = roundedRects
+      .map((rr: any) => rr.props.height)
+      .filter((h: any) => typeof h === 'number' && h > 0);
+    const maxHeight = Math.max(...barHeights);
+    // Should be within 5% of 100
+    expect(maxHeight).toBeGreaterThanOrEqual(95);
+    expect(maxHeight).toBeLessThanOrEqual(105);
+  });
+
+  it('FR4.6 — zero-hours bar has height 0', () => {
+    const tree = renderWidget(React.createElement(LargeWidgetFn, makeWeekData()));
+    const roundedRects = collectNodes(tree, 'RoundedRectangle');
+    // Future/zero bars: Thu, Fri, Sat, Sun — their heights should be 0
+    const zeroHeightBars = roundedRects.filter(
+      (rr: any) => typeof rr.props.height === 'number' && rr.props.height === 0
+    );
+    expect(zeroHeightBars.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('FR4.7 — day labels are 3-char strings', () => {
+    const tree = renderWidget(React.createElement(LargeWidgetFn, makeWeekData()));
+    const texts = collectNodes(tree, 'Text');
+    const dayLabels = texts.filter((t: any) => {
+      const content = Array.isArray(t.children) ? t.children.join('') : String(t.children ?? '');
+      return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].includes(content);
+    });
+    for (const label of dayLabels) {
+      const content = Array.isArray(label.children) ? label.children.join('') : String(label.children ?? '');
+      expect(content).toHaveLength(3);
+    }
+  });
+
+  it('FR4.8 — all-zero daily input: no error, bar heights all 0', () => {
+    const allZero = makeWidgetData({
+      urgency: 'none',
+      daily: [
+        { day: 'Mon', hours: 0, isToday: false, isFuture: false },
+        { day: 'Tue', hours: 0, isToday: false, isFuture: false },
+        { day: 'Wed', hours: 0, isToday: true,  isFuture: false },
+        { day: 'Thu', hours: 0, isToday: false, isFuture: true  },
+        { day: 'Fri', hours: 0, isToday: false, isFuture: true  },
+        { day: 'Sat', hours: 0, isToday: false, isFuture: true  },
+        { day: 'Sun', hours: 0, isToday: false, isFuture: true  },
+      ],
+    });
+    expect(() => renderWidget(React.createElement(LargeWidgetFn, allZero))).not.toThrow();
+    const tree = renderWidget(React.createElement(LargeWidgetFn, allZero));
+    const roundedRects = collectNodes(tree, 'RoundedRectangle');
+    const barHeights = roundedRects
+      .map((rr: any) => rr.props.height)
+      .filter((h: any) => typeof h === 'number');
+    for (const h of barHeights) {
+      expect(h).toBe(0);
+    }
+  });
+
+  it('FR4.9 — single non-zero entry: that column bar height = MAX_BAR_HEIGHT (100)', () => {
+    const singleNonZero = makeWidgetData({
+      urgency: 'none',
+      daily: [
+        { day: 'Mon', hours: 0,   isToday: false, isFuture: false },
+        { day: 'Tue', hours: 0,   isToday: false, isFuture: false },
+        { day: 'Wed', hours: 8.0, isToday: true,  isFuture: false },
+        { day: 'Thu', hours: 0,   isToday: false, isFuture: true  },
+        { day: 'Fri', hours: 0,   isToday: false, isFuture: true  },
+        { day: 'Sat', hours: 0,   isToday: false, isFuture: true  },
+        { day: 'Sun', hours: 0,   isToday: false, isFuture: true  },
+      ],
+    });
+    const tree = renderWidget(React.createElement(LargeWidgetFn, singleNonZero));
+    const roundedRects = collectNodes(tree, 'RoundedRectangle');
+    const barHeights = roundedRects
+      .map((rr: any) => rr.props.height)
+      .filter((h: any) => typeof h === 'number');
+    expect(barHeights).toContain(100);
+  });
+
+  it('FR4.10 — LargeWidget renders IosBarChart (contains 7 day Text nodes)', () => {
+    const tree = renderWidget(React.createElement(LargeWidgetFn, makeWeekData()));
+    const texts = collectNodes(tree, 'Text');
+    const dayLabels = texts.filter((t: any) => {
+      const content = Array.isArray(t.children) ? t.children.join('') : String(t.children ?? '');
+      return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].includes(content);
+    });
+    expect(dayLabels).toHaveLength(7);
+  });
+});
