@@ -5,15 +5,18 @@
 // Data is pre-populated via HourglassWidget.updateTimeline() in bridge.ts.
 // This file is compiled by the expo-widgets build plugin — never bundled
 // into the main app JS bundle.
+//
+// 01-widget-visual-ios:
+//   FR2: Glass cards for Medium/Large hero row
+//   FR3: Gradient background (two Rectangle layers) for all sizes
+//   FR4: Bar chart (IosBarChart) for Large size
 
-'widget';
-
-import type { WidgetData } from '../types';
+import type { WidgetData, WidgetDailyEntry } from '../types';
 
 // SwiftUI component imports (expo-widgets JSX subset)
 // These are resolved at build time by the expo-widgets plugin
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { VStack, HStack, ZStack, Text, Spacer } = require('@expo/ui/swift-ui');
+const { VStack, HStack, ZStack, Text, Spacer, Rectangle, RoundedRectangle } = require('@expo/ui/swift-ui');
 
 // ─── Urgency color mapping ─────────────────────────────────────────────────────
 
@@ -24,14 +27,6 @@ const PACE_LABELS: Record<string, string> = {
   critical:   'CRITICAL',
 };
 
-const URGENCY_COLORS: Record<string, string> = {
-  none: '#1A1A2E',
-  low: '#4A3B00',
-  high: '#4A1F00',
-  critical: '#4A0000',
-  expired: '#2A2A2A',
-};
-
 const URGENCY_ACCENT: Record<string, string> = {
   none: '#00FF88',
   low: '#F5C842',
@@ -39,6 +34,24 @@ const URGENCY_ACCENT: Record<string, string> = {
   critical: '#FF2D55',
   expired: '#6B6B6B',
 };
+
+// FR3: gradient background tint colours (8-char hex = RRGGBBAA, ~12% opacity)
+const URGENCY_TINTS: Record<string, string> = {
+  none:     '#0D0C1433',  // near-transparent base tint
+  low:      '#F5C84220',  // gold tint ~12%
+  high:     '#FF6B0020',  // orange tint ~12%
+  critical: '#FF2D5520',  // red tint ~12%
+  expired:  '#6B6B6B20',  // grey tint ~12%
+};
+
+// FR2: glass card colours
+const CARD_BG     = '#1F1E2C';
+const CARD_BORDER = '#2F2E41';
+
+// FR4: bar chart constants
+const MAX_BAR_HEIGHT = 100;
+const BAR_PAST  = '#4A4A6A';
+const BAR_MUTED = '#2F2E41';
 
 // ─── Stale indicator ──────────────────────────────────────────────────────────
 
@@ -53,19 +66,63 @@ function formatCachedTime(cachedAt: number): string {
   return `${h}:${m}`;
 }
 
+// ─── FR2: Glass card component ────────────────────────────────────────────────
+
+function IosGlassCard({ children }: { children: React.ReactNode }) {
+  return (
+    <ZStack>
+      <RoundedRectangle fill={CARD_BG} cornerRadius={12} stroke={CARD_BORDER} strokeWidth={1} />
+      <VStack padding={10}>
+        {children}
+      </VStack>
+    </ZStack>
+  );
+}
+
+// ─── FR4: Bar chart component ─────────────────────────────────────────────────
+// Exported for unit testing.
+
+export function IosBarChart({ daily, accent }: { daily: WidgetDailyEntry[]; accent: string }) {
+  const maxHours = Math.max(...daily.map((d) => d.hours), 0);
+
+  return (
+    <HStack spacing={4}>
+      {daily.map((entry) => {
+        const barHeight = maxHours > 0 ? (entry.hours / maxHours) * MAX_BAR_HEIGHT : 0;
+        const barColor = entry.isToday
+          ? accent
+          : entry.isFuture || entry.hours === 0
+            ? BAR_MUTED
+            : BAR_PAST;
+
+        return (
+          <VStack spacing={2} key={entry.day}>
+            <Spacer />
+            <RoundedRectangle fill={barColor} cornerRadius={3} height={barHeight} />
+            <Text font={{ size: 10 }} foregroundStyle="#777777">
+              {entry.day}
+            </Text>
+          </VStack>
+        );
+      })}
+    </HStack>
+  );
+}
+
 // ─── Small widget ─────────────────────────────────────────────────────────────
-// Shows: weekly hours total, earnings, hours remaining
+// Shows: weekly hours total, pace badge, stale indicator
 
 function SmallWidget({ props }: { props: WidgetData }) {
-  const bg = URGENCY_COLORS[props.urgency] ?? URGENCY_COLORS.none;
   const accent = URGENCY_ACCENT[props.urgency] ?? URGENCY_ACCENT.none;
+  const tint   = URGENCY_TINTS[props.urgency]  ?? URGENCY_TINTS.none;
 
   return (
     <ZStack>
-      <VStack
-        background={bg}
-        padding={12}
-      >
+      {/* FR3: gradient background layers */}
+      <Rectangle fill="#0D0C14" />
+      <Rectangle fill={tint} />
+
+      <VStack padding={12}>
         {/* Hours total */}
         <Text
           font={{ size: 28, weight: 'bold' }}
@@ -105,36 +162,38 @@ function SmallWidget({ props }: { props: WidgetData }) {
 }
 
 // ─── Medium widget ─────────────────────────────────────────────────────────────
-// Shows: hours (hero) + earnings (hero) + today's hours + AI%
+// Shows: glass card (hours) + glass card (earnings) + today's hours + AI%
 
 function MediumWidget({ props }: { props: WidgetData }) {
-  const bg = URGENCY_COLORS[props.urgency] ?? URGENCY_COLORS.none;
   const accent = URGENCY_ACCENT[props.urgency] ?? URGENCY_ACCENT.none;
+  const tint   = URGENCY_TINTS[props.urgency]  ?? URGENCY_TINTS.none;
 
   return (
     <ZStack>
-      <VStack background={bg} padding={12}>
-        {/* Top row: hero hours + earnings */}
-        <HStack>
-          <VStack>
+      {/* FR3: gradient background layers */}
+      <Rectangle fill="#0D0C14" />
+      <Rectangle fill={tint} />
+
+      <VStack padding={12}>
+        {/* FR2: Top row — two glass cards side by side */}
+        <HStack spacing={8}>
+          <IosGlassCard>
             <Text font={{ size: 32, weight: 'bold' }} foregroundStyle={accent}>
               {props.hoursDisplay}
             </Text>
             <Text font={{ size: 12 }} foregroundStyle="#AAAAAA">
               this week
             </Text>
-          </VStack>
+          </IosGlassCard>
 
-          <Spacer />
-
-          <VStack>
+          <IosGlassCard>
             <Text font={{ size: 24, weight: 'semibold' }} foregroundStyle="#FFFFFF">
               {props.earnings}
             </Text>
             <Text font={{ size: 12 }} foregroundStyle="#AAAAAA">
               earned
             </Text>
-          </VStack>
+          </IosGlassCard>
         </HStack>
 
         <Spacer />
@@ -174,35 +233,44 @@ function MediumWidget({ props }: { props: WidgetData }) {
 }
 
 // ─── Large widget ──────────────────────────────────────────────────────────────
-// Shows: all of medium + BrainLift hours
+// Shows: glass card hero row + bar chart + detail rows
 
 function LargeWidget({ props }: { props: WidgetData }) {
-  const bg = URGENCY_COLORS[props.urgency] ?? URGENCY_COLORS.none;
   const accent = URGENCY_ACCENT[props.urgency] ?? URGENCY_ACCENT.none;
+  const tint   = URGENCY_TINTS[props.urgency]  ?? URGENCY_TINTS.none;
 
   return (
     <ZStack>
-      <VStack background={bg} padding={16}>
-        {/* Hero row */}
-        <HStack>
-          <VStack>
+      {/* FR3: gradient background layers */}
+      <Rectangle fill="#0D0C14" />
+      <Rectangle fill={tint} />
+
+      <VStack padding={16}>
+        {/* FR2: Hero row — two glass cards */}
+        <HStack spacing={8}>
+          <IosGlassCard>
             <Text font={{ size: 36, weight: 'bold' }} foregroundStyle={accent}>
               {props.hoursDisplay}
             </Text>
             <Text font={{ size: 12 }} foregroundStyle="#AAAAAA">
               this week
             </Text>
-          </VStack>
-          <Spacer />
-          <VStack>
+          </IosGlassCard>
+
+          <IosGlassCard>
             <Text font={{ size: 26, weight: 'semibold' }} foregroundStyle="#FFFFFF">
               {props.earnings}
             </Text>
             <Text font={{ size: 12 }} foregroundStyle="#AAAAAA">
               earned
             </Text>
-          </VStack>
+          </IosGlassCard>
         </HStack>
+
+        {/* FR4: Daily bar chart */}
+        {props.daily && props.daily.length > 0 && (
+          <IosBarChart daily={props.daily} accent={accent} />
+        )}
 
         <Spacer />
 
@@ -276,3 +344,7 @@ const HourglassWidget = createWidget('HourglassWidget', (props: WidgetData & { w
 });
 
 export default HourglassWidget;
+
+// Named exports for unit testing — allows tests to render sub-components directly
+// without going through the expo-widgets createWidget/default export path.
+export { SmallWidget, MediumWidget, LargeWidget };

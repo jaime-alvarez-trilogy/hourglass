@@ -213,26 +213,25 @@ let IosBarChartFn: any;
 
 beforeAll(() => {
   const mod = require('../../widgets/ios/HourglassWidget');
-  // The default export is the widget factory result; we also need internal components.
-  // Since they're not exported, we render via the main widget with widgetFamily prop.
-  SmallWidgetFn  = (props: any) => mod.default({ ...props, widgetFamily: 'systemSmall' });
-  MediumWidgetFn = (props: any) => mod.default({ ...props, widgetFamily: 'systemMedium' });
-  LargeWidgetFn  = (props: any) => mod.default({ ...props, widgetFamily: 'systemLarge' });
-  // IosBarChart is internal — test via LargeWidget render
-  IosBarChartFn  = mod.IosBarChart; // exported for testing (will be undefined until impl adds export)
+  // Use named exports — the default export goes through expo-widgets 'widget' directive
+  // which Babel transforms and makes it non-callable in test environments.
+  SmallWidgetFn  = mod.SmallWidget;
+  MediumWidgetFn = mod.MediumWidget;
+  LargeWidgetFn  = mod.LargeWidget;
+  IosBarChartFn  = mod.IosBarChart;
 });
 
 // ─── FR2: iOS glass card layout ───────────────────────────────────────────────
 
 describe('FR2 — iOS glass card layout', () => {
   it('FR2.1 — MediumWidget renders ZStack elements with RoundedRectangle in hero row', () => {
-    const tree = renderWidget(React.createElement(MediumWidgetFn, makeWidgetData()));
+    const tree = renderWidget(React.createElement(MediumWidgetFn, { props: makeWidgetData() }));
     const roundedRects = collectNodes(tree, 'RoundedRectangle');
     expect(roundedRects.length).toBeGreaterThanOrEqual(2);
   });
 
   it('FR2.2 — each glass card RoundedRectangle has cornerRadius >= 10', () => {
-    const tree = renderWidget(React.createElement(MediumWidgetFn, makeWidgetData()));
+    const tree = renderWidget(React.createElement(MediumWidgetFn, { props: makeWidgetData() }));
     const roundedRects = collectNodes(tree, 'RoundedRectangle');
     for (const rr of roundedRects) {
       expect(rr.props.cornerRadius).toBeGreaterThanOrEqual(10);
@@ -240,7 +239,7 @@ describe('FR2 — iOS glass card layout', () => {
   });
 
   it('FR2.3 — MediumWidget renders hoursDisplay text', () => {
-    const tree = renderWidget(React.createElement(MediumWidgetFn, makeWidgetData()));
+    const tree = renderWidget(React.createElement(MediumWidgetFn, { props: makeWidgetData() }));
     const texts = collectNodes(tree, 'Text');
     const textContent = texts.map((t: any) =>
       Array.isArray(t.children) ? t.children.join('') : String(t.children ?? '')
@@ -249,7 +248,7 @@ describe('FR2 — iOS glass card layout', () => {
   });
 
   it('FR2.4 — MediumWidget renders earnings text', () => {
-    const tree = renderWidget(React.createElement(MediumWidgetFn, makeWidgetData()));
+    const tree = renderWidget(React.createElement(MediumWidgetFn, { props: makeWidgetData() }));
     const texts = collectNodes(tree, 'Text');
     const textContent = texts.map((t: any) =>
       Array.isArray(t.children) ? t.children.join('') : String(t.children ?? '')
@@ -258,7 +257,7 @@ describe('FR2 — iOS glass card layout', () => {
   });
 
   it('FR2.5 — LargeWidget hero row has RoundedRectangle card elements', () => {
-    const tree = renderWidget(React.createElement(LargeWidgetFn, makeWidgetData()));
+    const tree = renderWidget(React.createElement(LargeWidgetFn, { props: makeWidgetData() }));
     const roundedRects = collectNodes(tree, 'RoundedRectangle');
     expect(roundedRects.length).toBeGreaterThanOrEqual(2);
   });
@@ -268,32 +267,32 @@ describe('FR2 — iOS glass card layout', () => {
 
 describe('FR3 — iOS gradient background', () => {
   it('FR3.1 — SmallWidget outer ZStack contains at least 2 Rectangle elements', () => {
-    const tree = renderWidget(React.createElement(SmallWidgetFn, makeWidgetData()));
+    const tree = renderWidget(React.createElement(SmallWidgetFn, { props: makeWidgetData() }));
     const rects = collectNodes(tree, 'Rectangle');
     expect(rects.length).toBeGreaterThanOrEqual(2);
   });
 
   it('FR3.2 — MediumWidget outer ZStack contains at least 2 Rectangle elements', () => {
-    const tree = renderWidget(React.createElement(MediumWidgetFn, makeWidgetData()));
+    const tree = renderWidget(React.createElement(MediumWidgetFn, { props: makeWidgetData() }));
     const rects = collectNodes(tree, 'Rectangle');
     expect(rects.length).toBeGreaterThanOrEqual(2);
   });
 
   it('FR3.3 — LargeWidget outer ZStack contains at least 2 Rectangle elements', () => {
-    const tree = renderWidget(React.createElement(LargeWidgetFn, makeWidgetData()));
+    const tree = renderWidget(React.createElement(LargeWidgetFn, { props: makeWidgetData() }));
     const rects = collectNodes(tree, 'Rectangle');
     expect(rects.length).toBeGreaterThanOrEqual(2);
   });
 
   it('FR3.4 — first Rectangle fill is #0D0C14 (base dark layer)', () => {
-    const tree = renderWidget(React.createElement(MediumWidgetFn, makeWidgetData({ urgency: 'none' })));
+    const tree = renderWidget(React.createElement(MediumWidgetFn, { props: makeWidgetData({ urgency: 'none' }) }));
     const rects = collectNodes(tree, 'Rectangle');
     expect(rects[0].props.fill).toBe('#0D0C14');
   });
 
   it('FR3.5 — urgency "low" produces different second Rectangle fill than urgency "high"', () => {
-    const lowTree  = renderWidget(React.createElement(MediumWidgetFn, makeWidgetData({ urgency: 'low' })));
-    const highTree = renderWidget(React.createElement(MediumWidgetFn, makeWidgetData({ urgency: 'high' })));
+    const lowTree  = renderWidget(React.createElement(MediumWidgetFn, { props: makeWidgetData({ urgency: 'low' }) }));
+    const highTree = renderWidget(React.createElement(MediumWidgetFn, { props: makeWidgetData({ urgency: 'high' }) }));
     const lowRects  = collectNodes(lowTree, 'Rectangle');
     const highRects = collectNodes(highTree, 'Rectangle');
     expect(lowRects[1].props.fill).not.toBe(highRects[1].props.fill);
@@ -301,7 +300,7 @@ describe('FR3 — iOS gradient background', () => {
 
   it('FR3.6 — root content VStack does not have a background prop equal to a solid urgency colour', () => {
     // The flat URGENCY_COLORS background should be removed from VStack
-    const tree = renderWidget(React.createElement(SmallWidgetFn, makeWidgetData({ urgency: 'none' })));
+    const tree = renderWidget(React.createElement(SmallWidgetFn, { props: makeWidgetData({ urgency: 'none' }) }));
     const vstacks = collectNodes(tree, 'VStack');
     // None of the vstacks should have background='#1A1A2E' (the old solid colour)
     for (const v of vstacks) {
@@ -332,7 +331,7 @@ describe('FR4 — iOS Large bar chart', () => {
   }
 
   it('FR4.1 — LargeWidget renders exactly 7 day label Text nodes in bar chart', () => {
-    const tree = renderWidget(React.createElement(LargeWidgetFn, makeWeekData()));
+    const tree = renderWidget(React.createElement(LargeWidgetFn, { props: makeWeekData() }));
     const texts = collectNodes(tree, 'Text');
     const dayLabels = texts.filter((t: any) => {
       const content = Array.isArray(t.children) ? t.children.join('') : String(t.children ?? '');
@@ -342,7 +341,7 @@ describe('FR4 — iOS Large bar chart', () => {
   });
 
   it('FR4.2 — today bar (Wed) RoundedRectangle uses accent colour', () => {
-    const tree = renderWidget(React.createElement(LargeWidgetFn, makeWeekData()));
+    const tree = renderWidget(React.createElement(LargeWidgetFn, { props: makeWeekData() }));
     const roundedRects = collectNodes(tree, 'RoundedRectangle');
     // At least one bar uses the accent colour (today bar)
     const todayBar = roundedRects.find((rr: any) => rr.props.fill === accent);
@@ -350,7 +349,7 @@ describe('FR4 — iOS Large bar chart', () => {
   });
 
   it('FR4.3 — future bar RoundedRectangle uses muted colour #2F2E41', () => {
-    const tree = renderWidget(React.createElement(LargeWidgetFn, makeWeekData()));
+    const tree = renderWidget(React.createElement(LargeWidgetFn, { props: makeWeekData() }));
     const roundedRects = collectNodes(tree, 'RoundedRectangle');
     // At least one bar uses the future/muted colour
     const mutedBar = roundedRects.find((rr: any) => rr.props.fill === '#2F2E41');
@@ -358,7 +357,7 @@ describe('FR4 — iOS Large bar chart', () => {
   });
 
   it('FR4.4 — past bar with hours uses colour #4A4A6A', () => {
-    const tree = renderWidget(React.createElement(LargeWidgetFn, makeWeekData()));
+    const tree = renderWidget(React.createElement(LargeWidgetFn, { props: makeWeekData() }));
     const roundedRects = collectNodes(tree, 'RoundedRectangle');
     // Mon and Tue have hours and are past → should use #4A4A6A
     const pastBar = roundedRects.find((rr: any) => rr.props.fill === '#4A4A6A');
@@ -366,7 +365,7 @@ describe('FR4 — iOS Large bar chart', () => {
   });
 
   it('FR4.5 — column with max hours has bar height close to MAX_BAR_HEIGHT (100pt, within 5%)', () => {
-    const tree = renderWidget(React.createElement(LargeWidgetFn, makeWeekData()));
+    const tree = renderWidget(React.createElement(LargeWidgetFn, { props: makeWeekData() }));
     const roundedRects = collectNodes(tree, 'RoundedRectangle');
     // Filter to bars that have a height prop (chart bars, not glass card borders)
     const barHeights = roundedRects
@@ -379,7 +378,7 @@ describe('FR4 — iOS Large bar chart', () => {
   });
 
   it('FR4.6 — zero-hours bar has height 0', () => {
-    const tree = renderWidget(React.createElement(LargeWidgetFn, makeWeekData()));
+    const tree = renderWidget(React.createElement(LargeWidgetFn, { props: makeWeekData() }));
     const roundedRects = collectNodes(tree, 'RoundedRectangle');
     // Future/zero bars: Thu, Fri, Sat, Sun — their heights should be 0
     const zeroHeightBars = roundedRects.filter(
@@ -389,7 +388,7 @@ describe('FR4 — iOS Large bar chart', () => {
   });
 
   it('FR4.7 — day labels are 3-char strings', () => {
-    const tree = renderWidget(React.createElement(LargeWidgetFn, makeWeekData()));
+    const tree = renderWidget(React.createElement(LargeWidgetFn, { props: makeWeekData() }));
     const texts = collectNodes(tree, 'Text');
     const dayLabels = texts.filter((t: any) => {
       const content = Array.isArray(t.children) ? t.children.join('') : String(t.children ?? '');
@@ -414,8 +413,8 @@ describe('FR4 — iOS Large bar chart', () => {
         { day: 'Sun', hours: 0, isToday: false, isFuture: true  },
       ],
     });
-    expect(() => renderWidget(React.createElement(LargeWidgetFn, allZero))).not.toThrow();
-    const tree = renderWidget(React.createElement(LargeWidgetFn, allZero));
+    expect(() => renderWidget(React.createElement(LargeWidgetFn, { props: allZero }))).not.toThrow();
+    const tree = renderWidget(React.createElement(LargeWidgetFn, { props: allZero }));
     const roundedRects = collectNodes(tree, 'RoundedRectangle');
     const barHeights = roundedRects
       .map((rr: any) => rr.props.height)
@@ -438,7 +437,7 @@ describe('FR4 — iOS Large bar chart', () => {
         { day: 'Sun', hours: 0,   isToday: false, isFuture: true  },
       ],
     });
-    const tree = renderWidget(React.createElement(LargeWidgetFn, singleNonZero));
+    const tree = renderWidget(React.createElement(LargeWidgetFn, { props: singleNonZero }));
     const roundedRects = collectNodes(tree, 'RoundedRectangle');
     const barHeights = roundedRects
       .map((rr: any) => rr.props.height)
@@ -447,7 +446,7 @@ describe('FR4 — iOS Large bar chart', () => {
   });
 
   it('FR4.10 — LargeWidget renders IosBarChart (contains 7 day Text nodes)', () => {
-    const tree = renderWidget(React.createElement(LargeWidgetFn, makeWeekData()));
+    const tree = renderWidget(React.createElement(LargeWidgetFn, { props: makeWeekData() }));
     const texts = collectNodes(tree, 'Text');
     const dayLabels = texts.filter((t: any) => {
       const content = Array.isArray(t.children) ? t.children.join('') : String(t.children ?? '');

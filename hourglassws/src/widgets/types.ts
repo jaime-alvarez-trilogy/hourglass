@@ -14,6 +14,8 @@ export interface WidgetDailyEntry {
   hours: number;
   /** Whether this day is today */
   isToday: boolean;
+  /** Whether this calendar day is strictly after today (local time); used to mute future bars */
+  isFuture: boolean;
 }
 
 /** Pending approval item for manager widget view (max 3 shown) */

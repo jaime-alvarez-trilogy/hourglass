@@ -63,12 +63,36 @@ function dateToDayIndex(dateStr: string): number {
 }
 
 /**
+ * Returns midnight (00:00:00.000) of the given date in local time.
+ */
+function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/**
+ * Returns the Monday of the ISO week containing `d` (local time midnight).
+ */
+function getWeekMonday(d: Date): Date {
+  const day = d.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  const daysFromMonday = day === 0 ? 6 : day - 1;
+  const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - daysFromMonday);
+  return monday;
+}
+
+/**
  * Builds exactly 7 WidgetDailyEntry values in Mon[0]–Sun[6] order
  * from HoursData.daily. Missing days are filled with hours: 0, isToday: false.
  *
+ * @param daily - Source daily entries from HoursData.
+ * @param now   - Current date for isFuture computation (defaults to new Date()).
+ *                Accepts an optional value for testability.
+ *
  * Exported for unit testing.
  */
-export function buildDailyEntries(daily: DailyEntry[]): WidgetDailyEntry[] {
+export function buildDailyEntries(daily: DailyEntry[], now: Date = new Date()): WidgetDailyEntry[] {
+  const todayStart = startOfDay(now);
+  const weekMonday = getWeekMonday(now);
+
   // Build a lookup: dayIndex → entry
   const byDayIndex: Record<number, DailyEntry> = {};
   for (const entry of daily) {
@@ -79,12 +103,24 @@ export function buildDailyEntries(daily: DailyEntry[]): WidgetDailyEntry[] {
   return DAY_LABELS.map((dayLabel, i) => {
     const entry = byDayIndex[i];
     if (!entry) {
-      return { day: dayLabel, hours: 0, isToday: false };
+      // Gap-filled: derive the reconstructed date from week Monday + day index
+      const reconstructedDate = new Date(
+        weekMonday.getFullYear(),
+        weekMonday.getMonth(),
+        weekMonday.getDate() + i,
+      );
+      return {
+        day: dayLabel,
+        hours: 0,
+        isToday: false,
+        isFuture: reconstructedDate > todayStart,
+      };
     }
     return {
       day: dayLabel,
       hours: Math.round(entry.hours * 10) / 10,
       isToday: entry.isToday,
+      isFuture: startOfDay(new Date(entry.date + 'T12:00:00')) > todayStart,
     };
   });
 }
@@ -138,7 +174,9 @@ export function formatMyRequests(
   entries: ManualRequestEntry[],
   maxCount: number,
 ): WidgetMyRequest[] {
-  return entries.slice(0, maxCount).map((entry) => ({
+  return entries
+    .filter((entry) => entry.status === 'PENDING' || entry.status === 'REJECTED')
+    .slice(0, maxCount).map((entry) => ({
     id: entry.id,
     date: formatRequestDate(entry.date),
     hours: (entry.durationMinutes / 60).toFixed(1) + 'h',
