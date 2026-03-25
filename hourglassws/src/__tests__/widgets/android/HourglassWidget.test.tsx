@@ -779,3 +779,217 @@ describe('FR7 — Manager urgency mode', () => {
     expect(dueNow).toBeDefined();
   });
 });
+
+// ─── 04-cockpit-hud: FR1 — badgeColor desaturated tokens (Android) ────────────
+
+describe('04-cockpit-hud FR1: badgeColor desaturated tokens (Android)', () => {
+  it('FR1-A-1 — badgeColor(crushed_it) === #CEA435 (luxuryGold)', () => {
+    expect(badgeColor('crushed_it')).toBe('#CEA435');
+  });
+
+  it('FR1-A-2 — badgeColor(on_track) === #4ADE80 (successGreen)', () => {
+    expect(badgeColor('on_track')).toBe('#4ADE80');
+  });
+
+  it('FR1-A-3 — badgeColor(behind) === #FCD34D (warnAmber)', () => {
+    expect(badgeColor('behind')).toBe('#FCD34D');
+  });
+
+  it('FR1-A-4 — badgeColor(critical) === #F87171 (desatCoral)', () => {
+    expect(badgeColor('critical')).toBe('#F87171');
+  });
+
+  it('FR1-A-5 — badgeColor(none) still returns empty string', () => {
+    expect(badgeColor('none')).toBe('');
+  });
+});
+
+// ─── 04-cockpit-hud: FR3 — Android P2 stripped deficit layout ────────────────
+
+describe('04-cockpit-hud FR3: Android P2 stripped deficit layout', () => {
+  it('FR3-A-1 — MediumWidget paceBadge=behind, no approvals → renders ⚠ warning text', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({ paceBadge: 'behind', approvalItems: [], myRequests: [], isManager: false }),
+        widgetFamily: 'medium',
+      })
+    );
+    const texts = getTextWidgets(tree);
+    const warningText = texts.find((t) => t.props.text && t.props.text.includes('⚠'));
+    expect(warningText).toBeDefined();
+  });
+
+  it('FR3-A-2 — MediumWidget paceBadge=behind, no approvals → renders hoursDisplay', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({ paceBadge: 'behind', approvalItems: [], myRequests: [], isManager: false }),
+        widgetFamily: 'medium',
+      })
+    );
+    const texts = getTextWidgets(tree);
+    const hoursText = texts.find((t) => t.props.text === '32.5h');
+    expect(hoursText).toBeDefined();
+  });
+
+  it('FR3-A-3 — MediumWidget paceBadge=behind, no approvals → renders hoursRemaining', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({ paceBadge: 'behind', approvalItems: [], myRequests: [], isManager: false }),
+        widgetFamily: 'medium',
+      })
+    );
+    const texts = getTextWidgets(tree);
+    const remainingText = texts.find((t) => t.props.text === '7.5h left');
+    expect(remainingText).toBeDefined();
+  });
+
+  it('FR3-A-4 — MediumWidget paceBadge=behind, no approvals → does NOT render aiPct text', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({ paceBadge: 'behind', approvalItems: [], myRequests: [], isManager: false, aiPct: '71%–75%' }),
+        widgetFamily: 'medium',
+      })
+    );
+    const texts = getTextWidgets(tree);
+    const aiText = texts.find((t) => t.props.text && t.props.text.includes('AI:'));
+    expect(aiText).toBeUndefined();
+  });
+
+  it('FR3-A-5 — MediumWidget paceBadge=behind, no approvals → does NOT render BL label', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({ paceBadge: 'behind', approvalItems: [], myRequests: [], isManager: false }),
+        widgetFamily: 'medium',
+      })
+    );
+    const texts = getTextWidgets(tree);
+    const blText = texts.find((t) => t.props.text === 'BL');
+    expect(blText).toBeUndefined();
+  });
+
+  it('FR3-A-6 — MediumWidget paceBadge=critical, no approvals → badge color is #F87171', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({ paceBadge: 'critical', approvalItems: [], myRequests: [], isManager: false }),
+        widgetFamily: 'medium',
+      })
+    );
+    const texts = getTextWidgets(tree);
+    const warningText = texts.find((t) => t.props.text && t.props.text.includes('⚠'));
+    expect(warningText).toBeDefined();
+    expect(warningText!.props.style?.color).toBe('#F87171');
+  });
+
+  it('FR3-A-7 (edge) — paceBadge=behind + isManager=true + urgency=critical + pendingCount=3 → urgency mode wins (not P2)', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({
+          paceBadge: 'behind',
+          isManager: true,
+          urgency: 'critical',
+          pendingCount: 3,
+          deadline: Date.now() + 4 * 60 * 60 * 1000,
+          approvalItems: [{ id: '1', name: 'Alice', hours: '2.5h', category: 'MANUAL' }],
+        }),
+        widgetFamily: 'medium',
+      })
+    );
+    const texts = getTextWidgets(tree);
+    // Urgency mode shows countdown, NOT the ⚠ P2 warning badge
+    const warningText = texts.find((t) => t.props.text && t.props.text.startsWith('⚠'));
+    expect(warningText).toBeUndefined();
+    // Countdown present instead
+    const countdownText = texts.find(
+      (t) => t.props.text && (t.props.text === 'Due now' || /^\d+h left$/.test(t.props.text))
+    );
+    expect(countdownText).toBeDefined();
+  });
+
+  it('FR3-A-8 (edge) — paceBadge=behind + approvalItems.length>0 → action mode wins (not P2)', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({
+          paceBadge: 'behind',
+          isManager: false,
+          urgency: 'none',
+          approvalItems: [{ id: '1', name: 'Alice', hours: '8h', category: 'MANUAL' }],
+          myRequests: [],
+        }),
+        widgetFamily: 'medium',
+      })
+    );
+    const texts = getTextWidgets(tree);
+    // Action mode shows item name, not P2 warning
+    const warningText = texts.find((t) => t.props.text && t.props.text.startsWith('⚠'));
+    expect(warningText).toBeUndefined();
+    const itemText = texts.find((t) => t.props.text === 'Alice');
+    expect(itemText).toBeDefined();
+  });
+
+  it('FR3-A-9 (edge) — paceBadge=on_track, no approvals → P3 hours mode, AI: label shown', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({ paceBadge: 'on_track', approvalItems: [], myRequests: [], isManager: false }),
+        widgetFamily: 'medium',
+      })
+    );
+    const texts = getTextWidgets(tree);
+    const aiText = texts.find((t) => t.props.text && t.props.text.startsWith('AI:'));
+    expect(aiText).toBeDefined();
+  });
+});
+
+// ─── 04-cockpit-hud: FR5 — Priority ordering P1 > P2 > P3 (Android) ─────────
+
+describe('04-cockpit-hud FR5: Priority ordering P1 > P2 > P3 (Android)', () => {
+  it('FR5-A-1 — isManager=true, pendingCount=3, paceBadge=critical, urgency=critical → P1 urgency (countdown hero)', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({
+          isManager: true,
+          urgency: 'critical',
+          pendingCount: 3,
+          paceBadge: 'critical',
+          deadline: Date.now() + 4 * 60 * 60 * 1000,
+          approvalItems: [{ id: '1', name: 'Alice', hours: '2.5h', category: 'MANUAL' }],
+        }),
+        widgetFamily: 'medium',
+      })
+    );
+    const texts = getTextWidgets(tree);
+    // P1 urgency mode: countdown, no ⚠ P2 badge
+    const warningText = texts.find((t) => t.props.text && t.props.text.startsWith('⚠'));
+    expect(warningText).toBeUndefined();
+    const countdownText = texts.find(
+      (t) => t.props.text && (t.props.text === 'Due now' || /^\d+h left$/.test(t.props.text))
+    );
+    expect(countdownText).toBeDefined();
+  });
+
+  it('FR5-A-2 — isManager=false, paceBadge=critical, myRequests=[], approvalItems=[] → P2 stripped layout', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({ isManager: false, paceBadge: 'critical', approvalItems: [], myRequests: [] }),
+        widgetFamily: 'medium',
+      })
+    );
+    const texts = getTextWidgets(tree);
+    const warningText = texts.find((t) => t.props.text && t.props.text.includes('⚠'));
+    expect(warningText).toBeDefined();
+  });
+
+  it('FR5-A-3 — isManager=false, paceBadge=on_track, myRequests=[], approvalItems=[] → P3 full hours mode', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({ isManager: false, paceBadge: 'on_track', approvalItems: [], myRequests: [] }),
+        widgetFamily: 'medium',
+      })
+    );
+    const texts = getTextWidgets(tree);
+    // P3 hours mode: AI: label present, no ⚠ warning
+    const aiText = texts.find((t) => t.props.text && t.props.text.startsWith('AI:'));
+    expect(aiText).toBeDefined();
+    const warningText = texts.find((t) => t.props.text && t.props.text.startsWith('⚠'));
+    expect(warningText).toBeUndefined();
+  });
+});

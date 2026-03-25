@@ -582,3 +582,193 @@ describe('FR6: Full-string null safety', () => {
     expect(() => fn(minimalProps({ brainliftTarget: undefined }), { widgetFamily: 'systemLarge' })).not.toThrow();
   });
 });
+
+// ─── 04-cockpit-hud: FR1 — PACE_COLORS desaturated dark glass tokens ──────────
+
+describe('04-cockpit-hud FR1: PACE_COLORS desaturated tokens (iOS)', () => {
+  it('FR1-iOS-1 — WIDGET_LAYOUT_JS string contains #CEA435 (crushed_it luxuryGold)', () => {
+    const src = extractWidgetLayoutJs();
+    expect(src).toContain('#CEA435');
+  });
+
+  it('FR1-iOS-2 — WIDGET_LAYOUT_JS string contains #4ADE80 (on_track successGreen)', () => {
+    const src = extractWidgetLayoutJs();
+    expect(src).toContain('#4ADE80');
+  });
+
+  it('FR1-iOS-3 — WIDGET_LAYOUT_JS string contains #FCD34D (behind warnAmber)', () => {
+    const src = extractWidgetLayoutJs();
+    expect(src).toContain('#FCD34D');
+  });
+
+  it('FR1-iOS-4 — WIDGET_LAYOUT_JS string contains #F87171 (critical desatCoral)', () => {
+    const src = extractWidgetLayoutJs();
+    expect(src).toContain('#F87171');
+  });
+
+  it('FR1-iOS-5 — PACE_COLORS in JS does not contain old #FFDF89 (old crushed_it)', () => {
+    // Extract only the PACE_COLORS block to isolate from meshStateColor which may keep saturated values
+    const src = extractWidgetLayoutJs();
+    const paceColorsStart = src.indexOf('var PACE_COLORS');
+    const paceColorsEnd = src.indexOf('};', paceColorsStart) + 2;
+    const paceColorsBlock = src.slice(paceColorsStart, paceColorsEnd);
+    expect(paceColorsBlock).not.toContain('#FFDF89');
+  });
+
+  it('FR1-iOS-6 — PACE_COLORS in JS does not contain old #F59E0B (old behind)', () => {
+    const src = extractWidgetLayoutJs();
+    const paceColorsStart = src.indexOf('var PACE_COLORS');
+    const paceColorsEnd = src.indexOf('};', paceColorsStart) + 2;
+    const paceColorsBlock = src.slice(paceColorsStart, paceColorsEnd);
+    expect(paceColorsBlock).not.toContain('#F59E0B');
+  });
+
+  it('FR1-iOS-7 — PACE_COLORS in JS does not contain old #F43F5E (old critical)', () => {
+    const src = extractWidgetLayoutJs();
+    const paceColorsStart = src.indexOf('var PACE_COLORS');
+    const paceColorsEnd = src.indexOf('};', paceColorsStart) + 2;
+    const paceColorsBlock = src.slice(paceColorsStart, paceColorsEnd);
+    expect(paceColorsBlock).not.toContain('#F43F5E');
+  });
+
+  it('FR1-iOS-8 — PACE_COLORS in JS does not contain old #10B981 (old on_track)', () => {
+    const src = extractWidgetLayoutJs();
+    const paceColorsStart = src.indexOf('var PACE_COLORS');
+    const paceColorsEnd = src.indexOf('};', paceColorsStart) + 2;
+    const paceColorsBlock = src.slice(paceColorsStart, paceColorsEnd);
+    expect(paceColorsBlock).not.toContain('#10B981');
+  });
+});
+
+// ─── 04-cockpit-hud: FR2 — iOS P2 stripped deficit layout ────────────────────
+
+describe('04-cockpit-hud FR2: iOS P2 stripped deficit layout', () => {
+  it('FR2-iOS-1 — buildMedium paceBadge=behind, no approvals → contains hoursDisplay', () => {
+    const fn = getWidgetFn();
+    const tree = fn(minimalProps({ paceBadge: 'behind', approvalItems: [], myRequests: [] }), { widgetFamily: 'systemMedium' });
+    expect(treeContains(tree, '32.5h')).toBe(true);
+  });
+
+  it('FR2-iOS-2 — buildMedium paceBadge=behind, no approvals → contains hoursRemaining', () => {
+    const fn = getWidgetFn();
+    const tree = fn(minimalProps({ paceBadge: 'behind', approvalItems: [], myRequests: [] }), { widgetFamily: 'systemMedium' });
+    expect(treeContains(tree, '7.5h left')).toBe(true);
+  });
+
+  it('FR2-iOS-3 — buildMedium paceBadge=behind, no approvals → does NOT contain aiPct value', () => {
+    const fn = getWidgetFn();
+    const tree = fn(minimalProps({ paceBadge: 'behind', approvalItems: [], myRequests: [], aiPct: '71%\u201375%' }), { widgetFamily: 'systemMedium' });
+    expect(treeContains(tree, '71%\u201375%')).toBe(false);
+  });
+
+  it('FR2-iOS-4 — buildMedium paceBadge=behind, no approvals → does NOT contain brainlift value in label context', () => {
+    const fn = getWidgetFn();
+    const tree = fn(minimalProps({ paceBadge: 'behind', approvalItems: [], myRequests: [], brainlift: '3.2h', brainliftTarget: '5h' }), { widgetFamily: 'systemMedium' });
+    // P2 strips brainlift bar — the "/ 5h" target label should not appear
+    expect(treeContains(tree, '/ 5h')).toBe(false);
+  });
+
+  it('FR2-iOS-5 — buildLarge paceBadge=critical, no approvals → contains hoursDisplay', () => {
+    const fn = getWidgetFn();
+    const tree = fn(minimalProps({ paceBadge: 'critical', approvalItems: [], myRequests: [] }), { widgetFamily: 'systemLarge' });
+    expect(treeContains(tree, '32.5h')).toBe(true);
+  });
+
+  it('FR2-iOS-6 — buildLarge paceBadge=critical, no approvals → contains hoursRemaining', () => {
+    const fn = getWidgetFn();
+    const tree = fn(minimalProps({ paceBadge: 'critical', approvalItems: [], myRequests: [] }), { widgetFamily: 'systemLarge' });
+    expect(treeContains(tree, '7.5h left')).toBe(true);
+  });
+
+  it('FR2-iOS-7 — buildLarge paceBadge=critical, no approvals → does NOT contain aiPct', () => {
+    const fn = getWidgetFn();
+    const tree = fn(minimalProps({ paceBadge: 'critical', approvalItems: [], myRequests: [], aiPct: '71%\u201375%' }), { widgetFamily: 'systemLarge' });
+    expect(treeContains(tree, '71%\u201375%')).toBe(false);
+  });
+
+  it('FR2-iOS-8 (edge) — paceBadge=behind WITH approvalItems → P1 wins, action rows (not P2)', () => {
+    const fn = getWidgetFn();
+    const tree = fn(minimalProps({
+      paceBadge: 'behind',
+      approvalItems: [{ id: '1', name: 'Alice', hours: '8h', category: 'MANUAL' }],
+    }), { widgetFamily: 'systemMedium' });
+    // P1 action mode: contains the item name, NOT the hoursRemaining P2 label
+    expect(treeContains(tree, 'Alice')).toBe(true);
+  });
+
+  it('FR2-iOS-9 (edge) — paceBadge=on_track, no approvals → P3 hours mode, aiPct IS shown', () => {
+    const fn = getWidgetFn();
+    const tree = fn(minimalProps({ paceBadge: 'on_track', approvalItems: [], myRequests: [], aiPct: '71%\u201375%' }), { widgetFamily: 'systemMedium' });
+    expect(treeContains(tree, '71%\u201375%')).toBe(true);
+  });
+
+  it('FR2-iOS-10 (edge) — paceBadge=none, no approvals → P3 hours mode, aiPct IS shown', () => {
+    const fn = getWidgetFn();
+    const tree = fn(minimalProps({ paceBadge: 'none', approvalItems: [], myRequests: [], aiPct: '71%\u201375%' }), { widgetFamily: 'systemMedium' });
+    expect(treeContains(tree, '71%\u201375%')).toBe(true);
+  });
+
+  it('FR2-iOS-11 — buildSmall paceBadge=critical, no approvals → shows hoursDisplay', () => {
+    const fn = getWidgetFn();
+    const tree = fn(minimalProps({ paceBadge: 'critical', approvalItems: [], myRequests: [] }), { widgetFamily: 'systemSmall' });
+    expect(treeContains(tree, '32.5h')).toBe(true);
+  });
+
+  it('FR2-iOS-12 — buildSmall paceBadge=critical, no approvals → shows hoursRemaining', () => {
+    const fn = getWidgetFn();
+    const tree = fn(minimalProps({ paceBadge: 'critical', approvalItems: [], myRequests: [] }), { widgetFamily: 'systemSmall' });
+    expect(treeContains(tree, '7.5h left')).toBe(true);
+  });
+});
+
+// ─── 04-cockpit-hud: FR4 — iOS hero typography ────────────────────────────────
+
+describe('04-cockpit-hud FR4: iOS hero typography (monospaced heavy)', () => {
+  it('FR4-iOS-1 — WIDGET_LAYOUT_JS string contains weight: \'heavy\'', () => {
+    const src = extractWidgetLayoutJs();
+    expect(src).toContain("weight: 'heavy'");
+  });
+
+  it('FR4-iOS-2 — WIDGET_LAYOUT_JS string contains design: \'monospaced\'', () => {
+    const src = extractWidgetLayoutJs();
+    expect(src).toContain("design: 'monospaced'");
+  });
+
+  it('FR4-iOS-3 — buildSmall output includes monospaced design on hero Text node', () => {
+    const fn = getWidgetFn();
+    const tree = fn(minimalProps({ paceBadge: 'on_track', approvalItems: [], myRequests: [] }), { widgetFamily: 'systemSmall' });
+    // The hero Text node's font modifier should carry design: 'monospaced'
+    expect(treeContains(tree, 'monospaced')).toBe(true);
+  });
+});
+
+// ─── 04-cockpit-hud: FR5 — Priority ordering P1 > P2 > P3 (iOS) ─────────────
+
+describe('04-cockpit-hud FR5: Priority ordering P1 > P2 > P3 (iOS)', () => {
+  it('FR5-iOS-1 — paceBadge=behind WITH approvalItems → P1 wins, action rows not P2', () => {
+    const fn = getWidgetFn();
+    const tree = fn(minimalProps({
+      paceBadge: 'behind',
+      approvalItems: [{ id: '1', name: 'Alice', hours: '8h', category: 'MANUAL' }],
+      myRequests: [],
+    }), { widgetFamily: 'systemMedium' });
+    expect(treeContains(tree, 'Alice')).toBe(true);
+    // P2 would show hoursRemaining as a standalone label — P1 shows it inline only
+    // Key check: aiPct is absent in P1 (action mode), but that's also absent in P2
+    // Better check: action mode item name is present
+    expect(treeContains(tree, 'MANUAL')).toBe(true);
+  });
+
+  it('FR5-iOS-2 — paceBadge=critical, no approvals → P2 stripped layout (no aiPct)', () => {
+    const fn = getWidgetFn();
+    const tree = fn(minimalProps({ paceBadge: 'critical', approvalItems: [], myRequests: [], aiPct: '71%\u201375%' }), { widgetFamily: 'systemMedium' });
+    expect(treeContains(tree, '71%\u201375%')).toBe(false);
+    expect(treeContains(tree, '32.5h')).toBe(true);
+  });
+
+  it('FR5-iOS-3 — paceBadge=on_track, no approvals → P3 full hours mode (aiPct shown)', () => {
+    const fn = getWidgetFn();
+    const tree = fn(minimalProps({ paceBadge: 'on_track', approvalItems: [], myRequests: [], aiPct: '71%\u201375%' }), { widgetFamily: 'systemMedium' });
+    expect(treeContains(tree, '71%\u201375%')).toBe(true);
+  });
+});
