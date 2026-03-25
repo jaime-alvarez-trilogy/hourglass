@@ -54,12 +54,13 @@ function meshStateColor(urgency: WidgetUrgency, paceBadge: string): string {
  * Returns the background hex color for a pace badge capsule.
  * Returns '' for 'none' (no badge should render).
  */
+// 04-cockpit-hud: desaturated dark glass tokens (luxuryGold, successGreen, warnAmber, desatCoral)
 export function badgeColor(paceBadge: string): string {
   switch (paceBadge) {
-    case 'crushed_it': return '#FFDF89';
-    case 'on_track':   return '#10B981';
-    case 'behind':     return '#F59E0B';
-    case 'critical':   return '#F43F5E';
+    case 'crushed_it': return '#CEA435';
+    case 'on_track':   return '#4ADE80';
+    case 'behind':     return '#FCD34D';
+    case 'critical':   return '#F87171';
     default:           return '';
   }
 }
@@ -321,6 +322,10 @@ function MediumWidget({ data }: { data: WidgetData }) {
   const brainliftHours = parseFloat(data.brainlift) || 0;
   const targetHours = parseFloat(data.brainliftTarget ?? '5h') || 5;
 
+  // 04-cockpit-hud FR3: P2 stripped deficit mode
+  const isPaceMode = !actionMode && !isUrgencyMode &&
+    (data.paceBadge === 'behind' || data.paceBadge === 'critical');
+
   // FR5: Delta display helpers
   const hoursDelta = data.weekDeltaHours ?? '';
   const earningsDelta = data.weekDeltaEarnings ?? '';
@@ -457,6 +462,57 @@ function MediumWidget({ data }: { data: WidgetData }) {
             </FlexWidget>
           );
         })}
+      </FlexWidget>
+    );
+  }
+
+  // ─── 04-cockpit-hud FR3: P2 stripped deficit layout ─────────────────────────
+  if (isPaceMode) {
+    const hoursColor = accent;
+    return (
+      <FlexWidget
+        style={{
+          backgroundColor: '#0D0C14',
+          flex: 1,
+          flexDirection: 'column',
+          position: 'relative',
+          padding: 12,
+        }}
+      >
+        <SvgWidget
+          svg={meshSvg}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        />
+        {/* Warning badge row */}
+        <FlexWidget style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+          <TextWidget
+            text={`⚠ ${badgeLabel(data.paceBadge ?? '')}`}
+            style={{ color: badgeColor(data.paceBadge ?? ''), fontSize: 11, fontWeight: '600' }}
+          />
+        </FlexWidget>
+        {/* Hero hours */}
+        <TextWidget
+          text={data.hoursDisplay}
+          style={{ color: hoursColor, fontSize: 32, fontWeight: '700' }}
+        />
+        {/* Hours remaining */}
+        <TextWidget
+          text={data.hoursRemaining}
+          style={{ color: '#A0A0A0', fontSize: 13 }}
+        />
+        {/* Flex spacer */}
+        <FlexWidget style={{ flex: 1 }} />
+        {/* Footer */}
+        <FlexWidget style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <TextWidget
+            text={data.weekDeltaEarnings || ''}
+            style={{ color: deltaColor(data.weekDeltaEarnings), fontSize: 12 }}
+          />
+          <TextWidget
+            text={`today ${data.today}`}
+            style={{ color: '#A0A0A0', fontSize: 12 }}
+          />
+        </FlexWidget>
       </FlexWidget>
     );
   }

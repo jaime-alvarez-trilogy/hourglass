@@ -240,23 +240,23 @@ describe('FR1: buildPaceBadge helper', () => {
     void badgeColors;
   });
 
-  it('SC1.5 — buildPaceBadge renders #FFDF89 for crushed_it', () => {
+  it('SC1.5 — buildPaceBadge renders #CEA435 for crushed_it (updated in 04-cockpit-hud)', () => {
     const fn = getWidgetFn();
     const tree = fn(minimalProps({ paceBadge: 'crushed_it' }), { widgetFamily: 'systemSmall' });
-    expect(treeContains(tree, '#FFDF89')).toBe(true);
+    expect(treeContains(tree, '#CEA435')).toBe(true);
   });
 
-  it('SC1.5 — buildPaceBadge renders #F59E0B for behind', () => {
+  it('SC1.5 — buildPaceBadge renders #FCD34D for behind (updated in 04-cockpit-hud)', () => {
     const fn = getWidgetFn();
-    const tree = fn(minimalProps({ paceBadge: 'behind', urgency: 'none' }), { widgetFamily: 'systemMedium' });
-    expect(treeContains(tree, '#F59E0B')).toBe(true);
+    const tree = fn(minimalProps({ paceBadge: 'behind', urgency: 'none', approvalItems: [], myRequests: [] }), { widgetFamily: 'systemMedium' });
+    expect(treeContains(tree, '#FCD34D')).toBe(true);
   });
 
-  it('SC1.5 — buildPaceBadge renders #F43F5E for critical badge', () => {
+  it('SC1.5 — buildPaceBadge renders #F87171 for critical badge (updated in 04-cockpit-hud)', () => {
     const fn = getWidgetFn();
-    // urgency 'none' so #F43F5E comes from badge, not hoursColor
-    const tree = fn(minimalProps({ paceBadge: 'critical', urgency: 'none' }), { widgetFamily: 'systemMedium' });
-    expect(treeContains(tree, '#F43F5E')).toBe(true);
+    // paceBadge critical, no approvals → P2 mode shows ⚠ badge with #F87171
+    const tree = fn(minimalProps({ paceBadge: 'critical', urgency: 'none', approvalItems: [], myRequests: [] }), { widgetFamily: 'systemMedium' });
+    expect(treeContains(tree, '#F87171')).toBe(true);
   });
 
   it('SC6.1 — buildPaceBadge with undefined paceBadge does not throw', () => {
@@ -491,10 +491,10 @@ describe('FR4: systemLarge layout', () => {
     expect(treeContains(tree, '+$84')).toBe(false);
   });
 
-  it('SC4.4 — paceBadge behind shows #F59E0B in systemLarge', () => {
+  it('SC4.4 — paceBadge behind shows #FCD34D in systemLarge (updated in 04-cockpit-hud)', () => {
     const fn = getWidgetFn();
-    const tree = fn(minimalProps({ paceBadge: 'behind', urgency: 'none' }), { widgetFamily: 'systemLarge' });
-    expect(treeContains(tree, '#F59E0B')).toBe(true);
+    const tree = fn(minimalProps({ paceBadge: 'behind', urgency: 'none', approvalItems: [], myRequests: [] }), { widgetFamily: 'systemLarge' });
+    expect(treeContains(tree, '#FCD34D')).toBe(true);
   });
 
   it('SC4.7 — brainliftTarget appears in BL label in systemLarge', () => {

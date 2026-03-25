@@ -425,11 +425,12 @@ const WIDGET_LAYOUT_JS = `(function(props, env) {
   };
 
   // Pace badge label and color maps
+  // 04-cockpit-hud: desaturated dark glass tokens (luxuryGold, successGreen, warnAmber, desatCoral)
   var PACE_COLORS = {
-    crushed_it: '#FFDF89',
-    on_track:   '#10B981',
-    behind:     '#F59E0B',
-    critical:   '#F43F5E'
+    crushed_it: '#CEA435',
+    on_track:   '#4ADE80',
+    behind:     '#FCD34D',
+    critical:   '#F87171'
   };
   var PACE_LABELS = {
     crushed_it: 'CRUSHED IT',
@@ -475,6 +476,7 @@ const WIDGET_LAYOUT_JS = `(function(props, env) {
 
   // ── 4. buildGlassPanel(children) ───────────────────────────────────────────
   // Simulates frosted glass: gradient fill + border overlay + content.
+  // NOTE: LinearGradient is NOT a function — pass plain object { type, colors, startPoint, endPoint }
   function buildGlassPanel(children) {
     return ZStack({
       alignment: 'leading',
@@ -482,22 +484,24 @@ const WIDGET_LAYOUT_JS = `(function(props, env) {
         RoundedRectangle({
           cornerRadius: 12,
           modifiers: [
-            foregroundStyle(LinearGradient({
+            foregroundStyle({
+              type: 'linearGradient',
               colors: [SURFACE_TOP, SURFACE_BTM],
-              startPoint: 'topLeading',
-              endPoint: 'bottomTrailing'
-            })),
+              startPoint: { x: 0, y: 0 },
+              endPoint: { x: 1, y: 1 }
+            }),
             opacity(0.85)
           ]
         }),
         RoundedRectangle({
           cornerRadius: 12,
           modifiers: [
-            foregroundStyle(LinearGradient({
+            foregroundStyle({
+              type: 'linearGradient',
               colors: [BORDER_TOP, SURFACE_TOP],
-              startPoint: 'topLeading',
-              endPoint: 'bottomTrailing'
-            })),
+              startPoint: { x: 0, y: 0 },
+              endPoint: { x: 1, y: 1 }
+            }),
             frame({ maxWidth: 9999, maxHeight: 9999 })
           ]
         }),
@@ -589,17 +593,46 @@ const WIDGET_LAYOUT_JS = `(function(props, env) {
   // ── 9. buildSmall(p) ────────────────────────────────────────────────────────
   // systemSmall: mesh bg + hours hero + earnings + remaining + pace badge.
   // Manager urgency mode: pendingCount hero when isManager + high/critical + pending > 0.
+  // P2 mode: stripped deficit layout when paceBadge=behind/critical and no action mode.
   function buildSmall(p) {
     var pg = p.paceBadge;
     var urg = p.urgency || 'none';
     var hColor = HOURS_COLOR[urg] || HOURS_COLOR.none;
     var badgeNode = buildPaceBadge(pg);
     var isUrgentMgr = p.isManager && (urg === 'high' || urg === 'critical') && p.pendingCount > 0;
+    var hasApprovalsSmall = p.approvalItems && p.approvalItems.length > 0;
+    var hasRequestsSmall = p.myRequests && p.myRequests.length > 0;
+    var actionModeSmall = hasApprovalsSmall || hasRequestsSmall;
+    var isPaceMode = !actionModeSmall && (pg === 'behind' || pg === 'critical');
+
+    // P2: stripped deficit layout
+    if (isPaceMode) {
+      var paceColor = PACE_COLORS[pg] || hColor;
+      var paceLabel = PACE_LABELS[pg] || pg;
+      return ZStack({
+        children: [
+          buildMeshBg(urg, pg),
+          VStack({
+            alignment: 'leading',
+            spacing: 4,
+            modifiers: [padding({ all: 14 }), fillFrame],
+            children: [
+              Text({ modifiers: [foregroundStyle(paceColor), font({ size: 10, weight: 'semibold' })],
+                children: '\u26A0 ' + paceLabel }),
+              Text({ modifiers: [foregroundStyle(hColor), font({ size: 28, weight: 'heavy', design: 'monospaced' })],
+                children: p.hoursDisplay }),
+              Text({ modifiers: [foregroundStyle(TEXT_SECONDARY), font({ size: 12, weight: 'medium' })],
+                children: p.hoursRemaining })
+            ]
+          })
+        ]
+      });
+    }
 
     var heroText = isUrgentMgr
-      ? Text({ modifiers: [foregroundStyle(hColor), font({ size: 36, weight: 'bold' })],
+      ? Text({ modifiers: [foregroundStyle(hColor), font({ size: 36, weight: 'heavy', design: 'monospaced' })],
           children: String(p.pendingCount) })
-      : Text({ modifiers: [foregroundStyle(hColor), font({ size: 32, weight: 'bold' })],
+      : Text({ modifiers: [foregroundStyle(hColor), font({ size: 32, weight: 'heavy', design: 'monospaced' })],
           children: p.hoursDisplay });
 
     var subLabel = isUrgentMgr
@@ -635,19 +668,21 @@ const WIDGET_LAYOUT_JS = `(function(props, env) {
   // ── 10. buildMedium(p) ──────────────────────────────────────────────────────
   // systemMedium hours mode: mesh + dual glass panels + stats row + delta + badge.
   // Action mode: mesh + glass item rows.
+  // P2 mode: stripped deficit layout when paceBadge=behind/critical and no action mode.
   function buildMedium(p) {
     var pg = p.paceBadge;
     var urg = p.urgency || 'none';
     var hColor = HOURS_COLOR[urg] || HOURS_COLOR.none;
     var badgeNode = buildPaceBadge(pg);
     var deltaHours = buildDeltaText(p.weekDeltaHours, hColor);
+    var isPaceModeMed = !actionMode && (pg === 'behind' || pg === 'critical');
 
     if (actionMode) {
       var medItems = actionItems.slice(0, 2);
       var medRows = medItems.map(function(item) { return buildItemRow(item); });
       var mgCount = p.pendingCount || actionItems.length;
       var headerChildren = [
-        Text({ modifiers: [foregroundStyle(hColor), font({ size: 16, weight: 'bold' })],
+        Text({ modifiers: [foregroundStyle(hColor), font({ size: 16, weight: 'heavy', design: 'monospaced' })],
           children: p.hoursDisplay }),
         Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 14 })], children: ' · ' }),
         Text({ modifiers: [foregroundStyle(GOLD), font({ size: 14, weight: 'semibold' })],
@@ -668,9 +703,45 @@ const WIDGET_LAYOUT_JS = `(function(props, env) {
       void mgCount;
     }
 
+    // P2: stripped deficit layout
+    if (isPaceModeMed) {
+      var paceColorMed = PACE_COLORS[pg] || hColor;
+      var paceLabelMed = PACE_LABELS[pg] || pg;
+      var deltaEarningsMed = p.weekDeltaEarnings || '';
+      var deltaColorMed = deltaEarningsMed.charAt(0) === '+' ? HOURS_COLOR.none : (deltaEarningsMed.charAt(0) === '-' ? HOURS_COLOR.high : TEXT_MUTED);
+      return ZStack({
+        children: [
+          buildMeshBg(urg, pg),
+          VStack({
+            alignment: 'leading',
+            spacing: 8,
+            modifiers: [padding({ all: 14 }), fillFrame],
+            children: [
+              HStack({ spacing: 4, children: [
+                Text({ modifiers: [foregroundStyle(paceColorMed), font({ size: 11, weight: 'semibold' })],
+                  children: '\u26A0 ' + paceLabelMed })
+              ]}),
+              Text({ modifiers: [foregroundStyle(hColor), font({ size: 32, weight: 'heavy', design: 'monospaced' })],
+                children: p.hoursDisplay }),
+              Text({ modifiers: [foregroundStyle(TEXT_SECONDARY), font({ size: 13, weight: 'medium' })],
+                children: p.hoursRemaining }),
+              Spacer({}),
+              HStack({ children: [
+                Text({ modifiers: [foregroundStyle(deltaColorMed), font({ size: 12 })],
+                  children: deltaEarningsMed }),
+                Spacer({}),
+                Text({ modifiers: [foregroundStyle(TEXT_SECONDARY), font({ size: 12 })],
+                  children: 'today ' + (p.today || '') })
+              ]})
+            ]
+          })
+        ]
+      });
+    }
+
     // Hours mode
     var hoursPanel = buildGlassPanel([
-      Text({ modifiers: [foregroundStyle(hColor), font({ size: 32, weight: 'bold' })],
+      Text({ modifiers: [foregroundStyle(hColor), font({ size: 32, weight: 'heavy', design: 'monospaced' })],
         children: p.hoursDisplay }),
       Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 11 })], children: 'this week' }),
       deltaHours || Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 1 })], children: '' })
@@ -726,6 +797,7 @@ const WIDGET_LAYOUT_JS = `(function(props, env) {
   // ── 11. buildLarge(p) ───────────────────────────────────────────────────────
   // systemLarge: full dashboard — hero panels, stats, badge, bar chart, progress bars.
   // Action mode: mesh + glass item rows.
+  // P2 mode: stripped deficit layout when paceBadge=behind/critical and no action mode.
   function buildLarge(p) {
     var pg = p.paceBadge;
     var urg = p.urgency || 'none';
@@ -733,6 +805,7 @@ const WIDGET_LAYOUT_JS = `(function(props, env) {
     var badgeNode = buildPaceBadge(pg);
     var deltaHours = buildDeltaText(p.weekDeltaHours, hColor);
     var deltaEarnings = buildDeltaText(p.weekDeltaEarnings, GOLD);
+    var isPaceModeLg = !actionMode && (pg === 'behind' || pg === 'critical');
 
     if (actionMode) {
       var lgItems = actionItems.slice(0, 4);
@@ -754,7 +827,7 @@ const WIDGET_LAYOUT_JS = `(function(props, env) {
             modifiers: [padding({ all: 18 }), fillFrame],
             children: [
               HStack({ spacing: 6, children: [
-                Text({ modifiers: [foregroundStyle(hColor), font({ size: 18, weight: 'bold' })],
+                Text({ modifiers: [foregroundStyle(hColor), font({ size: 18, weight: 'heavy', design: 'monospaced' })],
                   children: p.hoursDisplay }),
                 Text({ modifiers: [foregroundStyle(TEXT_MUTED), font({ size: 16 })],
                   children: ' · ' }),
@@ -762,6 +835,42 @@ const WIDGET_LAYOUT_JS = `(function(props, env) {
                   children: p.earnings })
               ]})
             ].concat(lgRows)
+          })
+        ]
+      });
+    }
+
+    // P2: stripped deficit layout
+    if (isPaceModeLg) {
+      var paceColorLg = PACE_COLORS[pg] || hColor;
+      var paceLabelLg = PACE_LABELS[pg] || pg;
+      var deltaEarningsLg = p.weekDeltaEarnings || '';
+      var deltaColorLg = deltaEarningsLg.charAt(0) === '+' ? HOURS_COLOR.none : (deltaEarningsLg.charAt(0) === '-' ? HOURS_COLOR.high : TEXT_MUTED);
+      return ZStack({
+        children: [
+          buildMeshBg(urg, pg),
+          VStack({
+            alignment: 'leading',
+            spacing: 8,
+            modifiers: [padding({ all: 18 }), fillFrame],
+            children: [
+              HStack({ spacing: 4, children: [
+                Text({ modifiers: [foregroundStyle(paceColorLg), font({ size: 11, weight: 'semibold' })],
+                  children: '\u26A0 ' + paceLabelLg })
+              ]}),
+              Text({ modifiers: [foregroundStyle(hColor), font({ size: 32, weight: 'heavy', design: 'monospaced' })],
+                children: p.hoursDisplay }),
+              Text({ modifiers: [foregroundStyle(TEXT_SECONDARY), font({ size: 13, weight: 'medium' })],
+                children: p.hoursRemaining }),
+              Spacer({}),
+              HStack({ children: [
+                Text({ modifiers: [foregroundStyle(deltaColorLg), font({ size: 12 })],
+                  children: deltaEarningsLg }),
+                Spacer({}),
+                Text({ modifiers: [foregroundStyle(TEXT_SECONDARY), font({ size: 12 })],
+                  children: 'today ' + (p.today || '') })
+              ]})
+            ]
           })
         ]
       });
@@ -806,7 +915,7 @@ const WIDGET_LAYOUT_JS = `(function(props, env) {
       deltaHours
     ].filter(Boolean);
     hoursEarningsChildren.unshift(
-      Text({ modifiers: [foregroundStyle(hColor), font({ size: 34, weight: 'bold' })],
+      Text({ modifiers: [foregroundStyle(hColor), font({ size: 34, weight: 'heavy', design: 'monospaced' })],
         children: p.hoursDisplay })
     );
 

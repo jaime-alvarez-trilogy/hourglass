@@ -174,20 +174,20 @@ describe('FR1 — buildMeshSvg', () => {
 });
 
 describe('FR1 — badgeColor', () => {
-  it('FR1.8 — crushed_it → #FFDF89', () => {
-    expect(badgeColor('crushed_it')).toBe('#FFDF89');
+  it('FR1.8 — crushed_it → #CEA435 (luxuryGold, updated in 04-cockpit-hud)', () => {
+    expect(badgeColor('crushed_it')).toBe('#CEA435');
   });
 
-  it('FR1.9 — on_track → #10B981', () => {
-    expect(badgeColor('on_track')).toBe('#10B981');
+  it('FR1.9 — on_track → #4ADE80 (successGreen, updated in 04-cockpit-hud)', () => {
+    expect(badgeColor('on_track')).toBe('#4ADE80');
   });
 
-  it('FR1.10 — behind → #F59E0B', () => {
-    expect(badgeColor('behind')).toBe('#F59E0B');
+  it('FR1.10 — behind → #FCD34D (warnAmber, updated in 04-cockpit-hud)', () => {
+    expect(badgeColor('behind')).toBe('#FCD34D');
   });
 
-  it('FR1.11 — critical → #F43F5E', () => {
-    expect(badgeColor('critical')).toBe('#F43F5E');
+  it('FR1.11 — critical → #F87171 (desatCoral, updated in 04-cockpit-hud)', () => {
+    expect(badgeColor('critical')).toBe('#F87171');
   });
 
   it('FR1.12 — none → empty string', () => {
@@ -391,48 +391,48 @@ describe('FR3 — Glass panel cards', () => {
 // ─── FR4: Pace badge ───────────────────────────────────────────────────────────
 
 describe('FR4 — Pace badge', () => {
-  it('FR4.1 — paceBadge on_track → badge with backgroundColor #10B981 and text ON TRACK', () => {
+  it('FR4.1 — paceBadge on_track → badge with backgroundColor #4ADE80 and text ON TRACK', () => {
     const tree = renderWidget(
       React.createElement(HourglassWidget, { data: makeData({ paceBadge: 'on_track' }), widgetFamily: 'medium' })
     );
     const flexes = getFlexWidgets(tree);
-    const badge = flexes.find((n) => n.props.style?.backgroundColor === '#10B981');
+    const badge = flexes.find((n) => n.props.style?.backgroundColor === '#4ADE80');
     expect(badge).toBeDefined();
     const texts = getTextWidgets(badge);
     expect(texts.some((t) => t.props.text === 'ON TRACK')).toBe(true);
   });
 
-  it('FR4.2 — paceBadge crushed_it → badge with backgroundColor #FFDF89 and text CRUSHED IT', () => {
+  it('FR4.2 — paceBadge crushed_it → badge with backgroundColor #CEA435 and text CRUSHED IT', () => {
     const tree = renderWidget(
       React.createElement(HourglassWidget, { data: makeData({ paceBadge: 'crushed_it' }), widgetFamily: 'medium' })
     );
     const flexes = getFlexWidgets(tree);
-    const badge = flexes.find((n) => n.props.style?.backgroundColor === '#FFDF89');
+    const badge = flexes.find((n) => n.props.style?.backgroundColor === '#CEA435');
     expect(badge).toBeDefined();
     const texts = getTextWidgets(badge);
     expect(texts.some((t) => t.props.text === 'CRUSHED IT')).toBe(true);
   });
 
-  it('FR4.3 — paceBadge behind → badge with backgroundColor #F59E0B and text BEHIND PACE', () => {
+  it('FR4.3 — paceBadge behind → P2 warning text uses #FCD34D color and shows BEHIND PACE', () => {
+    // behind triggers P2 mode (no approvals) → warning TextWidget, not PaceBadge capsule
     const tree = renderWidget(
-      React.createElement(HourglassWidget, { data: makeData({ paceBadge: 'behind' }), widgetFamily: 'medium' })
+      React.createElement(HourglassWidget, { data: makeData({ paceBadge: 'behind', approvalItems: [], myRequests: [] }), widgetFamily: 'medium' })
     );
-    const flexes = getFlexWidgets(tree);
-    const badge = flexes.find((n) => n.props.style?.backgroundColor === '#F59E0B');
-    expect(badge).toBeDefined();
-    const texts = getTextWidgets(badge);
-    expect(texts.some((t) => t.props.text === 'BEHIND PACE')).toBe(true);
+    const texts = getTextWidgets(tree);
+    const warningText = texts.find((t) => t.props.text && t.props.text.includes('BEHIND PACE'));
+    expect(warningText).toBeDefined();
+    expect(warningText!.props.style?.color).toBe('#FCD34D');
   });
 
-  it('FR4.4 — paceBadge critical → badge with backgroundColor #F43F5E and text CRITICAL', () => {
+  it('FR4.4 — paceBadge critical → P2 warning text uses #F87171 color and shows CRITICAL', () => {
+    // critical triggers P2 mode (no approvals) → warning TextWidget, not PaceBadge capsule
     const tree = renderWidget(
-      React.createElement(HourglassWidget, { data: makeData({ paceBadge: 'critical' }), widgetFamily: 'medium' })
+      React.createElement(HourglassWidget, { data: makeData({ paceBadge: 'critical', approvalItems: [], myRequests: [] }), widgetFamily: 'medium' })
     );
-    const flexes = getFlexWidgets(tree);
-    const badge = flexes.find((n) => n.props.style?.backgroundColor === '#F43F5E');
-    expect(badge).toBeDefined();
-    const texts = getTextWidgets(badge);
-    expect(texts.some((t) => t.props.text === 'CRITICAL')).toBe(true);
+    const texts = getTextWidgets(tree);
+    const warningText = texts.find((t) => t.props.text && t.props.text.includes('CRITICAL'));
+    expect(warningText).toBeDefined();
+    expect(warningText!.props.style?.color).toBe('#F87171');
   });
 
   it('FR4.5 — paceBadge none → no pace badge rendered (no text ON TRACK / BEHIND PACE / etc.)', () => {
