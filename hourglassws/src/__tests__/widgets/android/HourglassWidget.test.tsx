@@ -76,6 +76,7 @@ let badgeColor: any;
 let badgeLabel: any;
 let deltaColor: any;
 let blProgressBar: any;
+let buildBarChartSvg: any;
 let HourglassWidget: any;
 let FallbackWidget: any;
 
@@ -86,6 +87,7 @@ beforeAll(() => {
   badgeLabel = mod.badgeLabel;
   deltaColor = mod.deltaColor;
   blProgressBar = mod.blProgressBar;
+  buildBarChartSvg = mod.buildBarChartSvg;
   HourglassWidget = mod.HourglassWidget;
   FallbackWidget = mod.FallbackWidget;
 });
@@ -996,5 +998,314 @@ describe('04-cockpit-hud FR5: Priority ordering P1 > P2 > P3 (Android)', () => {
     expect(aiText).toBeDefined();
     const warningText = texts.find((t) => t.props.text && t.props.text.startsWith('⚠'));
     expect(warningText).toBeUndefined();
+  });
+});
+
+// ─── 02-widget-visual-android: FR1, FR2, FR3 ──────────────────────────────────
+
+// ─── Daily entry fixture helpers ───────────────────────────────────────────────
+
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/** Build a 7-entry WidgetDailyEntry array. todayIndex = 0..6 (Mon=0). */
+function makeDailyEntries(
+  hours: number[],
+  todayIndex: number,
+): any[] {
+  return DAY_NAMES.map((day, i) => ({
+    day,
+    hours: hours[i] ?? 0,
+    isToday: i === todayIndex,
+    isFuture: i > todayIndex,
+  }));
+}
+
+// ─── FR1: GlassPanel inner card opacity ────────────────────────────────────────
+
+describe('02-android FR1 — GlassPanel inner card opacity', () => {
+  it('FR1.1 — MediumWidget Hours mode renders an inner FlexWidget with backgroundColor #1F1E2C', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({ isManager: false, paceBadge: 'on_track', approvalItems: [], myRequests: [] }),
+        widgetFamily: 'medium',
+      })
+    );
+    const flexes = getFlexWidgets(tree);
+    const innerCard = flexes.find((n) => n.props.style?.backgroundColor === '#1F1E2C');
+    expect(innerCard).toBeDefined();
+  });
+
+  it('FR1.2 — MediumWidget Hours mode retains outer FlexWidget with backgroundColor #2F2E41 (border trick)', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({ isManager: false, paceBadge: 'on_track', approvalItems: [], myRequests: [] }),
+        widgetFamily: 'medium',
+      })
+    );
+    const flexes = getFlexWidgets(tree);
+    const outerBorder = flexes.find((n) => n.props.style?.backgroundColor === '#2F2E41');
+    expect(outerBorder).toBeDefined();
+  });
+
+  it('FR1.3 — old inner colour #16151F is not present in any FlexWidget', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({ isManager: false, paceBadge: 'on_track', approvalItems: [], myRequests: [] }),
+        widgetFamily: 'medium',
+      })
+    );
+    const flexes = getFlexWidgets(tree);
+    const oldCard = flexes.find((n) => n.props.style?.backgroundColor === '#16151F');
+    expect(oldCard).toBeUndefined();
+  });
+
+  it('FR1.4 — GlassPanel inner FlexWidget retains borderRadius: 12 and padding: 12 (structural unchanged)', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({ isManager: false, paceBadge: 'on_track', approvalItems: [], myRequests: [] }),
+        widgetFamily: 'medium',
+      })
+    );
+    const flexes = getFlexWidgets(tree);
+    const innerCard = flexes.find((n) => n.props.style?.backgroundColor === '#1F1E2C');
+    expect(innerCard).toBeDefined();
+    expect(innerCard!.props.style?.borderRadius).toBe(12);
+    expect(innerCard!.props.style?.padding).toBe(12);
+  });
+});
+
+// ─── FR2: buildBarChartSvg function ────────────────────────────────────────────
+
+describe('02-android FR2 — buildBarChartSvg', () => {
+  it('FR2.1 — returns a string starting with <svg', () => {
+    const daily = makeDailyEntries([8, 7, 6, 5, 4, 3, 2], 4);
+    const svg = buildBarChartSvg(daily, 280, 28, '#00FF88');
+    expect(typeof svg).toBe('string');
+    expect(svg.startsWith('<svg')).toBe(true);
+  });
+
+  it('FR2.2 — SVG contains exactly 7 <rect elements', () => {
+    const daily = makeDailyEntries([8, 7, 6, 5, 4, 3, 2], 4);
+    const svg = buildBarChartSvg(daily, 280, 28, '#00FF88');
+    const rectMatches = svg.match(/<rect/g);
+    expect(rectMatches).not.toBeNull();
+    expect(rectMatches!.length).toBe(7);
+  });
+
+  it('FR2.3 — SVG contains exactly 7 <text elements', () => {
+    const daily = makeDailyEntries([8, 7, 6, 5, 4, 3, 2], 4);
+    const svg = buildBarChartSvg(daily, 280, 28, '#00FF88');
+    const textMatches = svg.match(/<text/g);
+    expect(textMatches).not.toBeNull();
+    expect(textMatches!.length).toBe(7);
+  });
+
+  it('FR2.4 — today bar (isToday=true) has fill equal to accentColor', () => {
+    const daily = makeDailyEntries([8, 7, 6, 5, 8, 3, 2], 4); // Friday is today
+    const accentColor = '#F5C842';
+    const svg = buildBarChartSvg(daily, 280, 28, accentColor);
+    expect(svg).toContain(`fill="${accentColor}"`);
+  });
+
+  it('FR2.5 — past bar with hours > 0 has fill="#4A4A6A"', () => {
+    const daily = makeDailyEntries([8, 7, 6, 5, 4, 0, 0], 4); // Mon–Thu past with hours
+    const svg = buildBarChartSvg(daily, 280, 28, '#00FF88');
+    expect(svg).toContain('fill="#4A4A6A"');
+  });
+
+  it('FR2.6 — future bar (isFuture=true) has fill="#2F2E41"', () => {
+    const daily = makeDailyEntries([8, 7, 6, 5, 4, 0, 0], 4); // Sat, Sun are future
+    const svg = buildBarChartSvg(daily, 280, 28, '#00FF88');
+    // Sat and Sun (index 5, 6) are future → muted
+    expect(svg).toContain('fill="#2F2E41"');
+  });
+
+  it('FR2.7 — past bar with hours = 0 has fill="#2F2E41"', () => {
+    // Mon–Wed have hours, Thu is past with 0 hours, today is Friday
+    const daily = makeDailyEntries([8, 7, 6, 0, 4, 0, 0], 4);
+    const svg = buildBarChartSvg(daily, 280, 28, '#00FF88');
+    expect(svg).toContain('fill="#2F2E41"');
+  });
+
+  it('FR2.8 — all bars have height >= 2 (floor enforced)', () => {
+    const daily = makeDailyEntries([8, 7, 6, 5, 4, 0, 0], 4);
+    const svg = buildBarChartSvg(daily, 280, 28, '#00FF88');
+    // Extract all height= values from <rect elements
+    const heights = [...svg.matchAll(/<rect[^>]*height="(\d+)"/g)].map((m) => parseInt(m[1], 10));
+    expect(heights.length).toBe(7);
+    heights.forEach((h) => expect(h).toBeGreaterThanOrEqual(2));
+  });
+
+  it('FR2.9 — all hours = 0: all bars at minimum 2px, no error thrown', () => {
+    const daily = makeDailyEntries([0, 0, 0, 0, 0, 0, 0], 3);
+    let svg: string;
+    expect(() => {
+      svg = buildBarChartSvg(daily, 280, 28, '#00FF88');
+    }).not.toThrow();
+    const heights = [...svg!.matchAll(/<rect[^>]*height="(\d+)"/g)].map((m) => parseInt(m[1], 10));
+    expect(heights.length).toBe(7);
+    heights.forEach((h) => expect(h).toBe(2));
+  });
+
+  it('FR2.10 — today hours = max: today bar height equals barAreaHeight', () => {
+    // Today (index 3, Thu) has the highest hours
+    const daily = makeDailyEntries([4, 5, 6, 28, 3, 0, 0], 3);
+    const barAreaHeight = 28;
+    const svg = buildBarChartSvg(daily, 280, barAreaHeight, '#00FF88');
+    // The today bar should be at full height (barAreaHeight)
+    // Find the rect with fill="#00FF88" and extract its height
+    const todayRectMatch = svg.match(/<rect[^>]*fill="#00FF88"[^>]*height="(\d+)"/);
+    const altTodayRectMatch = svg.match(/<rect[^>]*height="(\d+)"[^>]*fill="#00FF88"/);
+    const heightStr = todayRectMatch?.[1] ?? altTodayRectMatch?.[1];
+    expect(heightStr).toBeDefined();
+    expect(parseInt(heightStr!, 10)).toBe(barAreaHeight);
+  });
+
+  it('FR2.11 — exactly 7 entries → exactly 7 bars rendered', () => {
+    const daily = makeDailyEntries([8, 7, 6, 5, 4, 3, 2], 2);
+    const svg = buildBarChartSvg(daily, 280, 28, '#00FF88');
+    expect((svg.match(/<rect/g) ?? []).length).toBe(7);
+  });
+
+  it('FR2.12 — accentColor = "#FF2D55" (critical): today bar fill is #FF2D55', () => {
+    const daily = makeDailyEntries([4, 5, 6, 8, 3, 0, 0], 3);
+    const svg = buildBarChartSvg(daily, 280, 28, '#FF2D55');
+    expect(svg).toContain('fill="#FF2D55"');
+  });
+
+  it('FR2.13 — SVG height attribute equals barAreaHeight + 12', () => {
+    const daily = makeDailyEntries([8, 7, 6, 5, 4, 3, 2], 4);
+    const barAreaHeight = 28;
+    const svg = buildBarChartSvg(daily, 280, barAreaHeight, '#00FF88');
+    expect(svg).toContain(`height="${barAreaHeight + 12}"`);
+  });
+
+  it('FR2.14 — day labels Mon, Tue, Wed, Thu, Fri, Sat, Sun all present in SVG', () => {
+    const daily = makeDailyEntries([8, 7, 6, 5, 4, 3, 2], 4);
+    const svg = buildBarChartSvg(daily, 280, 28, '#00FF88');
+    ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach((label) => {
+      expect(svg).toContain(label);
+    });
+  });
+});
+
+// ─── FR3: MediumWidget Hours mode bar chart integration ────────────────────────
+
+describe('02-android FR3 — MediumWidget Hours mode bar chart integration', () => {
+  function makeDailyData(): any[] {
+    return makeDailyEntries([8, 7, 6, 5, 4, 0, 0], 4);
+  }
+
+  it('FR3.1 — MediumWidget Hours mode renders a SvgWidget after the BrainLift row (bar chart present)', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({
+          isManager: false,
+          paceBadge: 'on_track',
+          approvalItems: [],
+          myRequests: [],
+          daily: makeDailyData(),
+        }),
+        widgetFamily: 'medium',
+      })
+    );
+    const svgs = getSvgWidgets(tree);
+    // Should have: mesh background + BrainLift progress bar + bar chart = at least 3
+    expect(svgs.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('FR3.2 — bar chart SvgWidget svg prop starts with <svg', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({
+          isManager: false,
+          paceBadge: 'on_track',
+          approvalItems: [],
+          myRequests: [],
+          daily: makeDailyData(),
+        }),
+        widgetFamily: 'medium',
+      })
+    );
+    const svgs = getSvgWidgets(tree);
+    // The bar chart SVG is the one that contains <rect elements (bar chart, not mesh or progress bar)
+    const barChartSvg = svgs.find((s) => {
+      const svg: string = s.props.svg ?? '';
+      return (svg.match(/<rect/g) ?? []).length === 7;
+    });
+    expect(barChartSvg).toBeDefined();
+    expect(barChartSvg!.props.svg.startsWith('<svg')).toBe(true);
+  });
+
+  it('FR3.3 — bar chart SvgWidget height prop is 40', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({
+          isManager: false,
+          paceBadge: 'on_track',
+          approvalItems: [],
+          myRequests: [],
+          daily: makeDailyData(),
+        }),
+        widgetFamily: 'medium',
+      })
+    );
+    const svgs = getSvgWidgets(tree);
+    const barChartSvg = svgs.find((s) => {
+      const svg: string = s.props.svg ?? '';
+      return (svg.match(/<rect/g) ?? []).length === 7;
+    });
+    expect(barChartSvg).toBeDefined();
+    // SvgWidget height is passed via style prop (width/height on SvgWidget)
+    // Check that the SVG itself contains height="40" (barAreaHeight + 12 = 28 + 12 = 40)
+    expect(barChartSvg!.props.svg).toContain('height="40"');
+  });
+
+  it('FR3.4 — bar chart uses urgency accentColor (urgency=critical → #FF2D55 in bar chart svg)', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({
+          isManager: false,
+          paceBadge: 'on_track',
+          urgency: 'critical',
+          approvalItems: [],
+          myRequests: [],
+          daily: makeDailyData(),
+        }),
+        widgetFamily: 'medium',
+      })
+    );
+    const svgs = getSvgWidgets(tree);
+    const barChartSvg = svgs.find((s) => {
+      const svg: string = s.props.svg ?? '';
+      return (svg.match(/<rect/g) ?? []).length === 7;
+    });
+    expect(barChartSvg).toBeDefined();
+    // critical urgency → URGENCY_ACCENT.critical = '#FF2D55'
+    expect(barChartSvg!.props.svg).toContain('#FF2D55');
+  });
+
+  it('FR3.5 — bar chart receives data.daily (SVG contains 7 bars from the daily array)', () => {
+    const daily = makeDailyEntries([10, 8, 6, 4, 2, 0, 0], 4);
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeData({
+          isManager: false,
+          paceBadge: 'on_track',
+          approvalItems: [],
+          myRequests: [],
+          daily,
+        }),
+        widgetFamily: 'medium',
+      })
+    );
+    const svgs = getSvgWidgets(tree);
+    const barChartSvg = svgs.find((s) => {
+      const svg: string = s.props.svg ?? '';
+      return (svg.match(/<rect/g) ?? []).length === 7;
+    });
+    expect(barChartSvg).toBeDefined();
+    // Mon bar has max hours → full height bar (barAreaHeight = 28)
+    expect(barChartSvg!.props.svg).toContain('height="28"');
   });
 });
