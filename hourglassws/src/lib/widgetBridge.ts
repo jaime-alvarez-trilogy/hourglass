@@ -26,6 +26,10 @@ export async function updateWidgetData(data: CrossoverSnapshot): Promise<void> {
     data.pendingCount,
     data.config,
     data.approvalItems ?? [],
-    data.myRequests ?? []
+    data.myRequests ?? [],
+    // prevWeekSnapshot intentionally omitted on background path (Decision 2, 01-data-extensions):
+    // Background handler does not have AsyncStorage history available mid-execution.
+    // weekDeltaHours and weekDeltaEarnings will be "" on background-triggered widget updates.
+    // The foreground path (_layout.tsx) provides the full snapshot via useWeeklyHistory.
   );
 }
