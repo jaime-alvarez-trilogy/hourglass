@@ -5,6 +5,7 @@
 // Extended in 08-widget-enhancements: buildDailyEntries, formatApprovalItems, formatMyRequests
 
 import { Platform } from 'react-native';
+import { requireOptionalNativeModule } from 'expo-modules-core';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUrgencyLevel } from '../lib/hours';
 import type { HoursData, DailyEntry } from '../lib/hours';
@@ -167,6 +168,55 @@ function deriveActionBg(
   return '';
 }
 
+// ─── 01-data-extensions: pace badge + week delta computation ─────────────────
+
+/**
+ * Computes the paceBadge value from hoursData and config.
+ * Returns 'none' if hoursData is null or expectedHours is 0 (Monday).
+ * Returns 'crushed_it' if in overtime.
+ * Otherwise compares total vs expected using workdays elapsed Mon–Fri.
+ */
+function computePaceBadge(
+  hoursData: HoursData | null,
+  config: CrossoverConfig,
+): 'crushed_it' | 'on_track' | 'behind' | 'critical' | 'none' {
+  if (!hoursData) return 'none';
+  if (hoursData.overtimeHours > 0) return 'crushed_it';
+
+  const day = new Date().getDay(); // 0=Sun, 1=Mon..6=Sat
+  // Elapsed workdays: Mon(1)→0, Tue(2)→1, Wed(3)→2, Thu(4)→3, Fri(5)→4, Sat(6)→5, Sun(0)→5
+  const workdaysElapsed = (day === 0 || day === 6) ? 5 : Math.min(day - 1, 5);
+  const weeklyLimit = config.weeklyLimit ?? 40;
+  const expectedHours = weeklyLimit * (workdaysElapsed / 5);
+
+  if (expectedHours === 0) return 'none';
+
+  const ratio = hoursData.total / expectedHours;
+  if (ratio >= 0.9) return 'on_track';
+  if (ratio >= 0.7) return 'behind';
+  return 'critical';
+}
+
+/**
+ * Computes weekDeltaHours and weekDeltaEarnings formatted strings.
+ * Returns empty strings when hoursData or prevWeekSnapshot is missing.
+ */
+function computeWeekDeltas(
+  hoursData: HoursData | null,
+  prevWeekSnapshot: { hours: number; earnings: number } | null | undefined,
+): { weekDeltaHours: string; weekDeltaEarnings: string } {
+  if (!hoursData || !prevWeekSnapshot) {
+    return { weekDeltaHours: '', weekDeltaEarnings: '' };
+  }
+  const dh = hoursData.total - prevWeekSnapshot.hours;
+  const de = hoursData.weeklyEarnings - prevWeekSnapshot.earnings;
+  const weekDeltaHours = (dh >= 0 ? '+' : '') + dh.toFixed(1) + 'h';
+  const weekDeltaEarnings = de >= 0
+    ? '+$' + Math.round(de).toLocaleString()
+    : '-$' + Math.abs(Math.round(de)).toLocaleString();
+  return { weekDeltaHours, weekDeltaEarnings };
+}
+
 // ─── buildWidgetData ──────────────────────────────────────────────────────────
 
 /**
@@ -175,16 +225,53 @@ function deriveActionBg(
  *
  * Extended in 08-widget-enhancements to accept approvalItems + myRequests
  * and produce daily, approvalItems, myRequests, actionBg fields.
+ *
+ * Extended in 01-data-extensions: accepts HoursData | null and optional
+ * prevWeekSnapshot; produces paceBadge, weekDeltaHours, weekDeltaEarnings,
+ * brainliftTarget fields.
  */
 function buildWidgetData(
-  hoursData: HoursData,
+  hoursData: HoursData | null,
   aiData: AIWeekData | null,
   _pendingCount: number,
   config: CrossoverConfig,
   approvalItems: ApprovalItem[] = [],
   myRequests: ManualRequestEntry[] = [],
-  now: number = Date.now()
+  now: number = Date.now(),
+  prevWeekSnapshot?: { hours: number; earnings: number } | null,
 ): WidgetData {
+  // 01-data-extensions: compute new fields (work with null hoursData)
+  const paceBadge = computePaceBadge(hoursData, config);
+  const { weekDeltaHours, weekDeltaEarnings } = computeWeekDeltas(hoursData, prevWeekSnapshot);
+
+  // Guard: hoursData required for deadline-dependent fields
+  if (!hoursData) {
+    return {
+      hours: '0.0',
+      hoursDisplay: '0.0h',
+      earnings: '$0',
+      earningsRaw: 0,
+      today: '0.0h',
+      hoursRemaining: '0.0h left',
+      aiPct: formatAIPct(aiData),
+      brainlift: aiData ? `${aiData.brainliftHours.toFixed(1)}h` : '0.0h',
+      deadline: now,
+      urgency: 'none',
+      pendingCount: 0,
+      isManager: config.isManager,
+      cachedAt: now,
+      useQA: config.useQA,
+      daily: [],
+      approvalItems: [],
+      myRequests: [],
+      actionBg: '',
+      paceBadge,
+      weekDeltaHours,
+      weekDeltaEarnings,
+      brainliftTarget: '5h',
+    };
+  }
+
   const deadlineMs = hoursData.deadline.getTime();
   const urgency: WidgetUrgency = getUrgencyLevel(deadlineMs - now);
 
@@ -215,6 +302,11 @@ function buildWidgetData(
     approvalItems: widgetApprovalItems,
     myRequests: widgetMyRequests,
     actionBg: deriveActionBg(config.isManager, approvalItems, myRequests),
+    // 01-data-extensions fields
+    paceBadge,
+    weekDeltaHours,
+    weekDeltaEarnings,
+    brainliftTarget: '5h',
   };
 }
 
@@ -435,27 +527,29 @@ const WIDGET_LAYOUT_JS = `(function(props, env) {
       });
     }
 
-    // Hours mode: existing layout + bar chart
-    var barChart = [];
-    if (props.daily && props.daily.length > 0) {
-      var maxHours = Math.max.apply(null, props.daily.map(function(d) { return d.hours; }).concat([8]));
-      barChart = props.daily.map(function(entry) {
-        var barWidth = Math.max(3, Math.round((entry.hours / maxHours) * 160));
-        var barColor = entry.isToday ? hoursColor : '#2A2A3A';
+    // Bar chart — only days with hours > 0, bars fill toward right edge
+    var activeDays = (props.daily || []).filter(function(d) { return d.hours > 0; });
+    var barRows = [];
+    if (activeDays.length > 0) {
+      var maxHours = Math.max.apply(null, activeDays.map(function(d) { return d.hours; }).concat([8]));
+      barRows = activeDays.map(function(entry) {
+        var barWidth = Math.max(4, Math.round((entry.hours / maxHours) * 220));
+        var barColor = entry.isToday ? hoursColor : '#3D3B54';
+        var valueColor = entry.isToday ? hoursColor : LABEL;
         return HStack({
-          spacing: 6,
+          spacing: 5,
           children: [
             Text({
-              modifiers: [foregroundStyle(MUTED), font({ size: 12 }), frame({ width: 30 })],
+              modifiers: [foregroundStyle(MUTED), font({ size: 11 }), frame({ width: 26 })],
               children: entry.day
             }),
-            HStack({
-              modifiers: [background(barColor), frame({ width: barWidth, height: 8 }), cornerRadius(3)],
-              children: []
+            RoundedRectangle({
+              cornerRadius: 3,
+              modifiers: [foregroundStyle(barColor), frame({ width: barWidth, height: 7 })]
             }),
             Spacer({}),
             Text({
-              modifiers: [foregroundStyle(LABEL), font({ size: 11 })],
+              modifiers: [foregroundStyle(valueColor), font({ size: 11 })],
               children: entry.hours.toFixed(1) + 'h'
             })
           ]
@@ -463,79 +557,116 @@ const WIDGET_LAYOUT_JS = `(function(props, env) {
       });
     }
 
+    // AI & BrainLift progress bars — parse "87%–91%" → midpoint
+    var avgAIPct = 0;
+    var aiMatch = props.aiPct ? props.aiPct.match(/(\d+)[^\d]+(\d+)/) : null;
+    if (aiMatch) { avgAIPct = (parseFloat(aiMatch[1]) + parseFloat(aiMatch[2])) / 2; }
+    var aiBarWidth = Math.max(4, Math.round(Math.min(avgAIPct / 100, 1) * 190));
+    var aiTrackWidth = Math.max(4, 190 - aiBarWidth);
+
+    var blHours = parseFloat(props.brainlift) || 0;
+    var blBarWidth = Math.max(4, Math.round(Math.min(blHours / 5, 1) * 190));
+    var blTrackWidth = Math.max(4, 190 - blBarWidth);
+
+    // No explicit background — let Swift containerBackground handle it (avoids grey frame)
     return VStack({
       alignment: 'leading',
-      spacing: 20,
-      modifiers: [background(bg), padding({ all: 18 }), fill],
+      spacing: 0,
+      modifiers: [padding({ all: 14 }), fill],
       children: [
+        // ── Hero: hours left, earnings right ───────────────────────────────
         HStack({
           children: [
             VStack({
               alignment: 'leading',
-              spacing: 2,
+              spacing: 0,
               children: [
-                Text({
-                  modifiers: [foregroundStyle(hoursColor), font({ size: 42, weight: 'bold' })],
-                  children: props.hoursDisplay
-                }),
-                Text({
-                  modifiers: [foregroundStyle(MUTED), font({ size: 12 })],
-                  children: 'this week'
-                })
+                Text({ modifiers: [foregroundStyle(hoursColor), font({ size: 34, weight: 'bold' })], children: props.hoursDisplay }),
+                Text({ modifiers: [foregroundStyle(MUTED), font({ size: 11 })], children: 'this week' })
               ]
             }),
             Spacer({}),
             VStack({
               alignment: 'trailing',
-              spacing: 2,
+              spacing: 0,
               children: [
-                Text({
-                  modifiers: [foregroundStyle(GOLD), font({ size: 30, weight: 'semibold' })],
-                  children: props.earnings
-                }),
-                Text({
-                  modifiers: [foregroundStyle(MUTED), font({ size: 12 })],
-                  children: 'earned'
-                })
+                Text({ modifiers: [foregroundStyle(GOLD), font({ size: 26, weight: 'semibold' })], children: props.earnings }),
+                Text({ modifiers: [foregroundStyle(MUTED), font({ size: 11 })], children: 'earned' })
               ]
             })
           ]
         }),
-        VStack({
-          alignment: 'leading',
-          spacing: 14,
+        Spacer({}),
+        // ── Stats: 2-column pairs ───────────────────────────────────────────
+        HStack({
           children: [
-            HStack({
+            VStack({
+              alignment: 'leading',
+              spacing: 1,
               children: [
-                Text({ modifiers: [foregroundStyle(LABEL), font({ size: 14 })], children: 'Today' }),
-                Spacer({}),
+                Text({ modifiers: [foregroundStyle(MUTED), font({ size: 10 })], children: 'TODAY' }),
                 Text({ modifiers: [foregroundStyle(WHITE), font({ size: 14, weight: 'semibold' })], children: props.today })
               ]
             }),
-            HStack({
+            Spacer({}),
+            VStack({
+              alignment: 'trailing',
+              spacing: 1,
               children: [
-                Text({ modifiers: [foregroundStyle(LABEL), font({ size: 14 })], children: 'Remaining' }),
-                Spacer({}),
+                Text({ modifiers: [foregroundStyle(MUTED), font({ size: 10 })], children: 'REMAINING' }),
                 Text({ modifiers: [foregroundStyle(hoursColor), font({ size: 14, weight: 'semibold' })], children: props.hoursRemaining })
               ]
-            }),
-            HStack({
+            })
+          ]
+        }),
+        Spacer({ minLength: 6 }),
+        HStack({
+          children: [
+            VStack({
+              alignment: 'leading',
+              spacing: 1,
               children: [
-                Text({ modifiers: [foregroundStyle(LABEL), font({ size: 14 })], children: 'AI usage' }),
-                Spacer({}),
+                Text({ modifiers: [foregroundStyle(MUTED), font({ size: 10 })], children: 'AI USAGE' }),
                 Text({ modifiers: [foregroundStyle(CYAN), font({ size: 14, weight: 'semibold' })], children: props.aiPct })
               ]
             }),
-            HStack({
+            Spacer({}),
+            VStack({
+              alignment: 'trailing',
+              spacing: 1,
               children: [
-                Text({ modifiers: [foregroundStyle(LABEL), font({ size: 14 })], children: 'BrainLift' }),
-                Spacer({}),
+                Text({ modifiers: [foregroundStyle(MUTED), font({ size: 10 })], children: 'BRAINLIFT' }),
                 Text({ modifiers: [foregroundStyle(VIOLET), font({ size: 14, weight: 'semibold' })], children: props.brainlift })
               ]
             })
           ]
+        }),
+        Spacer({}),
+        // ── Daily bar chart ────────────────────────────────────────────────
+        VStack({ alignment: 'leading', spacing: 5, children: barRows }),
+        Spacer({}),
+        // ── AI progress bar ────────────────────────────────────────────────
+        HStack({
+          spacing: 5,
+          children: [
+            Text({ modifiers: [foregroundStyle(MUTED), font({ size: 10 }), frame({ width: 16 })], children: 'AI' }),
+            RoundedRectangle({ cornerRadius: 2, modifiers: [foregroundStyle(CYAN), frame({ width: aiBarWidth, height: 5 })] }),
+            RoundedRectangle({ cornerRadius: 2, modifiers: [foregroundStyle('#2A2A3A'), frame({ width: aiTrackWidth, height: 5 })] }),
+            Text({ modifiers: [foregroundStyle(CYAN), font({ size: 10 })], children: props.aiPct })
+          ]
+        }),
+        Spacer({ minLength: 4 }),
+        // ── BrainLift progress bar ─────────────────────────────────────────
+        HStack({
+          spacing: 5,
+          children: [
+            Text({ modifiers: [foregroundStyle(MUTED), font({ size: 10 }), frame({ width: 16 })], children: 'BL' }),
+            RoundedRectangle({ cornerRadius: 2, modifiers: [foregroundStyle(VIOLET), frame({ width: blBarWidth, height: 5 })] }),
+            RoundedRectangle({ cornerRadius: 2, modifiers: [foregroundStyle('#2A2A3A'), frame({ width: blTrackWidth, height: 5 })] }),
+            Text({ modifiers: [foregroundStyle(VIOLET), font({ size: 10 })], children: props.brainlift + ' / 5h' })
+          ]
         })
-      ].concat(barChart)
+      ]
     });
   }
 
@@ -653,22 +784,24 @@ const WIDGET_LAYOUT_JS = `(function(props, env) {
  * - iOS: stores layout + timeline entries in shared UserDefaults (App Group),
  *   then tells WidgetKit to reload the 'HourglassWidget' timeline.
  *
- * @param hoursData     - Weekly hours/earnings data from useHoursData hook
- * @param aiData        - AI% and BrainLift data from useAIData hook (null if unavailable)
- * @param pendingCount  - Pending approval count (0 for contributors) — legacy param, derived internally now
- * @param config        - App configuration including isManager and useQA
- * @param approvalItems - Manager's pending approval items (default [])
- * @param myRequests    - Contributor's manual time requests (default [])
+ * @param hoursData         - Weekly hours/earnings data from useHoursData hook (null if still loading)
+ * @param aiData            - AI% and BrainLift data from useAIData hook (null if unavailable)
+ * @param pendingCount      - Pending approval count (0 for contributors) — legacy param, derived internally now
+ * @param config            - App configuration including isManager and useQA
+ * @param approvalItems     - Manager's pending approval items (default [])
+ * @param myRequests        - Contributor's manual time requests (default [])
+ * @param prevWeekSnapshot  - Previous week's hours+earnings for delta computation (omitted on background path)
  */
 export async function updateWidgetData(
-  hoursData: HoursData,
+  hoursData: HoursData | null,
   aiData: AIWeekData | null,
   pendingCount: number,
   config: CrossoverConfig,
   approvalItems?: ApprovalItem[],
-  myRequests?: ManualRequestEntry[]
+  myRequests?: ManualRequestEntry[],
+  prevWeekSnapshot?: { hours: number; earnings: number } | null,
 ): Promise<void> {
-  const data = buildWidgetData(hoursData, aiData, pendingCount, config, approvalItems ?? [], myRequests ?? []);
+  const data = buildWidgetData(hoursData, aiData, pendingCount, config, approvalItems ?? [], myRequests ?? [], Date.now(), prevWeekSnapshot);
 
   // Android: write snapshot to AsyncStorage for task handler to read
   await AsyncStorage.setItem(WIDGET_DATA_KEY, JSON.stringify(data));
@@ -676,16 +809,29 @@ export async function updateWidgetData(
   // iOS: store layout string + timeline entries in App Group UserDefaults,
   // then signal WidgetKit to reload.
   if (Platform.OS === 'ios') {
+    // Guard: check if the native module is available before requiring expo-widgets.
+    // requireOptionalNativeModule returns null if the module isn't compiled in
+    // (New Architecture / TurboModules safe — NativeModules registry is old-arch only).
+    if (!requireOptionalNativeModule('ExpoWidgets')) {
+      console.log('[bridge] iOS widget skipped (native module unavailable)');
+      return;
+    }
+    let createWidget: ((...args: unknown[]) => { updateTimeline: (entries: unknown[]) => void }) | undefined;
     try {
-      // expo-widgets is iOS-only and only available in production EAS builds.
+      // expo-widgets is iOS-only and only available in native dev/prod builds.
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const expoWidgets = require('expo-widgets') as { createWidget?: (...args: unknown[]) => { updateTimeline: (entries: unknown[]) => void } } | undefined;
-      const createWidget = expoWidgets?.createWidget;
-      if (!createWidget) {
-        // Native module not compiled in (Expo Go / simulator) — skip silently
-        console.log('[bridge] iOS widget skipped (expo-widgets unavailable in dev)');
-        return;
-      }
+      const mod = require('expo-widgets') as { createWidget?: (...args: unknown[]) => { updateTimeline: (entries: unknown[]) => void } } | undefined;
+      createWidget = mod?.createWidget;
+    } catch {
+      // Module not compiled in (Expo Go / simulator) — skip silently
+      console.log('[bridge] iOS widget skipped (expo-widgets unavailable in dev)');
+      return;
+    }
+    if (!createWidget) {
+      console.log('[bridge] iOS widget skipped (expo-widgets unavailable in dev)');
+      return;
+    }
+    try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const widget = createWidget('HourglassWidget', WIDGET_LAYOUT_JS as any);
       const entries = buildTimelineEntries(data, 60, 15);
