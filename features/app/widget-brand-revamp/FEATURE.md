@@ -113,4 +113,4 @@ Mesh simulation approach: `ZStack` base with 3 overlapping `Circle()` shapes fil
 | 2026-03-24 | [01-data-extensions](specs/01-data-extensions/spec.md) | Add paceBadge, weekDelta, brainliftTarget fields to WidgetData with full call-chain wiring — **Complete** |
 | 2026-03-24 | [02-ios-visual](specs/02-ios-visual/spec.md) | Full WIDGET_LAYOUT_JS redesign: mesh bg simulation, glass panels, pace badge, trend deltas, brainliftTarget-driven progress bars, brand color compliance across all sizes — **Complete** |
 | 2026-03-24 | [03-android-visual](specs/03-android-visual/spec.md) | Android HourglassWidget brand redesign: SVG mesh bg, glass panels, pace badge, trend deltas, BrainLift bar, urgency mode — **Complete** |
-| 2026-03-25 | [04-cockpit-hud](specs/04-cockpit-hud/spec-research.md) | Dynamic 3-priority HUD: desaturated dark glass color tokens, P2 stripped deficit layout (iOS+Android), iOS monospaced/heavy hero typography — **Research** |
+| 2026-03-25 | [04-cockpit-hud](specs/04-cockpit-hud/spec.md) | Dynamic 3-priority HUD: desaturated dark glass color tokens, P2 stripped deficit layout (iOS+Android), iOS monospaced/heavy hero typography — **Spec** |
