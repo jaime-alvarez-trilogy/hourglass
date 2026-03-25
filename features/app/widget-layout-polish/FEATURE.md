@@ -52,14 +52,14 @@ Android MediumWidget: replaces second hoursRemaining occurrence
 
 | Date | Spec | Description |
 |------|------|-------------|
-| 2026-03-25 | [01-widget-polish](specs/01-widget-polish/spec.md) | Spec and checklist created: Small content triage, iOS Large padding, Android SVG background, todayDelta field, progress bar polish |
+| 2026-03-25 | [01-widget-polish](specs/01-widget-polish/spec.md) | COMPLETE: Small content triage, iOS Large padding, Android SVG background, todayDelta field, progress bar polish |
 
 ## Success Criteria
 
-- [ ] iOS Small shows only `hoursDisplay` + urgency accent + `paceBadge` (no earnings, no hoursRemaining)
-- [ ] iOS Large renders without bottom clipping at `padding={16}` (increased from 14)
-- [ ] Android mesh SVG replaced with a single top-to-bottom linear gradient (no ellipses)
-- [ ] `WidgetData.todayDelta` field added; bridge computes it from `today - average`
-- [ ] iOS Large and Android Medium display `todayDelta` alongside today's hours
-- [ ] BrainLift progress bar height ≥ 8px; label reads "BrainLift" not "BL"
-- [ ] All modified widget tests still pass; snapshot tests updated
+- [x] iOS Small shows only `hoursDisplay` + urgency accent + `paceBadge` (no earnings, no hoursRemaining)
+- [x] iOS Large renders without bottom clipping at `padding={16}` (increased from 14)
+- [x] Android mesh SVG replaced with a single top-to-bottom linear gradient (no ellipses)
+- [x] `WidgetData.todayDelta` field added; bridge computes it from `today - average`
+- [x] iOS Large displays `todayDelta` alongside today's hours (Android Medium deferred)
+- [x] BrainLift progress bar height ≥ 8px; label reads "BrainLift" not "BL"
+- [x] All modified widget tests still pass; existing tests updated for new behavior
