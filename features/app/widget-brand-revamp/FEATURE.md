@@ -101,3 +101,4 @@ Mesh simulation approach: `ZStack` base with 3 overlapping `Circle()` shapes fil
 | Date | Spec | Description |
 |------|------|-------------|
 | 2026-03-24 | [01-data-extensions](specs/01-data-extensions/spec.md) | Add paceBadge, weekDelta, brainliftTarget fields to WidgetData with full call-chain wiring — **Complete** |
+| 2026-03-24 | [03-android-visual](specs/03-android-visual/spec.md) | Android HourglassWidget brand redesign: SVG mesh bg, glass panels, pace badge, trend deltas, BrainLift bar, urgency mode |
