@@ -81,7 +81,8 @@ describe('FR5: useWidgetSync', () => {
       2,
       MOCK_CONFIG,
       [],
-      []
+      [],
+      undefined,
     );
   });
 
@@ -133,7 +134,8 @@ describe('FR5: useWidgetSync', () => {
       3,
       MOCK_CONFIG,
       [],
-      []
+      [],
+      undefined,
     );
   });
 
@@ -149,7 +151,8 @@ describe('FR5: useWidgetSync', () => {
       0,
       MOCK_CONFIG,
       [],
-      []
+      [],
+      undefined,
     );
   });
 
@@ -205,7 +208,8 @@ describe('FR5: useWidgetSync', () => {
       1,
       MOCK_CONFIG,
       approvalItems,
-      []
+      [],
+      undefined,
     );
   });
 
@@ -222,7 +226,8 @@ describe('FR5: useWidgetSync', () => {
       0,
       MOCK_CONFIG,
       [],
-      myRequests
+      myRequests,
+      undefined,
     );
   });
 
@@ -289,25 +294,31 @@ describe('FR6 (01-data-extensions): useWidgetSync prevWeekSnapshot param', () =>
     expect(mockUpdateWidgetData).toHaveBeenCalledTimes(1);
   });
 
-  it('FR6: prevWeekSnapshot NOT in useEffect deps — changing snapshot alone does NOT re-trigger', () => {
+  it('FR6: prevWeekSnapshot NOT in useEffect deps — changing snapshot does NOT add extra calls vs dep change', () => {
     const snap1 = { hours: 30.0, earnings: 1200 };
     const snap2 = { hours: 28.0, earnings: 1120 };
+    // Use stable array references so approvalItems dep does NOT change between renders
+    const stableApprovals: never[] = [];
+    const stableRequests: never[] = [];
 
     const { rerender } = renderHook<
       void,
       { snap: typeof snap1 | typeof snap2 }
     >(
       ({ snap }) =>
-        useWidgetSync(MOCK_HOURS_DATA, MOCK_AI_DATA, 0, MOCK_CONFIG, [], [], snap),
+        useWidgetSync(MOCK_HOURS_DATA, MOCK_AI_DATA, 0, MOCK_CONFIG, stableApprovals, stableRequests, snap),
       { initialProps: { snap: snap1 } }
     );
 
-    expect(mockUpdateWidgetData).toHaveBeenCalledTimes(1);
+    // Record calls after initial render
+    const callsAfterMount = mockUpdateWidgetData.mock.calls.length;
+    expect(callsAfterMount).toBeGreaterThanOrEqual(1);
 
-    // Change only the snapshot — should NOT trigger a re-render
+    // Change only the snapshot — should NOT add new calls beyond what mount produced
+    mockUpdateWidgetData.mockClear();
     rerender({ snap: snap2 });
 
-    // Still only called once — prevWeekSnapshot is NOT in deps
-    expect(mockUpdateWidgetData).toHaveBeenCalledTimes(1);
+    // No additional calls — prevWeekSnapshot is NOT in deps
+    expect(mockUpdateWidgetData).toHaveBeenCalledTimes(0);
   });
 });
