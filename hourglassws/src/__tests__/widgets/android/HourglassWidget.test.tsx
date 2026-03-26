@@ -703,7 +703,7 @@ describe('FR7 — Manager urgency mode', () => {
     expect(countdownText).toBeDefined();
   });
 
-  it('FR7.3 — isManager low urgency pendingCount=5 → hours mode (no countdown)', () => {
+  it('FR7.3 — isManager low urgency pendingCount=5 → P1 approvals mode (02-android-hud-layout: P1 now activates for any manager with pending>0, not just high/critical urgency)', () => {
     const tree = renderWidget(
       React.createElement(HourglassWidget, {
         data: makeData({
@@ -715,15 +715,12 @@ describe('FR7 — Manager urgency mode', () => {
       })
     );
     const texts = getTextWidgets(tree);
-    const countdownText = texts.find(
-      // Countdown format is "{N}h left" (integer hours) or "Due now"
-      // Distinguish from hoursRemaining like "7.5h left" which has a decimal
-      (t) => t.props.text && (t.props.text === 'Due now' || /^\d+h left$/.test(t.props.text))
+    // Under new P1 logic: manager + pendingCount=5 → P1 approvals layout
+    // Header contains "5 PENDING"
+    const pendingHeader = texts.find(
+      (t) => t.props.text && t.props.text.includes('5') && t.props.text.includes('PENDING')
     );
-    expect(countdownText).toBeUndefined();
-    // Verify hours hero is shown instead
-    const hoursHero = texts.find((t) => t.props.text === '32.5h');
-    expect(hoursHero).toBeDefined();
+    expect(pendingHeader).toBeDefined();
   });
 
   it('FR7.4 — isManager=false → always hours mode, no approval items', () => {
@@ -887,7 +884,7 @@ describe('04-cockpit-hud FR3: Android P2 stripped deficit layout', () => {
     expect(warningText!.props.style?.color).toBe('#F87171');
   });
 
-  it('FR3-A-7 (edge) — paceBadge=behind + isManager=true + urgency=critical + pendingCount=3 → urgency mode wins (not P2)', () => {
+  it('FR3-A-7 (edge) — paceBadge=behind + isManager=true + urgency=critical + pendingCount=3 → P1 approvals wins (not P2) (02-android-hud-layout: P1 shows ⚠ PENDING header, not countdown)', () => {
     const tree = renderWidget(
       React.createElement(HourglassWidget, {
         data: makeData({
@@ -902,17 +899,19 @@ describe('04-cockpit-hud FR3: Android P2 stripped deficit layout', () => {
       })
     );
     const texts = getTextWidgets(tree);
-    // Urgency mode shows countdown, NOT the ⚠ P2 warning badge
-    const warningText = texts.find((t) => t.props.text && t.props.text.startsWith('⚠'));
-    expect(warningText).toBeUndefined();
-    // Countdown present instead
-    const countdownText = texts.find(
-      (t) => t.props.text && (t.props.text === 'Due now' || /^\d+h left$/.test(t.props.text))
+    // P1 approvals layout shows "⚠ 3 PENDING" header — not the P2 pace warning
+    const pendingHeader = texts.find(
+      (t) => t.props.text && t.props.text.includes('PENDING') && t.props.text.includes('3')
     );
-    expect(countdownText).toBeDefined();
+    expect(pendingHeader).toBeDefined();
+    // P2 warning badge (⚠ BEHIND PACE) should NOT appear separately
+    const paceWarning = texts.find(
+      (t) => t.props.text && t.props.text.includes('BEHIND PACE')
+    );
+    expect(paceWarning).toBeUndefined();
   });
 
-  it('FR3-A-8 (edge) — paceBadge=behind + approvalItems.length>0 → action mode wins (not P2)', () => {
+  it('FR3-A-8 (edge) — paceBadge=behind + approvalItems.length>0 + isManager=false → P2 deficit wins (02-android-hud-layout: non-manager never hits P1 regardless of approvalItems)', () => {
     const tree = renderWidget(
       React.createElement(HourglassWidget, {
         data: makeData({
@@ -926,11 +925,13 @@ describe('04-cockpit-hud FR3: Android P2 stripped deficit layout', () => {
       })
     );
     const texts = getTextWidgets(tree);
-    // Action mode shows item name, not P2 warning
-    const warningText = texts.find((t) => t.props.text && t.props.text.startsWith('⚠'));
-    expect(warningText).toBeUndefined();
-    const itemText = texts.find((t) => t.props.text === 'Alice');
-    expect(itemText).toBeDefined();
+    // isManager=false → P1 never triggers; paceBadge=behind → P2 deficit
+    // P2 warning badge present
+    const warningText = texts.find((t) => t.props.text && t.props.text.includes('⚠'));
+    expect(warningText).toBeDefined();
+    // P2 shows hoursDisplay, not the approvalItem name
+    const hoursHero = texts.find((t) => t.props.text === '32.5h');
+    expect(hoursHero).toBeDefined();
   });
 
   it('FR3-A-9 (edge) — paceBadge=on_track, no approvals → P3 hours mode, AI Usage: label shown (01-widget-polish: renamed from "AI:" to "AI Usage:")', () => {
@@ -949,7 +950,7 @@ describe('04-cockpit-hud FR3: Android P2 stripped deficit layout', () => {
 // ─── 04-cockpit-hud: FR5 — Priority ordering P1 > P2 > P3 (Android) ─────────
 
 describe('04-cockpit-hud FR5: Priority ordering P1 > P2 > P3 (Android)', () => {
-  it('FR5-A-1 — isManager=true, pendingCount=3, paceBadge=critical, urgency=critical → P1 urgency (countdown hero)', () => {
+  it('FR5-A-1 — isManager=true, pendingCount=3, paceBadge=critical, urgency=critical → P1 approvals (02-android-hud-layout: P1 shows ⚠ PENDING header, P2 pace warning absent)', () => {
     const tree = renderWidget(
       React.createElement(HourglassWidget, {
         data: makeData({
@@ -964,13 +965,16 @@ describe('04-cockpit-hud FR5: Priority ordering P1 > P2 > P3 (Android)', () => {
       })
     );
     const texts = getTextWidgets(tree);
-    // P1 urgency mode: countdown, no ⚠ P2 badge
-    const warningText = texts.find((t) => t.props.text && t.props.text.startsWith('⚠'));
-    expect(warningText).toBeUndefined();
-    const countdownText = texts.find(
-      (t) => t.props.text && (t.props.text === 'Due now' || /^\d+h left$/.test(t.props.text))
+    // P1 approvals mode: shows "⚠ 3 PENDING" header
+    const pendingHeader = texts.find(
+      (t) => t.props.text && t.props.text.includes('PENDING') && t.props.text.includes('3')
     );
-    expect(countdownText).toBeDefined();
+    expect(pendingHeader).toBeDefined();
+    // P2 "CRITICAL" pace badge warning not shown
+    const paceBadgeWarning = texts.find(
+      (t) => t.props.text && t.props.text.includes('CRITICAL') && t.props.text.startsWith('⚠')
+    );
+    expect(paceBadgeWarning).toBeUndefined();
   });
 
   it('FR5-A-2 — isManager=false, paceBadge=critical, myRequests=[], approvalItems=[] → P2 stripped layout', () => {

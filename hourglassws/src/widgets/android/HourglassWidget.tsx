@@ -305,6 +305,20 @@ function SmallWidget({ data }: { data: WidgetData }) {
   );
 }
 
+// ─── FR1 (02-android-hud-layout): getPriority helper ─────────────────────────
+
+/**
+ * Returns the priority mode for MediumWidget rendering.
+ * P1 (approvals): manager with any pending items to act on.
+ * P2 (deficit):   behind or critical pace (no pending items).
+ * P3 (default):   everything else — full hours mode.
+ */
+export function getPriority(data: Pick<WidgetData, 'isManager' | 'pendingCount' | 'paceBadge'>): 'approvals' | 'deficit' | 'default' {
+  if (data.isManager && data.pendingCount > 0) return 'approvals';
+  if (data.paceBadge === 'behind' || data.paceBadge === 'critical') return 'deficit';
+  return 'default';
+}
+
 // ─── Action mode badge colors ──────────────────────────────────────────────────
 
 const BADGE_COLORS: Record<string, string> = {
@@ -322,24 +336,12 @@ function MediumWidget({ data }: { data: WidgetData }) {
   const stale = isStale(data.cachedAt);
   const meshSvg = buildMeshSvg(data.urgency, data.paceBadge ?? 'none');
 
-  // FR7: Urgency mode — manager with high/critical urgency and pending approvals
-  const isUrgencyMode =
-    data.isManager &&
-    (data.urgency === 'high' || data.urgency === 'critical') &&
-    data.pendingCount > 0;
-
-  // Existing action mode: approvals or my requests (non-urgency)
-  const hasApprovals = data.approvalItems && data.approvalItems.length > 0;
-  const hasRequests = data.myRequests && data.myRequests.length > 0;
-  const actionMode = !isUrgencyMode && (hasApprovals || hasRequests);
+  // 02-android-hud-layout: unified three-priority model
+  const priority = getPriority(data);
 
   // FR6: BrainLift progress bar data
   const brainliftHours = parseFloat(data.brainlift) || 0;
   const targetHours = parseFloat(data.brainliftTarget ?? '5h') || 5;
-
-  // 04-cockpit-hud FR3: P2 stripped deficit mode
-  const isPaceMode = !actionMode && !isUrgencyMode &&
-    (data.paceBadge === 'behind' || data.paceBadge === 'critical');
 
   // FR5: Delta display helpers
   const hoursDelta = data.weekDeltaHours ?? '';
@@ -347,48 +349,38 @@ function MediumWidget({ data }: { data: WidgetData }) {
   const hoursDeltaText = formatDelta(hoursDelta);
   const earningsDeltaText = formatDelta(earningsDelta);
 
-  // ─── FR7: Urgency mode layout ───────────────────────────────────────────────
-  if (isUrgencyMode) {
+  // ─── P1: Approvals layout (manager with pending items) ──────────────────────
+  if (priority === 'approvals') {
     const approvalItems = (data.approvalItems ?? []).slice(0, 2);
-    const countdown = formatCountdown(data.deadline);
+    const actionBg = data.actionBg || '#1C1400';
 
     return (
       <FlexWidget
         style={{
-          backgroundColor: '#0D0C14',
+          backgroundColor: actionBg,
           flex: 1,
           flexDirection: 'column',
           position: 'relative',
           padding: 12,
         }}
       >
-        {/* FR2: SVG mesh background */}
+        {/* SVG mesh background */}
         <SvgWidget
           svg={meshSvg}
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
         />
 
-        {/* Countdown hero row */}
-        <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
+        {/* Header: pending count */}
+        <FlexWidget style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
           <TextWidget
-            text={countdown}
-            style={{ color: accent, fontSize: 28, fontWeight: 'bold', flex: 1 }}
-          />
-          <TextWidget
-            text={`${data.pendingCount} pending`}
-            style={{ color: accent, fontSize: 13, fontWeight: '600' }}
+            text={`⚠ ${data.pendingCount} PENDING`}
+            style={{ color: accent, fontSize: 15, fontWeight: '700', flex: 1 }}
           />
         </FlexWidget>
 
-        {/* Secondary hours/earnings row */}
-        <TextWidget
-          text={`${data.hoursDisplay}  ·  ${data.earnings}`}
-          style={{ color: '#A0A0A0', fontSize: 12 }}
-        />
-
         <TextWidget text="" style={{ height: 4 }} />
 
-        {/* Approval items */}
+        {/* Approval item rows (up to 2) */}
         {approvalItems.map((item) => {
           const badgeKey = item.category ?? '';
           const badgeClr = BADGE_COLORS[badgeKey] ?? '#A0A0A0';
@@ -413,76 +405,25 @@ function MediumWidget({ data }: { data: WidgetData }) {
             </FlexWidget>
           );
         })}
-      </FlexWidget>
-    );
-  }
 
-  // ─── Action mode (approvals / my requests — non-urgency) ────────────────────
-  if (actionMode) {
-    const actionItems = hasApprovals
-      ? (data.approvalItems ?? [])
-      : (data.myRequests ?? []);
-    const displayItems = actionItems.slice(0, 2);
-    const actionBg = data.actionBg || '#0D0C14';
-
-    return (
-      <FlexWidget
-        style={{
-          backgroundColor: actionBg,
-          flex: 1,
-          flexDirection: 'column',
-          position: 'relative',
-          padding: 12,
-        }}
-      >
-        {/* FR2: SVG mesh background */}
-        <SvgWidget
-          svg={meshSvg}
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-        />
-
-        {/* Compact hero */}
-        <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
+        {/* Footer: today hours + deadline */}
+        <FlexWidget style={{ flex: 1 }} />
+        <FlexWidget style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           <TextWidget
-            text={`${data.hoursDisplay}  ·  ${data.earnings}`}
-            style={{ color: accent, fontSize: 14, fontWeight: 'bold' }}
+            text={`Today: ${data.todayDelta || data.today}`}
+            style={{ color: '#A0A0A0', fontSize: 12 }}
+          />
+          <TextWidget
+            text={formatCountdown(data.deadline)}
+            style={{ color: accent, fontSize: 12, fontWeight: '600' }}
           />
         </FlexWidget>
-
-        <TextWidget text="" style={{ height: 6 }} />
-
-        {/* Item rows */}
-        {displayItems.map((item) => {
-          const badgeKey = ('category' in item ? item.category : item.status) ?? '';
-          const badgeClr = BADGE_COLORS[badgeKey] ?? '#A0A0A0';
-          const label = ('name' in item ? item.name : item.memo) ?? '';
-          return (
-            <FlexWidget
-              key={item.id}
-              style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}
-            >
-              <TextWidget
-                text={label}
-                style={{ color: '#E0E0E0', fontSize: 12, flex: 1 }}
-              />
-              <TextWidget
-                text={item.hours}
-                style={{ color: accent, fontSize: 12, fontWeight: '600' }}
-              />
-              <TextWidget text=" " style={{ fontSize: 12 }} />
-              <TextWidget
-                text={badgeKey}
-                style={{ color: badgeClr, fontSize: 11 }}
-              />
-            </FlexWidget>
-          );
-        })}
       </FlexWidget>
     );
   }
 
-  // ─── 04-cockpit-hud FR3: P2 stripped deficit layout ─────────────────────────
-  if (isPaceMode) {
+  // ─── P2: Deficit layout (behind/critical pace, no pending approvals) ─────────
+  if (priority === 'deficit') {
     const hoursColor = accent;
     return (
       <FlexWidget
@@ -524,7 +465,7 @@ function MediumWidget({ data }: { data: WidgetData }) {
             style={{ color: deltaColor(data.weekDeltaEarnings), fontSize: 12 }}
           />
           <TextWidget
-            text={`today ${data.today}`}
+            text={`today ${data.todayDelta || data.today}`}
             style={{ color: '#A0A0A0', fontSize: 12 }}
           />
         </FlexWidget>
@@ -532,7 +473,7 @@ function MediumWidget({ data }: { data: WidgetData }) {
     );
   }
 
-  // ─── Hours mode (standard display) ──────────────────────────────────────────
+  // ─── P3: Hours mode (default — full display) ─────────────────────────────────
   return (
     <FlexWidget
       style={{
@@ -555,7 +496,7 @@ function MediumWidget({ data }: { data: WidgetData }) {
         <GlassPanel flex={1}>
           <TextWidget
             text={data.hoursDisplay}
-            style={{ color: accent, fontSize: 32, fontWeight: 'bold' }}
+            style={{ color: accent, fontSize: 32, fontWeight: '700' }}
           />
           <TextWidget
             text="this week"
@@ -576,7 +517,7 @@ function MediumWidget({ data }: { data: WidgetData }) {
         <GlassPanel flex={1}>
           <TextWidget
             text={data.earnings}
-            style={{ color: '#E8C97A', fontSize: 22, fontWeight: '600' }}
+            style={{ color: '#E8C97A', fontSize: 22, fontWeight: '700' }}
           />
           <TextWidget
             text="earned"
@@ -599,10 +540,10 @@ function MediumWidget({ data }: { data: WidgetData }) {
 
       <TextWidget text="" style={{ height: 6 }} />
 
-      {/* Stats row: Today + AI% */}
+      {/* Stats row: Today + AI Usage% */}
       <FlexWidget style={{ flexDirection: 'row' }}>
         <TextWidget
-          text={`Today: ${data.today}`}
+          text={`Today: ${data.todayDelta || data.today}`}
           style={{ color: '#E0E0E0', fontSize: 13 }}
         />
         <TextWidget text="" style={{ flex: 1 }} />
@@ -645,14 +586,6 @@ function MediumWidget({ data }: { data: WidgetData }) {
         <TextWidget
           text={`Cached: ${formatCachedTime(data.cachedAt)}`}
           style={{ color: '#FF9500', fontSize: 10 }}
-        />
-      )}
-
-      {/* Manager pending badge (non-urgency) */}
-      {data.isManager && data.pendingCount > 0 && (
-        <TextWidget
-          text={`${data.pendingCount} pending approval`}
-          style={{ color: '#FF3B30', fontSize: 11, fontWeight: '600' }}
         />
       )}
     </FlexWidget>
