@@ -1309,3 +1309,333 @@ describe('02-android FR3 — MediumWidget Hours mode bar chart integration', () 
     expect(barChartSvg!.props.svg).toContain('height="28"');
   });
 });
+
+// ─── 02-android-hud-layout: FR1 — getPriority helper ─────────────────────────
+
+let getPriority: any;
+
+beforeAll(() => {
+  const mod = require('../../../widgets/android/HourglassWidget');
+  getPriority = mod.getPriority;
+});
+
+describe('02-hud FR1 — getPriority helper', () => {
+  it('FR1-hud-1 — isManager=true, pendingCount=2 → "approvals" (P1)', () => {
+    expect(getPriority({ isManager: true, pendingCount: 2, paceBadge: 'on_track' })).toBe('approvals');
+  });
+
+  it('FR1-hud-2 — isManager=false, paceBadge=critical → "deficit" (P2)', () => {
+    expect(getPriority({ isManager: false, pendingCount: 0, paceBadge: 'critical' })).toBe('deficit');
+  });
+
+  it('FR1-hud-3 — isManager=false, paceBadge=behind → "deficit" (P2)', () => {
+    expect(getPriority({ isManager: false, pendingCount: 0, paceBadge: 'behind' })).toBe('deficit');
+  });
+
+  it('FR1-hud-4 — isManager=false, paceBadge=on_track → "default" (P3)', () => {
+    expect(getPriority({ isManager: false, pendingCount: 0, paceBadge: 'on_track' })).toBe('default');
+  });
+
+  it('FR1-hud-5 — isManager=true, pendingCount=0, paceBadge=critical → "deficit" (P1 requires pending > 0)', () => {
+    expect(getPriority({ isManager: true, pendingCount: 0, paceBadge: 'critical' })).toBe('deficit');
+  });
+
+  it('FR1-hud-6 — isManager=true, urgency=critical, pendingCount=0 → "deficit" (urgency alone does not trigger P1)', () => {
+    expect(getPriority({ isManager: true, pendingCount: 0, paceBadge: 'critical', urgency: 'critical' })).toBe('deficit');
+  });
+
+  it('FR1-hud-7 — paceBadge=crushed_it, isManager=false → "default" (P3)', () => {
+    expect(getPriority({ isManager: false, pendingCount: 0, paceBadge: 'crushed_it' })).toBe('default');
+  });
+
+  it('FR1-hud-8 — contributor (isManager=false) with myRequests → "default" (not P1)', () => {
+    expect(getPriority({
+      isManager: false,
+      pendingCount: 0,
+      paceBadge: 'on_track',
+      myRequests: [{ id: '1', status: 'PENDING', hours: '2h', memo: 'fix' }],
+    })).toBe('default');
+  });
+
+  it('FR1-hud-9 — isManager=true, pendingCount=1 → "approvals" regardless of urgency=none', () => {
+    expect(getPriority({ isManager: true, pendingCount: 1, paceBadge: 'on_track', urgency: 'none' })).toBe('approvals');
+  });
+
+  it('FR1-hud-10 — isManager=true, pendingCount=5, paceBadge=behind → "approvals" (P1 wins over P2)', () => {
+    expect(getPriority({ isManager: true, pendingCount: 5, paceBadge: 'behind' })).toBe('approvals');
+  });
+});
+
+// ─── 02-android-hud-layout: FR5 — blProgressBar height regression guard ───────
+
+describe('02-hud FR5 — blProgressBar height regression guard', () => {
+  it('FR5-hud-1 — track rect has height="8" in SVG output', () => {
+    const svg = blProgressBar(3, 5, 120);
+    // Track rect is the first rect: width="${width}" height="8"
+    const rects = [...svg.matchAll(/<rect([^/]*?)\/>/g)].map((m: any) => m[0]);
+    expect(rects.length).toBeGreaterThanOrEqual(2);
+    const trackRect = rects[0];
+    expect(trackRect).toContain('height="8"');
+  });
+
+  it('FR5-hud-2 — fill rect has height="8" in SVG output', () => {
+    const svg = blProgressBar(3, 5, 120);
+    const rects = [...svg.matchAll(/<rect([^/]*?)\/>/g)].map((m: any) => m[0]);
+    expect(rects.length).toBeGreaterThanOrEqual(2);
+    const fillRect = rects[1];
+    expect(fillRect).toContain('height="8"');
+  });
+
+  it('FR5-hud-3 — fill width is capped at width value when brainliftHours >= targetHours (100%)', () => {
+    const width = 150;
+    const svg = blProgressBar(10, 5, width); // 200% → capped at 100% = width
+    // All width= values, max should equal the outer SVG width (not exceed)
+    const widthValues = [...svg.matchAll(/width="(\d+)"/g)].map((m: any) => parseInt(m[1], 10));
+    const maxFill = Math.max(...widthValues.filter((w: number) => w <= width));
+    expect(maxFill).toBe(width);
+  });
+
+  it('FR5-hud-4 — fill rect width is 0 when brainliftHours = 0', () => {
+    const svg = blProgressBar(0, 5, 120);
+    expect(svg).toContain('width="0"');
+  });
+
+  it('FR5-hud-5 — SVG outer element has height="8"', () => {
+    const svg = blProgressBar(2.5, 5, 120);
+    expect(svg).toMatch(/<svg[^>]*height="8"/);
+  });
+});
+
+// ─── 02-android-hud-layout: FR2 — MediumWidget P1 approvals layout ───────────
+
+describe('02-hud FR2 — MediumWidget P1 approvals layout', () => {
+  function makeP1Data(overrides: Record<string, unknown> = {}): any {
+    return makeData({
+      isManager: true,
+      pendingCount: 3,
+      urgency: 'none', // P1 must activate even with non-high urgency
+      paceBadge: 'on_track',
+      approvalItems: [
+        { id: '1', name: 'Alice Smith', hours: '2.5h', category: 'MANUAL' },
+        { id: '2', name: 'Bob Jones', hours: '1.0h', category: 'OVERTIME' },
+      ],
+      ...overrides,
+    });
+  }
+
+  it('FR2-hud-1 — P1: header text contains pendingCount', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, { data: makeP1Data({ pendingCount: 3 }), widgetFamily: 'medium' })
+    );
+    const texts = getTextWidgets(tree);
+    const headerText = texts.find((t: any) => t.props.text && t.props.text.includes('3'));
+    expect(headerText).toBeDefined();
+  });
+
+  it('FR2-hud-2 — P1: renders approvalItems[0].name', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, { data: makeP1Data(), widgetFamily: 'medium' })
+    );
+    const texts = getTextWidgets(tree);
+    const nameText = texts.find((t: any) => t.props.text === 'Alice Smith');
+    expect(nameText).toBeDefined();
+  });
+
+  it('FR2-hud-3 — P1: renders approvalItems[0].hours', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, { data: makeP1Data(), widgetFamily: 'medium' })
+    );
+    const texts = getTextWidgets(tree);
+    const hoursText = texts.find((t: any) => t.props.text === '2.5h');
+    expect(hoursText).toBeDefined();
+  });
+
+  it('FR2-hud-4 — P1: does NOT render earnings hero as a large featured text', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeP1Data({ earnings: '$1,300', weekDeltaEarnings: '' }),
+        widgetFamily: 'medium',
+      })
+    );
+    // P1 approvals layout does not have a prominent earnings glass panel
+    const flexes = getFlexWidgets(tree);
+    // earnings panel would be backgroundColor: #E8C97A-tinted or '#1F1E2C' inner glass
+    // Key check: no glass panel with inner card showing earnings as 22px hero
+    const texts = getTextWidgets(tree);
+    const earningsHero = texts.find((t: any) => t.props.text === '$1,300' && t.props.style?.fontSize >= 20);
+    expect(earningsHero).toBeUndefined();
+  });
+
+  it('FR2-hud-5 — P1: activates for manager with urgency=none (not just high/critical)', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeP1Data({ urgency: 'none', pendingCount: 2 }),
+        widgetFamily: 'medium',
+      })
+    );
+    const texts = getTextWidgets(tree);
+    // Should render approval items, not the full hours mode
+    const itemName = texts.find((t: any) => t.props.text === 'Alice Smith');
+    expect(itemName).toBeDefined();
+  });
+
+  it('FR2-hud-6 — P1: activates for manager with urgency=low (previously would not have triggered urgency mode)', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeP1Data({ urgency: 'low', pendingCount: 1 }),
+        widgetFamily: 'medium',
+      })
+    );
+    const texts = getTextWidgets(tree);
+    const itemName = texts.find((t: any) => t.props.text === 'Alice Smith');
+    expect(itemName).toBeDefined();
+  });
+});
+
+// ─── 02-android-hud-layout: FR3 — MediumWidget P2 deficit layout ─────────────
+
+describe('02-hud FR3 — MediumWidget P2 deficit layout (unified priority)', () => {
+  function makeP2Data(overrides: Record<string, unknown> = {}): any {
+    return makeData({
+      isManager: false,
+      pendingCount: 0,
+      paceBadge: 'behind',
+      approvalItems: [],
+      myRequests: [],
+      ...overrides,
+    });
+  }
+
+  it('FR3-hud-1 — P2: renders hoursDisplay prominently', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, { data: makeP2Data(), widgetFamily: 'medium' })
+    );
+    const texts = getTextWidgets(tree);
+    const hoursText = texts.find((t: any) => t.props.text === '32.5h');
+    expect(hoursText).toBeDefined();
+  });
+
+  it('FR3-hud-2 — P2: renders hoursRemaining', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, { data: makeP2Data(), widgetFamily: 'medium' })
+    );
+    const texts = getTextWidgets(tree);
+    const remainingText = texts.find((t: any) => t.props.text === '7.5h left');
+    expect(remainingText).toBeDefined();
+  });
+
+  it('FR3-hud-3 — P2: does NOT render AI usage text', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, { data: makeP2Data({ aiPct: '71%' }), widgetFamily: 'medium' })
+    );
+    const texts = getTextWidgets(tree);
+    const aiText = texts.find((t: any) => t.props.text && t.props.text.includes('AI'));
+    expect(aiText).toBeUndefined();
+  });
+
+  it('FR3-hud-4 — P2: does NOT render bar chart (no 7-rect SVG)', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, { data: makeP2Data(), widgetFamily: 'medium' })
+    );
+    const svgs = getSvgWidgets(tree);
+    const barChart = svgs.find((s: any) => (s.props.svg?.match(/<rect/g) ?? []).length === 7);
+    expect(barChart).toBeUndefined();
+  });
+
+  it('FR3-hud-5 — P2: paceBadge=critical also triggers P2 deficit layout', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeP2Data({ paceBadge: 'critical' }),
+        widgetFamily: 'medium',
+      })
+    );
+    const texts = getTextWidgets(tree);
+    const warningText = texts.find((t: any) => t.props.text && t.props.text.includes('⚠'));
+    expect(warningText).toBeDefined();
+    const hoursText = texts.find((t: any) => t.props.text === '32.5h');
+    expect(hoursText).toBeDefined();
+  });
+});
+
+// ─── 02-android-hud-layout: FR4 — MediumWidget P3 label and today delta fixes ─
+
+describe('02-hud FR4 — MediumWidget P3 label and today delta fixes', () => {
+  function makeP3Data(overrides: Record<string, unknown> = {}): any {
+    return makeData({
+      isManager: false,
+      pendingCount: 0,
+      paceBadge: 'on_track',
+      approvalItems: [],
+      myRequests: [],
+      today: '6.2h',
+      todayDelta: '+1.2h',
+      aiPct: '71%',
+      ...overrides,
+    });
+  }
+
+  it('FR4-hud-1 — P3: footer contains "AI Usage:" label (not "AI:")', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, { data: makeP3Data(), widgetFamily: 'medium' })
+    );
+    const texts = getTextWidgets(tree);
+    const aiUsageText = texts.find((t: any) => t.props.text && t.props.text.startsWith('AI Usage:'));
+    expect(aiUsageText).toBeDefined();
+  });
+
+  it('FR4-hud-2 — P3: footer does NOT contain bare "AI:" label', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, { data: makeP3Data(), widgetFamily: 'medium' })
+    );
+    const texts = getTextWidgets(tree);
+    const bareAiLabel = texts.find((t: any) => t.props.text && /^AI:\s/.test(t.props.text));
+    expect(bareAiLabel).toBeUndefined();
+  });
+
+  it('FR4-hud-3 — P3: todayDelta shown when non-empty', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeP3Data({ todayDelta: '+1.2h', today: '6.2h' }),
+        widgetFamily: 'medium',
+      })
+    );
+    const texts = getTextWidgets(tree);
+    const todayText = texts.find((t: any) => t.props.text && t.props.text.includes('+1.2h'));
+    expect(todayText).toBeDefined();
+  });
+
+  it('FR4-hud-4 — P3: falls back to today when todayDelta is empty string', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeP3Data({ todayDelta: '', today: '6.2h' }),
+        widgetFamily: 'medium',
+      })
+    );
+    const texts = getTextWidgets(tree);
+    const todayText = texts.find((t: any) => t.props.text && t.props.text.includes('6.2h'));
+    expect(todayText).toBeDefined();
+  });
+
+  it('FR4-hud-5 — P3: falls back to today when todayDelta is undefined', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, {
+        data: makeP3Data({ todayDelta: undefined, today: '6.5h' }),
+        widgetFamily: 'medium',
+      })
+    );
+    const texts = getTextWidgets(tree);
+    const todayText = texts.find((t: any) => t.props.text && t.props.text.includes('6.5h'));
+    expect(todayText).toBeDefined();
+  });
+
+  it('FR4-hud-6 — P3: hours hero TextWidget has fontWeight "700" or "bold"', () => {
+    const tree = renderWidget(
+      React.createElement(HourglassWidget, { data: makeP3Data(), widgetFamily: 'medium' })
+    );
+    const texts = getTextWidgets(tree);
+    const hoursHero = texts.find(
+      (t: any) => t.props.text === '32.5h' && (t.props.style?.fontWeight === '700' || t.props.style?.fontWeight === 'bold')
+    );
+    expect(hoursHero).toBeDefined();
+  });
+});
