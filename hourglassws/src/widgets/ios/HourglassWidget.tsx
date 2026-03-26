@@ -10,6 +10,13 @@
 //   FR2: Glass cards for Medium/Large hero row
 //   FR3: Gradient background (two Rectangle layers) for all sizes
 //   FR4: Bar chart (IosBarChart) for Large size
+//
+// 01-ios-hud-layout:
+//   FR1: getPriority helper — P1 (approvals), P2 (deficit), P3 (default)
+//   FR2: SmallWidget hero font weight: 'heavy', design: 'monospaced'
+//   FR3: MediumWidget priority-branched layouts
+//   FR4: LargeWidget priority-branched layouts + bottom padding fix
+//   FR5: Today row uses todayDelta with fallback to today
 
 import type { WidgetData, WidgetDailyEntry } from '../types';
 
@@ -52,6 +59,18 @@ const CARD_BORDER = '#2F2E41';
 const MAX_BAR_HEIGHT = 100;
 const BAR_PAST  = '#4A4A6A';
 const BAR_MUTED = '#2F2E41';
+
+// ─── FR1 (01-ios-hud-layout): Priority mode helper ───────────────────────────
+// Returns the display priority mode for Medium/Large widgets:
+//   'approvals' — P1: manager with pending approvals (most actionable)
+//   'deficit'   — P2: pace is behind or critical
+//   'default'   — P3: on track / normal state
+
+export function getPriority(props: WidgetData): 'approvals' | 'deficit' | 'default' {
+  if (props.isManager && props.pendingCount > 0) return 'approvals';
+  if (props.paceBadge === 'critical' || props.paceBadge === 'behind') return 'deficit';
+  return 'default';
+}
 
 // ─── Stale indicator ──────────────────────────────────────────────────────────
 
@@ -111,6 +130,7 @@ export function IosBarChart({ daily, accent }: { daily: WidgetDailyEntry[]; acce
 
 // ─── Small widget ─────────────────────────────────────────────────────────────
 // Shows: weekly hours total, pace badge, stale indicator
+// 01-ios-hud-layout FR2: hero font updated to weight: 'heavy', design: 'monospaced'
 
 function SmallWidget({ props }: { props: WidgetData }) {
   const accent = URGENCY_ACCENT[props.urgency] ?? URGENCY_ACCENT.none;
@@ -123,9 +143,9 @@ function SmallWidget({ props }: { props: WidgetData }) {
       <Rectangle fill={tint} />
 
       <VStack padding={12}>
-        {/* Hours total */}
+        {/* Hours total — FR2: weight 'heavy', design 'monospaced' */}
         <Text
-          font={{ size: 28, weight: 'bold' }}
+          font={{ size: 28, weight: 'heavy', design: 'monospaced' }}
           foregroundStyle={accent}
         >
           {props.hoursDisplay}
@@ -162,159 +182,260 @@ function SmallWidget({ props }: { props: WidgetData }) {
 }
 
 // ─── Medium widget ─────────────────────────────────────────────────────────────
-// Shows: glass card (hours) + glass card (earnings) + today's hours + AI%
+// 01-ios-hud-layout FR3: priority-branched layouts (P1/P2/P3)
 
 function MediumWidget({ props }: { props: WidgetData }) {
-  const accent = URGENCY_ACCENT[props.urgency] ?? URGENCY_ACCENT.none;
-  const tint   = URGENCY_TINTS[props.urgency]  ?? URGENCY_TINTS.none;
+  const accent   = URGENCY_ACCENT[props.urgency] ?? URGENCY_ACCENT.none;
+  const tint     = URGENCY_TINTS[props.urgency]  ?? URGENCY_TINTS.none;
+  const priority = getPriority(props);
+
+  // P1 overrides tint to high-urgency orange
+  const bgTint = priority === 'approvals' ? '#FF6B0020' : tint;
 
   return (
     <ZStack>
       {/* FR3: gradient background layers */}
       <Rectangle fill="#0D0C14" />
-      <Rectangle fill={tint} />
+      <Rectangle fill={bgTint} />
 
       <VStack padding={12}>
-        {/* FR2: Top row — two glass cards side by side */}
-        <HStack spacing={8}>
-          <IosGlassCard>
-            <Text font={{ size: 32, weight: 'bold' }} foregroundStyle={accent}>
+
+        {/* ── P1: Approvals layout ── */}
+        {priority === 'approvals' && (
+          <>
+            <Text font={{ size: 13, weight: 'semibold' }} foregroundStyle={accent}>
+              PENDING APPROVALS
+            </Text>
+            <Text font={{ size: 12 }} foregroundStyle="#DDDDDD">
+              {props.pendingCount} items requiring action
+            </Text>
+            {props.approvalItems.slice(0, 2).map((item) => (
+              <HStack key={item.id}>
+                <Text font={{ size: 12 }} foregroundStyle="#FFFFFF">{item.name}</Text>
+                <Spacer />
+                <Text font={{ size: 11 }} foregroundStyle="#AAAAAA">{item.hours}</Text>
+                <Text font={{ size: 10 }} foregroundStyle={accent}> {item.category}</Text>
+              </HStack>
+            ))}
+          </>
+        )}
+
+        {/* ── P2: Deficit layout ── */}
+        {priority === 'deficit' && (
+          <>
+            <Text font={{ size: 13, weight: 'semibold' }} foregroundStyle="#FF3B30">
+              {PACE_LABELS[props.paceBadge]}
+            </Text>
+            <Text font={{ size: 32, weight: 'heavy', design: 'monospaced' }} foregroundStyle={accent}>
               {props.hoursDisplay}
             </Text>
             <Text font={{ size: 12 }} foregroundStyle="#AAAAAA">
-              this week
+              {props.hoursRemaining}
             </Text>
-          </IosGlassCard>
-
-          <IosGlassCard>
-            <Text font={{ size: 24, weight: 'semibold' }} foregroundStyle="#FFFFFF">
-              {props.earnings}
-            </Text>
-            <Text font={{ size: 12 }} foregroundStyle="#AAAAAA">
-              earned
-            </Text>
-          </IosGlassCard>
-        </HStack>
-
-        <Spacer />
-
-        {/* Bottom row: today + AI% */}
-        <HStack>
-          <Text font={{ size: 13 }} foregroundStyle="#DDDDDD">
-            Today: {props.today}
-          </Text>
-          <Spacer />
-          <Text font={{ size: 13 }} foregroundStyle="#DDDDDD">
-            AI: {props.aiPct}
-          </Text>
-        </HStack>
-
-        {/* Hours remaining */}
-        <Text font={{ size: 12 }} foregroundStyle="#AAAAAA">
-          {props.hoursRemaining}
-        </Text>
-
-        {/* Stale indicator */}
-        {isStale(props.cachedAt) && (
-          <Text font={{ size: 10 }} foregroundStyle="#FF9500">
-            Cached: {formatCachedTime(props.cachedAt)}
-          </Text>
+            <Spacer />
+            <HStack>
+              <Text font={{ size: 13 }} foregroundStyle="#DDDDDD">
+                {props.today}
+              </Text>
+              <Spacer />
+              <Text font={{ size: 13 }} foregroundStyle="#DDDDDD">
+                {props.weekDeltaEarnings}
+              </Text>
+            </HStack>
+          </>
         )}
 
-        {/* Manager badge */}
-        {props.isManager && props.pendingCount > 0 && (
-          <Text font={{ size: 11 }} foregroundStyle="#FF3B30">
-            {props.pendingCount} pending approval
-          </Text>
+        {/* ── P3: Default layout ── */}
+        {priority === 'default' && (
+          <>
+            {/* Two glass cards side by side */}
+            <HStack spacing={8}>
+              <IosGlassCard>
+                <Text font={{ size: 32, weight: 'heavy', design: 'monospaced' }} foregroundStyle={accent}>
+                  {props.hoursDisplay}
+                </Text>
+                <Text font={{ size: 12 }} foregroundStyle="#AAAAAA">
+                  this week
+                </Text>
+              </IosGlassCard>
+
+              <IosGlassCard>
+                <Text font={{ size: 24, weight: 'semibold' }} foregroundStyle="#FFFFFF">
+                  {props.earnings}
+                </Text>
+                <Text font={{ size: 12 }} foregroundStyle="#AAAAAA">
+                  earned
+                </Text>
+              </IosGlassCard>
+            </HStack>
+
+            <Spacer />
+
+            {/* FR5: Bottom row — todayDelta with fallback to today */}
+            <HStack>
+              <Text font={{ size: 13 }} foregroundStyle="#DDDDDD">
+                Today: {props.todayDelta || props.today}
+              </Text>
+              <Spacer />
+              <Text font={{ size: 13 }} foregroundStyle="#DDDDDD">
+                AI: {props.aiPct}
+              </Text>
+            </HStack>
+
+            {/* Stale indicator */}
+            {isStale(props.cachedAt) && (
+              <Text font={{ size: 10 }} foregroundStyle="#FF9500">
+                Cached: {formatCachedTime(props.cachedAt)}
+              </Text>
+            )}
+          </>
         )}
+
       </VStack>
     </ZStack>
   );
 }
 
 // ─── Large widget ──────────────────────────────────────────────────────────────
-// Shows: glass card hero row + bar chart + detail rows
+// 01-ios-hud-layout FR4: priority-branched layouts + bottom padding fix (28pt)
 
 function LargeWidget({ props }: { props: WidgetData }) {
-  const accent = URGENCY_ACCENT[props.urgency] ?? URGENCY_ACCENT.none;
-  const tint   = URGENCY_TINTS[props.urgency]  ?? URGENCY_TINTS.none;
+  const accent   = URGENCY_ACCENT[props.urgency] ?? URGENCY_ACCENT.none;
+  const tint     = URGENCY_TINTS[props.urgency]  ?? URGENCY_TINTS.none;
+  const priority = getPriority(props);
+
+  // P1 overrides tint to high-urgency orange
+  const bgTint = priority === 'approvals' ? '#FF6B0020' : tint;
 
   return (
     <ZStack>
       {/* FR3: gradient background layers */}
       <Rectangle fill="#0D0C14" />
-      <Rectangle fill={tint} />
+      <Rectangle fill={bgTint} />
 
-      <VStack padding={16}>
-        {/* FR2: Hero row — two glass cards */}
-        <HStack spacing={8}>
-          <IosGlassCard>
-            <Text font={{ size: 36, weight: 'bold' }} foregroundStyle={accent}>
+      {/* FR4: bottom padding increased to 28pt to prevent OS clipping */}
+      <VStack padding={{ top: 16, leading: 16, trailing: 16, bottom: 28 }}>
+
+        {/* ── P1: Approvals layout ── */}
+        {priority === 'approvals' && (
+          <>
+            <Text font={{ size: 14, weight: 'semibold' }} foregroundStyle={accent}>
+              PENDING APPROVALS
+            </Text>
+            <Text font={{ size: 13 }} foregroundStyle="#DDDDDD">
+              {props.pendingCount} items requiring action
+            </Text>
+            <Spacer />
+            {props.approvalItems.slice(0, 3).map((item) => (
+              <HStack key={item.id}>
+                <Text font={{ size: 13 }} foregroundStyle="#FFFFFF">{item.name}</Text>
+                <Spacer />
+                <Text font={{ size: 12 }} foregroundStyle="#AAAAAA">{item.hours}</Text>
+                <Text font={{ size: 11 }} foregroundStyle={accent}> {item.category}</Text>
+              </HStack>
+            ))}
+            <Spacer />
+            {/* Stale indicator */}
+            {isStale(props.cachedAt) && (
+              <Text font={{ size: 10 }} foregroundStyle="#FF9500">
+                Cached: {formatCachedTime(props.cachedAt)}
+              </Text>
+            )}
+          </>
+        )}
+
+        {/* ── P2: Deficit layout ── */}
+        {priority === 'deficit' && (
+          <>
+            <Text font={{ size: 14, weight: 'semibold' }} foregroundStyle="#FF3B30">
+              {PACE_LABELS[props.paceBadge]}
+            </Text>
+            <Text font={{ size: 36, weight: 'heavy', design: 'monospaced' }} foregroundStyle={accent}>
               {props.hoursDisplay}
             </Text>
-            <Text font={{ size: 12 }} foregroundStyle="#AAAAAA">
-              this week
+            <Text font={{ size: 13 }} foregroundStyle="#AAAAAA">
+              {props.hoursRemaining}
             </Text>
-          </IosGlassCard>
-
-          <IosGlassCard>
-            <Text font={{ size: 26, weight: 'semibold' }} foregroundStyle="#FFFFFF">
-              {props.earnings}
-            </Text>
-            <Text font={{ size: 12 }} foregroundStyle="#AAAAAA">
-              earned
-            </Text>
-          </IosGlassCard>
-        </HStack>
-
-        {/* FR4: Daily bar chart */}
-        {props.daily && props.daily.length > 0 && (
-          <IosBarChart daily={props.daily} accent={accent} />
+            <Spacer />
+            <HStack>
+              <Text font={{ size: 13 }} foregroundStyle="#DDDDDD">
+                {props.today}
+              </Text>
+              <Spacer />
+              <Text font={{ size: 13 }} foregroundStyle="#DDDDDD">
+                {props.weekDeltaEarnings}
+              </Text>
+            </HStack>
+            {/* Stale indicator */}
+            {isStale(props.cachedAt) && (
+              <Text font={{ size: 10 }} foregroundStyle="#FF9500">
+                Cached: {formatCachedTime(props.cachedAt)}
+              </Text>
+            )}
+          </>
         )}
 
-        <Spacer />
+        {/* ── P3: Default layout ── */}
+        {priority === 'default' && (
+          <>
+            {/* Hero row — two glass cards */}
+            <HStack spacing={8}>
+              <IosGlassCard>
+                <Text font={{ size: 36, weight: 'heavy', design: 'monospaced' }} foregroundStyle={accent}>
+                  {props.hoursDisplay}
+                </Text>
+                <Text font={{ size: 12 }} foregroundStyle="#AAAAAA">
+                  this week
+                </Text>
+              </IosGlassCard>
 
-        {/* Today + delta vs daily average */}
-        <HStack>
-          <Text font={{ size: 13 }} foregroundStyle="#DDDDDD">
-            Today: {props.today}
-          </Text>
-          <Spacer />
-          {props.todayDelta && (
-            <Text font={{ size: 13 }} foregroundStyle="#DDDDDD">
-              {props.todayDelta}
-            </Text>
-          )}
-        </HStack>
+              <IosGlassCard>
+                <Text font={{ size: 26, weight: 'semibold' }} foregroundStyle="#FFFFFF">
+                  {props.earnings}
+                </Text>
+                <Text font={{ size: 12 }} foregroundStyle="#AAAAAA">
+                  earned
+                </Text>
+              </IosGlassCard>
+            </HStack>
 
-        {/* AI% */}
-        <HStack>
-          <Text font={{ size: 13 }} foregroundStyle="#DDDDDD">
-            AI usage: {props.aiPct}
-          </Text>
-          <Spacer />
-          <Text font={{ size: 13 }} foregroundStyle="#DDDDDD">
-            BrainLift: {props.brainlift}
-          </Text>
-        </HStack>
+            {/* FR4: Daily bar chart */}
+            {props.daily && props.daily.length > 0 && (
+              <IosBarChart daily={props.daily} accent={accent} />
+            )}
 
-        <Spacer />
+            <Spacer />
 
-        {/* Manager badge */}
-        {props.isManager && props.pendingCount > 0 && (
-          <HStack>
-            <Text font={{ size: 13, weight: 'semibold' }} foregroundStyle="#FF3B30">
-              {props.pendingCount} pending approval{props.pendingCount > 1 ? 's' : ''}
-            </Text>
-          </HStack>
+            {/* FR5: Today + delta vs daily average */}
+            <HStack>
+              <Text font={{ size: 13 }} foregroundStyle="#DDDDDD">
+                Today: {props.todayDelta || props.today}
+              </Text>
+              <Spacer />
+            </HStack>
+
+            {/* AI% */}
+            <HStack>
+              <Text font={{ size: 13 }} foregroundStyle="#DDDDDD">
+                AI usage: {props.aiPct}
+              </Text>
+              <Spacer />
+              <Text font={{ size: 13 }} foregroundStyle="#DDDDDD">
+                BrainLift: {props.brainlift}
+              </Text>
+            </HStack>
+
+            <Spacer />
+
+            {/* Stale indicator */}
+            {isStale(props.cachedAt) && (
+              <Text font={{ size: 10 }} foregroundStyle="#FF9500">
+                Cached: {formatCachedTime(props.cachedAt)}
+              </Text>
+            )}
+          </>
         )}
 
-        {/* Stale indicator */}
-        {isStale(props.cachedAt) && (
-          <Text font={{ size: 10 }} foregroundStyle="#FF9500">
-            Cached: {formatCachedTime(props.cachedAt)}
-          </Text>
-        )}
       </VStack>
     </ZStack>
   );
