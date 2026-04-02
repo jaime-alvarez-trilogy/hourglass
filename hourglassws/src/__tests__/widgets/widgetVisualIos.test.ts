@@ -26,6 +26,7 @@ jest.mock(
       Spacer: makeComp('Spacer'),
       Rectangle: makeComp('Rectangle'),
       RoundedRectangle: makeComp('RoundedRectangle'),
+      Circle: makeComp('Circle'),
     };
   },
   { virtual: true }
@@ -268,36 +269,62 @@ describe('FR2 — iOS glass card layout', () => {
 // ─── FR3: iOS gradient background ─────────────────────────────────────────────
 
 describe('FR3 — iOS gradient background', () => {
-  it('FR3.1 — SmallWidget outer ZStack contains at least 2 Rectangle elements', () => {
+  it('FR3.1 — SmallWidget outer ZStack contains at least 1 Rectangle element (WidgetBackground base)', () => {
     const tree = renderWidget(React.createElement(SmallWidgetFn, { props: makeWidgetData() }));
     const rects = collectNodes(tree, 'Rectangle');
-    expect(rects.length).toBeGreaterThanOrEqual(2);
+    expect(rects.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('FR3.2 — MediumWidget outer ZStack contains at least 2 Rectangle elements', () => {
+  it('FR3.2 — MediumWidget outer ZStack contains at least 1 Rectangle element (WidgetBackground base)', () => {
     const tree = renderWidget(React.createElement(MediumWidgetFn, { props: makeWidgetData() }));
     const rects = collectNodes(tree, 'Rectangle');
-    expect(rects.length).toBeGreaterThanOrEqual(2);
+    expect(rects.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('FR3.3 — LargeWidget outer ZStack contains at least 2 Rectangle elements', () => {
+  it('FR3.3 — LargeWidget outer ZStack contains at least 1 Rectangle element (WidgetBackground base)', () => {
     const tree = renderWidget(React.createElement(LargeWidgetFn, { props: makeWidgetData() }));
     const rects = collectNodes(tree, 'Rectangle');
-    expect(rects.length).toBeGreaterThanOrEqual(2);
+    expect(rects.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('FR3.4 — first Rectangle fill is #0D0C14 (base dark layer)', () => {
+  it('FR3.4 — first Rectangle fill is #0B0D13 (updated base dark layer)', () => {
     const tree = renderWidget(React.createElement(MediumWidgetFn, { props: makeWidgetData({ urgency: 'none' }) }));
     const rects = collectNodes(tree, 'Rectangle');
-    expect(rects[0].props.fill).toBe('#0D0C14');
+    expect(rects[0].props.fill).toBe('#0B0D13');
   });
 
-  it('FR3.5 — urgency "low" produces different second Rectangle fill than urgency "high"', () => {
+  it('FR3.5 — urgency "low" produces different Circle accent fill than urgency "high"', () => {
     const lowTree  = renderWidget(React.createElement(MediumWidgetFn, { props: makeWidgetData({ urgency: 'low' }) }));
     const highTree = renderWidget(React.createElement(MediumWidgetFn, { props: makeWidgetData({ urgency: 'high' }) }));
-    const lowRects  = collectNodes(lowTree, 'Rectangle');
-    const highRects = collectNodes(highTree, 'Rectangle');
-    expect(lowRects[1].props.fill).not.toBe(highRects[1].props.fill);
+    const lowCircles  = collectNodes(lowTree, 'Circle');
+    const highCircles = collectNodes(highTree, 'Circle');
+    // Top-right accent Circle (first Circle) fill differs by urgency
+    expect(lowCircles[0].props.fill).not.toBe(highCircles[0].props.fill);
+  });
+
+  it('FR3.7 — SmallWidget renders at least 2 Circle elements (WidgetBackground glow layers)', () => {
+    const tree = renderWidget(React.createElement(SmallWidgetFn, { props: makeWidgetData() }));
+    const circles = collectNodes(tree, 'Circle');
+    expect(circles.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('FR3.8 — MediumWidget renders at least 2 Circle elements', () => {
+    const tree = renderWidget(React.createElement(MediumWidgetFn, { props: makeWidgetData() }));
+    const circles = collectNodes(tree, 'Circle');
+    expect(circles.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('FR3.9 — LargeWidget renders at least 2 Circle elements', () => {
+    const tree = renderWidget(React.createElement(LargeWidgetFn, { props: makeWidgetData() }));
+    const circles = collectNodes(tree, 'Circle');
+    expect(circles.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('FR3.10 — bottom-left Circle fill is #3B82F6 (blue glow)', () => {
+    const tree = renderWidget(React.createElement(SmallWidgetFn, { props: makeWidgetData({ urgency: 'none' }) }));
+    const circles = collectNodes(tree, 'Circle');
+    const blueCircle = circles.find((c: any) => c.props.fill === '#3B82F6');
+    expect(blueCircle).toBeDefined();
   });
 
   it('FR3.6 — root content VStack does not have a background prop equal to a solid urgency colour', () => {
@@ -366,7 +393,7 @@ describe('FR4 — iOS Large bar chart', () => {
     expect(pastBar).toBeDefined();
   });
 
-  it('FR4.5 — column with max hours has bar height close to MAX_BAR_HEIGHT (100pt, within 5%)', () => {
+  it('FR4.5 — column with max hours has bar height close to MAX_BAR_HEIGHT (60pt, within 5pt)', () => {
     const tree = renderWidget(React.createElement(LargeWidgetFn, { props: makeWeekData() }));
     const roundedRects = collectNodes(tree, 'RoundedRectangle');
     // Filter to bars that have a height prop (chart bars, not glass card borders)
@@ -374,9 +401,9 @@ describe('FR4 — iOS Large bar chart', () => {
       .map((rr: any) => rr.props.height)
       .filter((h: any) => typeof h === 'number' && h > 0);
     const maxHeight = Math.max(...barHeights);
-    // Should be within 5% of 100
-    expect(maxHeight).toBeGreaterThanOrEqual(95);
-    expect(maxHeight).toBeLessThanOrEqual(105);
+    // Should be within 5pt of 60
+    expect(maxHeight).toBeGreaterThanOrEqual(55);
+    expect(maxHeight).toBeLessThanOrEqual(65);
   });
 
   it('FR4.6 — zero-hours bar has height 0', () => {
@@ -426,7 +453,7 @@ describe('FR4 — iOS Large bar chart', () => {
     }
   });
 
-  it('FR4.9 — single non-zero entry: that column bar height = MAX_BAR_HEIGHT (100)', () => {
+  it('FR4.9 — single non-zero entry: that column bar height = MAX_BAR_HEIGHT (60)', () => {
     const singleNonZero = makeWidgetData({
       urgency: 'none',
       daily: [
@@ -444,7 +471,7 @@ describe('FR4 — iOS Large bar chart', () => {
     const barHeights = roundedRects
       .map((rr: any) => rr.props.height)
       .filter((h: any) => typeof h === 'number');
-    expect(barHeights).toContain(100);
+    expect(barHeights).toContain(60);
   });
 
   it('FR4.10 — LargeWidget renders IosBarChart (contains 7 day Text nodes)', () => {
@@ -455,6 +482,58 @@ describe('FR4 — iOS Large bar chart', () => {
       return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].includes(content);
     });
     expect(dayLabels).toHaveLength(7);
+  });
+});
+
+// ─── FR-New: IosGlassCard values ─────────────────────────────────────────────
+
+describe('FR-New — IosGlassCard upgraded values', () => {
+  it('IosGlassCard.1 — glass card RoundedRectangle fill is #1C1E26CC', () => {
+    // MediumWidget P3 renders IosGlassCard — check fill on first surface RoundedRectangle
+    const tree = renderWidget(React.createElement(MediumWidgetFn, { props: makeWidgetData() }));
+    const roundedRects = collectNodes(tree, 'RoundedRectangle');
+    const surfaceRect = roundedRects.find((rr: any) => rr.props.fill === '#1C1E26CC');
+    expect(surfaceRect).toBeDefined();
+  });
+
+  it('IosGlassCard.2 — glass card RoundedRectangle cornerRadius is 16', () => {
+    const tree = renderWidget(React.createElement(MediumWidgetFn, { props: makeWidgetData() }));
+    const roundedRects = collectNodes(tree, 'RoundedRectangle');
+    const surfaceRect = roundedRects.find((rr: any) => rr.props.fill === '#1C1E26CC');
+    expect(surfaceRect).toBeDefined();
+    expect(surfaceRect.props.cornerRadius).toBe(16);
+  });
+
+  it('IosGlassCard.3 — glass card border RoundedRectangle strokeWidth is 0.5', () => {
+    const tree = renderWidget(React.createElement(MediumWidgetFn, { props: makeWidgetData() }));
+    const roundedRects = collectNodes(tree, 'RoundedRectangle');
+    // Border stroke rect has strokeWidth 0.5
+    const borderRect = roundedRects.find((rr: any) => rr.props.strokeWidth === 0.5);
+    expect(borderRect).toBeDefined();
+  });
+});
+
+// ─── FR-New: StatusPill opacity ─────────────────────────────────────────────
+
+describe('FR-New — StatusPill reduced opacity', () => {
+  it('StatusPill.1 — background RoundedRectangle fill ends with 15 (reduced opacity)', () => {
+    // Render SmallWidget with on_track pace to trigger StatusPill
+    const tree = renderWidget(React.createElement(SmallWidgetFn, { props: makeWidgetData({ paceBadge: 'on_track' }) }));
+    const roundedRects = collectNodes(tree, 'RoundedRectangle');
+    // StatusPill background fill should end with '15'
+    const pillBg = roundedRects.find((rr: any) =>
+      typeof rr.props.fill === 'string' && rr.props.fill.endsWith('15')
+    );
+    expect(pillBg).toBeDefined();
+  });
+
+  it('StatusPill.2 — stroke value ends with 80 (unchanged)', () => {
+    const tree = renderWidget(React.createElement(SmallWidgetFn, { props: makeWidgetData({ paceBadge: 'on_track' }) }));
+    const roundedRects = collectNodes(tree, 'RoundedRectangle');
+    const pillStroke = roundedRects.find((rr: any) =>
+      typeof rr.props.stroke === 'string' && rr.props.stroke.endsWith('80')
+    );
+    expect(pillStroke).toBeDefined();
   });
 });
 
@@ -564,7 +643,7 @@ describe('FR1 — getPriority helper', () => {
 // ─── FR2 — SmallWidget hero font ──────────────────────────────────────────────
 
 describe('FR2 — SmallWidget hero font', () => {
-  it('FR2.1 — SC2.1: hero Text has font.weight === heavy', () => {
+  it('FR2.1 — SC2.1: hero Text has font.weight === bold', () => {
     const tree = renderWidget(React.createElement(SmallWidgetFn, { props: makeWidgetData() }));
     const texts = collectNodes(tree, 'Text');
     // Hero text renders hoursDisplay — find the Text node containing '32.5h'
@@ -573,10 +652,10 @@ describe('FR2 — SmallWidget hero font', () => {
       return content.includes('32.5h');
     });
     expect(heroText).toBeDefined();
-    expect(heroText.props.font.weight).toBe('heavy');
+    expect(heroText.props.font.weight).toBe('bold');
   });
 
-  it('FR2.2 — SC2.2: hero Text has font.design === monospaced', () => {
+  it('FR2.2 — SC2.2: hero Text has font.design === rounded', () => {
     const tree = renderWidget(React.createElement(SmallWidgetFn, { props: makeWidgetData() }));
     const texts = collectNodes(tree, 'Text');
     const heroText = texts.find((t: any) => {
@@ -584,7 +663,7 @@ describe('FR2 — SmallWidget hero font', () => {
       return content.includes('32.5h');
     });
     expect(heroText).toBeDefined();
-    expect(heroText.props.font.design).toBe('monospaced');
+    expect(heroText.props.font.design).toBe('rounded');
   });
 
   it('FR2.3 — SC2.3: SmallWidget still renders hoursDisplay text', () => {
@@ -744,7 +823,7 @@ describe('FR4 — LargeWidget priority layouts + bottom padding', () => {
       expect(dayLabels).toHaveLength(7);
     });
 
-    it('FR4.new.7 — SC4.7: P3 hero font has weight heavy and design monospaced', () => {
+    it('FR4.new.7 — SC4.7: P3 hero font has weight bold and design rounded', () => {
       const tree = renderWidget(React.createElement(LargeWidgetFn, { props: makeP3Data() }));
       const texts = collectNodes(tree, 'Text');
       const heroText = texts.find((t: any) => {
@@ -752,11 +831,11 @@ describe('FR4 — LargeWidget priority layouts + bottom padding', () => {
         return content.includes('32.5h');
       });
       expect(heroText).toBeDefined();
-      expect(heroText.props.font.weight).toBe('heavy');
-      expect(heroText.props.font.design).toBe('monospaced');
+      expect(heroText.props.font.weight).toBe('bold');
+      expect(heroText.props.font.design).toBe('rounded');
     });
 
-    it('FR4.new.7b — SC4.7: P2 hero font has weight heavy and design monospaced', () => {
+    it('FR4.new.7b — SC4.7: P2 hero font has weight bold and design rounded', () => {
       const tree = renderWidget(React.createElement(LargeWidgetFn, { props: makeP2Data() }));
       const texts = collectNodes(tree, 'Text');
       const heroText = texts.find((t: any) => {
@@ -764,8 +843,8 @@ describe('FR4 — LargeWidget priority layouts + bottom padding', () => {
         return content.includes('32.5h');
       });
       expect(heroText).toBeDefined();
-      expect(heroText.props.font.weight).toBe('heavy');
-      expect(heroText.props.font.design).toBe('monospaced');
+      expect(heroText.props.font.weight).toBe('bold');
+      expect(heroText.props.font.design).toBe('rounded');
     });
   });
 });

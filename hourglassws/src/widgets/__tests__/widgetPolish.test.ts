@@ -178,8 +178,10 @@ describe('FR2: iOS LargeWidget padding', () => {
     expect(largeWidgetSrc).toContain('padding={16}');
   });
 
-  it('SC2.2: LargeWidget does NOT use padding={14}', () => {
-    expect(largeWidgetSrc).not.toContain('padding={14}');
+  it('SC2.2: LargeWidget outer VStack uses object-form padding (padding={{ top: 16...})', () => {
+    // The outer VStack uses object-form padding {top:16, leading:16, trailing:16, bottom:28}
+    // not a scalar integer. This is more precise than a negative check.
+    expect(largeWidgetSrc).toContain('padding={{ top: 16');
   });
 });
 
