@@ -47,10 +47,10 @@ function meshStateColor(urgency: WidgetUrgency, paceBadge: string): string {
 // 04-cockpit-hud: desaturated dark glass tokens (luxuryGold, successGreen, warnAmber, desatCoral)
 export function badgeColor(paceBadge: string): string {
   switch (paceBadge) {
-    case 'crushed_it': return '#CEA435';
-    case 'on_track':   return '#4ADE80';
-    case 'behind':     return '#FCD34D';
-    case 'critical':   return '#F87171';
+    case 'crushed_it': return '#F5C842';
+    case 'on_track':   return '#10B981';
+    case 'behind':     return '#F59E0B';
+    case 'critical':   return '#F43F5E';
     default:           return '';
   }
 }
@@ -138,8 +138,8 @@ export function buildBarChartSvg(
 const URGENCY_ACCENT: Record<string, string> = {
   none:     '#00FF88',
   low:      '#F5C842',
-  high:     '#FF6B00',
-  critical: '#FF2D55',
+  high:     '#F59E0B',
+  critical: '#F43F5E',
   expired:  '#6B6B6B',
 };
 
@@ -179,16 +179,16 @@ function GlassPanel({ flex, children }: GlassPanelProps) {
   return (
     <FlexWidget
       style={{
-        backgroundColor: '#2F2E41',
-        borderRadius: 13,
+        backgroundColor: '#1C1E26',
+        borderRadius: 16,
         padding: 1,
         ...(flex !== undefined ? { flex } : {}),
       }}
     >
       <FlexWidget
         style={{
-          backgroundColor: '#1F1E2C',
-          borderRadius: 12,
+          backgroundColor: '#16151F',
+          borderRadius: 15,
           padding: 12,
         }}
       >
@@ -262,7 +262,7 @@ function SmallWidget({ data }: { data: WidgetData }) {
   return (
     <FlexWidget
       style={{
-        backgroundColor: '#0D0C14',
+        backgroundColor: '#0B0D13',
         flex: 1,
         flexDirection: 'column',
         position: 'relative',
@@ -428,7 +428,7 @@ function MediumWidget({ data }: { data: WidgetData }) {
     return (
       <FlexWidget
         style={{
-          backgroundColor: '#0D0C14',
+          backgroundColor: '#0B0D13',
           flex: 1,
           flexDirection: 'column',
           position: 'relative',
@@ -477,7 +477,7 @@ function MediumWidget({ data }: { data: WidgetData }) {
   return (
     <FlexWidget
       style={{
-        backgroundColor: '#0D0C14',
+        backgroundColor: '#0B0D13',
         flex: 1,
         flexDirection: 'column',
         position: 'relative',
