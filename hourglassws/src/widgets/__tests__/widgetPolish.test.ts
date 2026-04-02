@@ -435,3 +435,64 @@ describe('02-glass-card FR3: borderColor prop removed', () => {
     expect(fullSrc).not.toMatch(/<IosGlassCard[^>]*borderColor/);
   });
 });
+
+// ─── 01-atmospheric-background: WidgetBackground single top-center glow ─────────
+
+describe('01-atmospheric-background FR1: single top-center glow circle', () => {
+  let widgetBgSrc: string;
+
+  beforeAll(() => {
+    const src = readIosWidget();
+    // Extract WidgetBackground function body: from `function WidgetBackground` to next `\n// `
+    const start = src.indexOf('function WidgetBackground(');
+    const end = src.indexOf('\n// ', start);
+    widgetBgSrc = src.slice(start, end);
+  });
+
+  it('SC1.1: WidgetBackground contains exactly one Circle element', () => {
+    // Count Circle occurrences — each JSX tag starts with `<Circle`
+    const matches = widgetBgSrc.match(/<Circle/g) ?? [];
+    expect(matches).toHaveLength(1);
+  });
+
+  it('SC1.2: Circle has width={250}', () => {
+    expect(widgetBgSrc).toContain('width={250}');
+  });
+
+  it('SC1.3: Circle has height={200}', () => {
+    expect(widgetBgSrc).toContain('height={200}');
+  });
+
+  it('SC1.4: Circle has opacity={0.15}', () => {
+    expect(widgetBgSrc).toContain('opacity={0.15}');
+  });
+
+  it('SC1.5: Circle has blur={60}', () => {
+    expect(widgetBgSrc).toContain('blur={60}');
+  });
+
+  it('SC1.6: Circle fill is the accent prop (not a hardcoded color)', () => {
+    // Must use `fill={accent}` — dynamic, not a literal color string
+    expect(widgetBgSrc).toContain('fill={accent}');
+  });
+
+  it('SC1.7: No old blue glow circle (#3B82F6) in WidgetBackground', () => {
+    expect(widgetBgSrc).not.toContain('#3B82F6');
+  });
+
+  it('SC1.8: No top-right HStack layout (no inner HStack wrapping Circle)', () => {
+    // Old layout had <HStack><Spacer /><Circle .../></HStack>
+    // New layout has VStack directly containing Circle — no inner HStack
+    expect(widgetBgSrc).not.toContain('<HStack>');
+  });
+
+  it('SC1.9: Rectangle fill is the #0B0D13 literal (not COLORS.bgDark)', () => {
+    expect(widgetBgSrc).toContain('fill="#0B0D13"');
+    expect(widgetBgSrc).not.toContain('COLORS.bgDark');
+  });
+
+  it('SC1.10: Old accent circle dimensions (width={160}, height={160}) are gone', () => {
+    expect(widgetBgSrc).not.toContain('width={160}');
+    expect(widgetBgSrc).not.toContain('height={160}');
+  });
+});
