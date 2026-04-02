@@ -742,6 +742,43 @@ describe('04-cockpit-hud FR4: iOS hero typography (monospaced heavy)', () => {
   });
 });
 
+// ─── 03-typography-layout: FR1 — bridge.ts "left left" fix ──────────────────
+
+describe('03-typography-layout FR1: bridge.ts hoursRemaining no double "left"', () => {
+  it('FR1-bridge-1 — systemLarge P3 does NOT contain "left left" when hoursRemaining is "7.5h left"', () => {
+    const fn = getWidgetFn();
+    const tree = fn(
+      minimalProps({ hoursRemaining: '7.5h left', paceBadge: 'on_track', approvalItems: [], myRequests: [] }),
+      { widgetFamily: 'systemLarge' }
+    );
+    expect(treeContains(tree, 'left left')).toBe(false);
+  });
+
+  it('FR1-bridge-2 — systemLarge P3 contains "7.5h left" exactly (hoursRemaining rendered as-is)', () => {
+    const fn = getWidgetFn();
+    const tree = fn(
+      minimalProps({ hoursRemaining: '7.5h left', paceBadge: 'on_track', approvalItems: [], myRequests: [] }),
+      { widgetFamily: 'systemLarge' }
+    );
+    const str = JSON.stringify(tree);
+    // Count occurrences of "7.5h left" — must appear at least once (not zero)
+    const occurrences = (str.match(/7\.5h left/g) ?? []).length;
+    expect(occurrences).toBeGreaterThan(0);
+    // And no "left left" anywhere
+    expect(str).not.toContain('left left');
+  });
+
+  it('FR1-bridge-3 — OT case: hoursRemaining "2.5h OT" renders as-is (no " left" appended)', () => {
+    const fn = getWidgetFn();
+    const tree = fn(
+      minimalProps({ hoursRemaining: '2.5h OT', paceBadge: 'on_track', approvalItems: [], myRequests: [] }),
+      { widgetFamily: 'systemLarge' }
+    );
+    expect(treeContains(tree, '2.5h OT left')).toBe(false);
+    expect(treeContains(tree, '2.5h OT')).toBe(true);
+  });
+});
+
 // ─── 04-cockpit-hud: FR5 — Priority ordering P1 > P2 > P3 (iOS) ─────────────
 
 describe('04-cockpit-hud FR5: Priority ordering P1 > P2 > P3 (iOS)', () => {

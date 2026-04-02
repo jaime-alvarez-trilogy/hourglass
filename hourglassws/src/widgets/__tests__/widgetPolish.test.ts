@@ -599,3 +599,147 @@ describe('04-pill-chart FR3: IosBarChart bar cornerRadius is 6', () => {
     expect(barChartSrc).toContain('isFuture');
   });
 });
+
+// ─── 03-typography-layout: LargeWidget P3 layout ────────────────────────────
+
+describe('03-typography-layout FR1: bridge.ts source has no "+ \' left\'" concatenation in P3', () => {
+  it('FR1-src-1: bridge.ts WIDGET_LAYOUT_JS does not contain p.hoursRemaining + \' left\'', () => {
+    const src = readBridge();
+    // Find the WIDGET_LAYOUT_JS template literal
+    const backtick = String.fromCharCode(96);
+    const startMarker = 'const WIDGET_LAYOUT_JS = ' + backtick;
+    const startIdx = src.indexOf(startMarker);
+    const closingSeq = '})' + backtick + ';';
+    const endIdx = src.indexOf(closingSeq, startIdx);
+    const layoutJs = src.slice(startIdx, endIdx);
+    // Must not contain the "left" concatenation in the statusRow text
+    expect(layoutJs).not.toContain("p.hoursRemaining + ' left'");
+  });
+});
+
+describe('03-typography-layout FR2: LargeWidget P3 hours card contains remaining text', () => {
+  let largeP3Src: string;
+
+  beforeAll(() => {
+    const src = readIosWidget();
+    const start = src.indexOf('function LargeWidget(');
+    const nextFn = src.indexOf('\n// ─── Main widget', start);
+    const largeSrc = src.slice(start, nextFn);
+    // Extract P3 section
+    const p3Start = largeSrc.indexOf("── P3:");
+    largeP3Src = p3Start > -1 ? largeSrc.slice(p3Start) : largeSrc;
+  });
+
+  it('FR2-1: P3 section references hoursRemaining in the hours IosGlassCard context', () => {
+    // hoursRemaining must appear in P3 section (moved from footer to card)
+    expect(largeP3Src).toContain('hoursRemaining');
+  });
+
+  it('FR2-2: P3 section has Text with foregroundStyle "#94A3B8" (remaining text color)', () => {
+    expect(largeP3Src).toContain('#94A3B8');
+  });
+
+  it('FR2-3: P3 section contains font size 11 weight medium Text (remaining label)', () => {
+    // The remaining text: font={{ size: 11, weight: 'medium' }}
+    expect(largeP3Src).toMatch(/size:\s*11.*weight:\s*'medium'|weight:\s*'medium'.*size:\s*11/);
+  });
+
+  it('FR2-4: P3 section strips "left" and appends "remaining" to hoursRemaining', () => {
+    // Must use .replace('left', '') to strip the word "left" then add "remaining"
+    expect(largeP3Src).toContain(".replace('left', '')");
+    expect(largeP3Src).toContain("remaining");
+  });
+});
+
+describe('03-typography-layout FR3: LargeWidget P3 hero row has two IosGlassCard children', () => {
+  let largeP3HeroSrc: string;
+
+  beforeAll(() => {
+    const src = readIosWidget();
+    const start = src.indexOf('function LargeWidget(');
+    const nextFn = src.indexOf('\n// ─── Main widget', start);
+    const largeSrc = src.slice(start, nextFn);
+    // Extract from P3 start to end of HStack hero row
+    const p3Start = largeSrc.indexOf("── P3:");
+    largeP3HeroSrc = p3Start > -1 ? largeSrc.slice(p3Start) : largeSrc;
+  });
+
+  it('FR3-1: P3 hero HStack contains "EARNED" label text', () => {
+    // The earnings card must show "EARNED"
+    expect(largeP3HeroSrc).toContain('"EARNED"');
+  });
+
+  it('FR3-2: P3 section has Text with font size 24 weight bold for earnings', () => {
+    // Earnings metric: font={{ size: 24, weight: 'bold' }}
+    expect(largeP3HeroSrc).toMatch(/size:\s*24.*weight:\s*'bold'|weight:\s*'bold'.*size:\s*24/);
+  });
+
+  it('FR3-3: P3 section does NOT have a nested VStack with two IosGlassCards (old right-column pattern)', () => {
+    // Old pattern: <VStack spacing={10}><IosGlassCard>...EARNINGS...</IosGlassCard><IosGlassCard>...TODAY...</IosGlassCard></VStack>
+    // New pattern: both IosGlassCards are direct children of hero HStack
+    // Check: no "TODAY" metric card inside P3 hero row
+    expect(largeP3HeroSrc).not.toMatch(/<MetricView[^>]*label="TODAY"/);
+  });
+});
+
+describe('03-typography-layout FR4: StatusPill Text weight is bold', () => {
+  let statusPillSrc: string;
+
+  beforeAll(() => {
+    const src = readIosWidget();
+    const start = src.indexOf('function StatusPill(');
+    const end = src.indexOf('\n// ', start);
+    statusPillSrc = src.slice(start, end);
+  });
+
+  it('FR4-1: StatusPill Text has weight "bold"', () => {
+    expect(statusPillSrc).toContain("weight: 'bold'");
+  });
+
+  it('FR4-2: StatusPill Text does NOT have weight "semibold"', () => {
+    expect(statusPillSrc).not.toContain("weight: 'semibold'");
+  });
+});
+
+describe('03-typography-layout FR5: LargeWidget P3 footer simplified to Today+AI text', () => {
+  let largeP3Src: string;
+  let footerSrc: string;
+
+  beforeAll(() => {
+    const src = readIosWidget();
+    const start = src.indexOf('function LargeWidget(');
+    const nextFn = src.indexOf('\n// ─── Main widget', start);
+    const largeSrc = src.slice(start, nextFn);
+    const p3Start = largeSrc.indexOf("── P3:");
+    largeP3Src = p3Start > -1 ? largeSrc.slice(p3Start) : largeSrc;
+
+    // Extract footer section: from {/* Footer */} to end of P3 block
+    const footerIdx = largeP3Src.indexOf('Footer');
+    footerSrc = footerIdx > -1 ? largeP3Src.slice(footerIdx) : largeP3Src;
+  });
+
+  it('FR5-1: P3 footer contains "Today:" label text', () => {
+    expect(footerSrc).toContain('Today:');
+  });
+
+  it('FR5-2: P3 footer references aiPct', () => {
+    expect(footerSrc).toContain('aiPct');
+  });
+
+  it('FR5-3: P3 footer does NOT contain props.hoursRemaining (moved to hours card)', () => {
+    // The footer should no longer render hoursRemaining
+    // (it's now in the hours card)
+    expect(footerSrc).not.toContain('props.hoursRemaining');
+  });
+
+  it('FR5-4: LargeWidget outer VStack uses uniform padding={16} (not asymmetric bottom:28)', () => {
+    const src = readIosWidget();
+    const start = src.indexOf('function LargeWidget(');
+    const nextFn = src.indexOf('\n// ─── Main widget', start);
+    const largeSrc = src.slice(start, nextFn);
+    // New: uniform padding={16}
+    expect(largeSrc).toContain('padding={16}');
+    // Old: asymmetric padding with bottom: 28 should be gone
+    expect(largeSrc).not.toContain('bottom: 28');
+  });
+});
