@@ -27,6 +27,7 @@ jest.mock(
       Rectangle: makeComp('Rectangle'),
       RoundedRectangle: makeComp('RoundedRectangle'),
       Circle: makeComp('Circle'),
+      Capsule: makeComp('Capsule'),
     };
   },
   { virtual: true }
@@ -515,25 +516,36 @@ describe('FR-New — IosGlassCard upgraded values', () => {
 
 // ─── FR-New: StatusPill opacity ─────────────────────────────────────────────
 
-describe('FR-New — StatusPill reduced opacity', () => {
-  it('StatusPill.1 — background RoundedRectangle fill ends with 15 (reduced opacity)', () => {
+describe('FR-New — StatusPill Capsule shape (04-pill-chart)', () => {
+  it('StatusPill.1 — fill Capsule fill ends with 1A (10% opacity)', () => {
     // Render SmallWidget with on_track pace to trigger StatusPill
     const tree = renderWidget(React.createElement(SmallWidgetFn, { props: makeWidgetData({ paceBadge: 'on_track' }) }));
-    const roundedRects = collectNodes(tree, 'RoundedRectangle');
-    // StatusPill background fill should end with '15'
-    const pillBg = roundedRects.find((rr: any) =>
-      typeof rr.props.fill === 'string' && rr.props.fill.endsWith('15')
+    const capsules = collectNodes(tree, 'Capsule');
+    // StatusPill fill Capsule has fill ending with '1A'
+    const pillBg = capsules.find((c: any) =>
+      typeof c.props.fill === 'string' && c.props.fill.endsWith('1A')
     );
     expect(pillBg).toBeDefined();
   });
 
-  it('StatusPill.2 — stroke value ends with 80 (unchanged)', () => {
+  it('StatusPill.2 — stroke Capsule uses full color (no suffix) with strokeWidth=0.5', () => {
     const tree = renderWidget(React.createElement(SmallWidgetFn, { props: makeWidgetData({ paceBadge: 'on_track' }) }));
-    const roundedRects = collectNodes(tree, 'RoundedRectangle');
-    const pillStroke = roundedRects.find((rr: any) =>
-      typeof rr.props.stroke === 'string' && rr.props.stroke.endsWith('80')
+    const capsules = collectNodes(tree, 'Capsule');
+    // on_track accent is '#10B981' — stroke Capsule has stroke='#10B981' and strokeWidth=0.5
+    const pillStroke = capsules.find((c: any) =>
+      typeof c.props.stroke === 'string' &&
+      !c.props.stroke.endsWith('80') &&
+      !c.props.stroke.endsWith('1A') &&
+      c.props.strokeWidth === 0.5
     );
     expect(pillStroke).toBeDefined();
+  });
+
+  it('StatusPill.3 — both Capsules have height=22', () => {
+    const tree = renderWidget(React.createElement(SmallWidgetFn, { props: makeWidgetData({ paceBadge: 'on_track' }) }));
+    const capsules = collectNodes(tree, 'Capsule');
+    const pillCapsules = capsules.filter((c: any) => c.props.height === 22);
+    expect(pillCapsules.length).toBeGreaterThanOrEqual(2);
   });
 });
 

@@ -496,3 +496,106 @@ describe('01-atmospheric-background FR1: single top-center glow circle', () => {
     expect(widgetBgSrc).not.toContain('height={160}');
   });
 });
+
+// ─── 04-pill-chart: StatusPill Capsule + IosBarChart cornerRadius ─────────────
+
+describe('04-pill-chart FR1: StatusPill uses Capsule shape', () => {
+  let statusPillSrc: string;
+
+  beforeAll(() => {
+    const src = readIosWidget();
+    const start = src.indexOf('function StatusPill(');
+    const end = src.indexOf('\n// ', start);
+    statusPillSrc = src.slice(start, end);
+  });
+
+  it('SC1.1: StatusPill contains Capsule element (not RoundedRectangle)', () => {
+    expect(statusPillSrc).toContain('<Capsule');
+  });
+
+  it('SC1.2: StatusPill does NOT contain RoundedRectangle with cornerRadius={10}', () => {
+    expect(statusPillSrc).not.toMatch(/RoundedRectangle[^>]*cornerRadius=\{10\}/);
+    expect(statusPillSrc).not.toMatch(/cornerRadius=\{10\}[^>]*RoundedRectangle/);
+    // Full check: no RoundedRectangle at all in StatusPill
+    expect(statusPillSrc).not.toContain('<RoundedRectangle');
+  });
+
+  it('SC1.3: StatusPill fill Capsule uses 1A opacity suffix', () => {
+    // Fill layer: color+'1A'
+    expect(statusPillSrc).toContain("'1A'");
+    expect(statusPillSrc).not.toContain("'15'");
+  });
+
+  it('SC1.4: StatusPill fill Capsule has height={22}', () => {
+    expect(statusPillSrc).toContain('height={22}');
+  });
+
+  it('SC1.5: StatusPill stroke Capsule has strokeWidth={0.5}', () => {
+    expect(statusPillSrc).toContain('strokeWidth={0.5}');
+  });
+
+  it('SC1.6: StatusPill stroke Capsule uses full color (no 80 suffix)', () => {
+    // Stroke must not append '80' to color
+    expect(statusPillSrc).not.toContain("'80'");
+    // Stroke passes color directly
+    expect(statusPillSrc).toMatch(/stroke=\{color\}/);
+  });
+});
+
+describe('04-pill-chart FR2: StatusPill text styling', () => {
+  let statusPillSrc: string;
+
+  beforeAll(() => {
+    const src = readIosWidget();
+    const start = src.indexOf('function StatusPill(');
+    const end = src.indexOf('\n// ', start);
+    statusPillSrc = src.slice(start, end);
+  });
+
+  it('SC2.1: StatusPill Text font weight is bold', () => {
+    expect(statusPillSrc).toContain("weight: 'bold'");
+    expect(statusPillSrc).not.toContain("weight: 'semibold'");
+  });
+
+  it('SC2.2: StatusPill Text padding has leading: 10', () => {
+    expect(statusPillSrc).toContain('leading: 10');
+  });
+
+  it('SC2.3: StatusPill Text padding has trailing: 10', () => {
+    expect(statusPillSrc).toContain('trailing: 10');
+  });
+
+  it('SC2.4: StatusPill Text does NOT use uniform padding={6}', () => {
+    // Old: padding={6} — replaced by object-form horizontal padding
+    expect(statusPillSrc).not.toMatch(/padding=\{6\}/);
+  });
+});
+
+describe('04-pill-chart FR3: IosBarChart bar cornerRadius is 6', () => {
+  let barChartSrc: string;
+
+  beforeAll(() => {
+    const src = readIosWidget();
+    const start = src.indexOf('export function IosBarChart(');
+    const end = src.indexOf('\n// ─── Small Widget', start);
+    barChartSrc = src.slice(start, end);
+  });
+
+  it('SC3.1: IosBarChart RoundedRectangle has cornerRadius={6}', () => {
+    expect(barChartSrc).toContain('cornerRadius={6}');
+  });
+
+  it('SC3.2: IosBarChart RoundedRectangle does NOT have cornerRadius={3} (old value)', () => {
+    expect(barChartSrc).not.toContain('cornerRadius={3}');
+  });
+
+  it('SC3.3: IosBarChart still renders 7 bars (one per day)', () => {
+    // The function maps over daily entries — confirm the .map call is present
+    expect(barChartSrc).toContain('.map(');
+  });
+
+  it('SC3.4: IosBarChart still uses fill based on isToday/isFuture logic', () => {
+    expect(barChartSrc).toContain('isToday');
+    expect(barChartSrc).toContain('isFuture');
+  });
+});
