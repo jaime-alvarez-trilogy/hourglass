@@ -9,14 +9,21 @@
 //
 // No StyleSheet. No hardcoded hex values.
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
   RefreshControl,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
+import { timingSmooth } from '@/src/lib/reanimated-presets';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useConfig } from '@/src/hooks/useConfig';
@@ -27,7 +34,7 @@ import { useFocusKey } from '@/src/hooks/useFocusKey';
 import { useStaggeredEntry } from '@/src/hooks/useStaggeredEntry';
 import { computePanelState, computeDaysElapsed } from '@/src/lib/panelState';
 import { computeAICone } from '@/src/lib/aiCone';
-import { getUrgencyLevel, getWeekLabels } from '@/src/lib/hours';
+import { getUrgencyLevel, getWeekLabels, computeDeadlineCountdown, computePacingSignal } from '@/src/lib/hours';
 import { setTag } from '@/src/lib/sharedTransitions';
 import { colors } from '@/src/lib/colors';
 import AnimatedMeshBackground from '@/src/components/AnimatedMeshBackground';
@@ -175,6 +182,39 @@ export default function HoursDashboard() {
   // Dev override: force overtime panel for UI testing
   const panelState: PanelState = config?.devOvertimePreview ? 'overtime' : basePanelState;
 
+  // FR2/FR3/FR4/FR5 (01-week-countdown-pacing): deadline countdown + pacing signal
+  const countdown = useMemo(() => computeDeadlineCountdown(), []);
+  const pacing = useMemo(
+    () => computePacingSignal(data?.total ?? 0, weeklyLimit),
+    [data?.total, weeklyLimit],
+  );
+
+  // FR3: Pulsing opacity animation for critical urgency
+  const criticalPulse = useSharedValue(1);
+  useEffect(() => {
+    if (countdown.urgency === 'critical') {
+      criticalPulse.value = withRepeat(
+        withSequence(
+          withTiming(0.4, timingSmooth),
+          withTiming(1, timingSmooth),
+        ),
+        -1, // infinite
+        false,
+      );
+    } else {
+      criticalPulse.value = 1;
+    }
+  }, [countdown.urgency]);
+  const criticalPulseStyle = useAnimatedStyle(() => ({
+    opacity: criticalPulse.value,
+  }));
+
+  // Map countdown urgency to color
+  const countdownColor =
+    countdown.urgency === 'critical' ? colors.critical
+    : countdown.urgency === 'warning' ? colors.warning
+    : colors.textMuted;
+
   // earningsPaceSignal: 0.0–1.0 signal passed to AnimatedMeshBackground Node C.
   // Drives the status-semantic mesh color: critical=red (1.0), behind=amber (0.5), else=off (0.0).
   const earningsPaceSignal = panelState === 'critical' ? 1.0
@@ -292,10 +332,40 @@ export default function HoursDashboard() {
                   sizeClass="text-5xl"
                   colorClass="text-textPrimary"
                 />
+                {/* FR5: Pacing label under hours hero, hidden on weekend and when target met */}
+                {pacing && pacing.hoursPerDayNeeded > 0 && (
+                  <Text
+                    className="text-sm font-sans mb-1"
+                    style={{ color: colors.textSecondary }}
+                    testID="pacing-label"
+                  >
+                    {pacing.label}
+                  </Text>
+                )}
                 <Text className="text-textSecondary text-sm font-sans mb-4">
                   of {weeklyLimit}h goal
                 </Text>
-                <StateBadge state={panelState} />
+                {/* FR2: StateBadge + countdown pill row */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <StateBadge state={panelState} />
+                  {/* FR2/FR3: Countdown pill with urgency color, pulsing when critical */}
+                  <Animated.View
+                    style={[
+                      {
+                        backgroundColor: colors.surface,
+                        borderRadius: 10,
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                      },
+                      countdown.urgency === 'critical' ? criticalPulseStyle : undefined,
+                    ]}
+                    testID="countdown-pill"
+                  >
+                    <Text style={{ color: countdownColor, fontSize: 11, fontWeight: '600' }}>
+                      {countdown.label}
+                    </Text>
+                  </Animated.View>
+                </View>
                 {/* Sub-metrics row */}
                 <View className="flex-row mt-4">
                   <SubMetric label="Today" value={data?.today ?? 0} unit="h" />
@@ -378,7 +448,16 @@ export default function HoursDashboard() {
           <Animated.View style={getEntryStyle(2)}>
           <Animated.View {...setTag('home-ai-card')}>
           <Card borderAccentColor={colors.cyan}>
-            <SectionLabel className="mb-2">AI TRAJECTORY</SectionLabel>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <SectionLabel>AI TRAJECTORY</SectionLabel>
+              {aiData && previousWeekPercent !== undefined && (() => {
+                const currentPct = (aiData.aiPctLow + aiData.aiPctHigh) / 2;
+                const diff = currentPct - previousWeekPercent;
+                const symbol = diff > 2 ? '↑' : diff < -2 ? '↓' : '→';
+                const color = diff > 2 ? colors.success : diff < -2 ? colors.critical : colors.textMuted;
+                return <Text style={{ fontSize: 16, color, fontWeight: '600' }}>{symbol}</Text>;
+              })()}
+            </View>
             <View
               style={{ height: 100 }}
               onLayout={e => setCompactConeDims({ width: e.nativeEvent.layout.width, height: 100 })}
