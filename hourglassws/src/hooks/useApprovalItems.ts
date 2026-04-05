@@ -76,6 +76,7 @@ export function useApprovalItems(): {
     queryFn: fetchAllApprovalItems,
     retry: false,
     staleTime: 0,
+    refetchOnWindowFocus: false, // prevent focus events from triggering refetch loop
   })
 
   // Effective items: use optimistic state if active, otherwise query data

@@ -125,14 +125,19 @@ export function useEarningsHistory(
   useEffect(() => {
     if (!payments) return;
 
-    // Build week map keyed by periodStartDate (YYYY-MM-DD)
+    // Build week maps keyed by periodStartDate (YYYY-MM-DD)
     const weeks: Record<string, number> = {};
     const hoursMap: Record<string, number> = {};
+    const overtimeMap: Record<string, number> = {};
     for (const p of payments) {
       if (!p.periodStartDate) continue;
       const weekFrom = p.periodStartDate.slice(0, 10);
       weeks[weekFrom] = (weeks[weekFrom] ?? 0) + p.amount;
       hoursMap[weekFrom] = (hoursMap[weekFrom] ?? 0) + p.paidHours;
+      // actualOvertime = workedHours - paidHours: workedHours is the uncapped total,
+      // paidHours is capped at the weekly limit. Their difference is exactly the
+      // "Actual Overtime" column shown on the Crossover payments dashboard.
+      overtimeMap[weekFrom] = (overtimeMap[weekFrom] ?? 0) + Math.max(0, (p.workedHours ?? 0) - p.paidHours);
     }
 
     // Merge with existing persisted data (keep weeks not in this API response)
@@ -148,7 +153,7 @@ export function useEarningsHistory(
         setPersistedTrend(mapToTrend(weeks, numWeeks));
       });
 
-    // FR3 (06-overview-history): also write earnings + hours to weekly_history_v2.
+    // FR3 (06-overview-history): also write earnings + hours + overtime to weekly_history_v2.
     // Additive write — failure is silent and does not affect the trend return value.
     loadWeeklyHistory()
       .then(history => {
@@ -158,6 +163,7 @@ export function useEarningsHistory(
             weekStart,
             earnings: weeks[weekStart],
             hours: hoursMap[weekStart] ?? 0,
+            overtime: overtimeMap[weekStart] ?? 0,
           });
         }
         return saveWeeklyHistory(updated);

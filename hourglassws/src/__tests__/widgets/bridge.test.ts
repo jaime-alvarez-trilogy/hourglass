@@ -612,9 +612,9 @@ describe('formatMyRequests (FR2)', () => {
     expect(result[0].status).toBe('PENDING');
   });
 
-  it('status APPROVED passes through unchanged', () => {
+  it('status APPROVED is filtered out — resolved items do not show on widget', () => {
     const result = formatMyRequests([makeRequest({ status: 'APPROVED' })], 3);
-    expect(result[0].status).toBe('APPROVED');
+    expect(result).toHaveLength(0);
   });
 
   it('status REJECTED passes through unchanged', () => {
@@ -1063,10 +1063,10 @@ describe('FR3: buildWidgetData extensions (via updateWidgetData)', () => {
     expect(data.actionBg).toBe('#120E1A');
   });
 
-  it('no pending items → actionBg === null', async () => {
+  it('no pending items → actionBg === ""', async () => {
     await updateWidgetData(makeHours(), null, 0, makeManagerConfig(), []);
     const data = getWritten()!;
-    expect(data.actionBg).toBeNull();
+    expect(data.actionBg).toBe('');
   });
 
   it('approvalItems param omitted → approvalItems: [], pendingCount: 0', async () => {

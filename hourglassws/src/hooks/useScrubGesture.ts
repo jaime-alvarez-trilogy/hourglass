@@ -22,6 +22,7 @@
  *   );
  */
 
+import { useEffect } from 'react';
 import { useSharedValue } from 'react-native-reanimated';
 import { Gesture } from 'react-native-gesture-handler';
 import type { SharedValue } from 'react-native-reanimated';
@@ -75,21 +76,40 @@ export function useScrubGesture(options: {
 
   const scrubIndex = useSharedValue(-1);
   const isScrubbing = useSharedValue(false);
+  // Bridge JS-thread array into the worklet runtime via a shared value.
+  // Plain JS arrays cannot be reliably captured in worklet closures under
+  // Reanimated 4 + New Architecture — shared values are the correct channel.
+  const pixelXsSV = useSharedValue<number[]>(pixelXs);
+  useEffect(() => {
+    pixelXsSV.value = pixelXs;
+  }, [pixelXs]);
 
+  // No 'worklet' directives — Reanimated 4 + New Architecture + RNGH v2.28
+  // runs these on the JS thread when no directive is present. Worklet callbacks
+  // throw unhandled JS errors in the worklet runtime (SIGABRT) due to how
+  // cross-module function calls are serialized in Reanimated 4.
   const gesture = Gesture.Pan()
     .minDistance(5)
     .enabled(enabled)
     .onBegin(() => {
-      'worklet';
       isScrubbing.value = true;
     })
     .onUpdate((e) => {
-      'worklet';
-      if (pixelXs.length === 0) return;
-      scrubIndex.value = nearestIndex(e.x, pixelXs);
+      const xs = pixelXsSV.value;
+      if (xs.length === 0) return;
+      // nearestIndex inlined — avoids cross-module worklet call in Reanimated 4
+      let best = 0;
+      let bestDist = Math.abs(e.x - xs[0]);
+      for (let i = 1; i < xs.length; i++) {
+        const d = Math.abs(e.x - xs[i]);
+        if (d < bestDist) {
+          best = i;
+          bestDist = d;
+        }
+      }
+      scrubIndex.value = best;
     })
     .onFinalize(() => {
-      'worklet';
       scrubIndex.value = -1;
       isScrubbing.value = false;
     });

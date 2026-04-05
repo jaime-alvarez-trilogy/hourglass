@@ -217,7 +217,8 @@ export function useAIData(): UseAIDataResult {
             credentials,
             config.useQA,
           );
-          return { date, tagData: countDiaryTags(slots), slots };
+          const tagData = countDiaryTags(slots);
+          return { date, tagData, slots };
         }),
       );
 

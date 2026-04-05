@@ -1,49 +1,35 @@
-// FR3: Credentials screen — email + password form with validation
-import { useState, useEffect } from 'react';
+// Credentials screen — aligned with welcome screen design language
+import { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, ActivityIndicator,
-  KeyboardAvoidingView, ScrollView, Platform, Keyboard,
+  View, Text, TextInput, TouchableOpacity,
+  KeyboardAvoidingView, ScrollView, Platform, Keyboard, StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useOnboarding } from '@/src/contexts/OnboardingContext';
+import { GradientButton } from '@/src/components/GradientButton';
 
 export default function CredentialsScreen() {
   const router = useRouter();
-  const { submitCredentials, setEnvironment, isLoading, error, step } = useOnboarding();
+  const { submitCredentials, isLoading, error, step } = useOnboarding();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [useQA, setUseQA] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+  const passwordRef = useRef<TextInput>(null);
 
-  function handleEnvSelect(qa: boolean) {
-    setUseQA(qa);
-    setEnvironment(qa);
-  }
-
-  // Navigate when step transitions away from credentials
   useEffect(() => {
-    if (step === 'verifying') {
-      router.push('/(auth)/verifying');
-    }
+    if (step === 'verifying') router.push('/(auth)/verifying');
+    if (step === 'env-select') router.push('/(auth)/env-select');
   }, [step]);
 
   function validate(): boolean {
     let valid = true;
-    if (!email.trim()) {
-      setEmailError('Email is required');
-      valid = false;
-    } else {
-      setEmailError('');
-    }
-    if (!password) {
-      setPasswordError('Password is required');
-      valid = false;
-    } else {
-      setPasswordError('');
-    }
+    if (!email.trim()) { setEmailError('Email is required'); valid = false; }
+    else setEmailError('');
+    if (!password) { setPasswordError('Password is required'); valid = false; }
+    else setPasswordError('');
     return valid;
   }
 
@@ -55,114 +41,192 @@ export default function CredentialsScreen() {
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-background"
+      style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
-        contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}
+        contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
       >
-        <View className="flex-1 px-4 pt-12 pb-4 justify-between" style={{ flexGrow: 1 }}>
+        <View style={styles.inner}>
           {/* Header */}
-          <View className="mb-6">
-            <Text className="font-display-semibold text-3xl text-textPrimary">Sign In</Text>
-            <Text className="font-body text-base text-textSecondary mt-1">
-              Enter your Crossover credentials
-            </Text>
+          <View style={styles.header}>
+            <Text style={styles.title}>Sign In</Text>
+            <Text style={styles.subtitle}>Enter your Crossover credentials</Text>
           </View>
 
           {/* Error banner */}
           {error ? (
-            <View className="bg-surface border border-critical rounded-xl p-4 mb-4">
-              <Text className="font-sans text-sm text-critical">{error}</Text>
+            <View style={styles.errorBanner}>
+              <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
 
           {/* Form */}
-          <View className="flex-1 gap-1">
-            <Text className="font-sans-medium text-sm text-textSecondary mb-1">Email</Text>
+          <View style={styles.form}>
+            <Text style={styles.label}>Email</Text>
             <TextInput
-              className={`bg-surface border rounded-xl px-4 py-3 font-sans text-base text-textPrimary ${
-                emailError ? 'border-critical' : emailFocused ? 'border-gold' : 'border-border'
-              }`}
+              style={[
+                styles.input,
+                emailFocused && styles.inputFocused,
+                !!emailError && styles.inputError,
+              ]}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               placeholder="you@crossover.com"
-              placeholderTextColor="#484F58"
+              placeholderTextColor="#3D3C52"
               editable={!isLoading}
               returnKeyType="next"
               onFocus={() => setEmailFocused(true)}
               onBlur={() => setEmailFocused(false)}
-              onSubmitEditing={() => {/* password field next */}}
+              onSubmitEditing={() => passwordRef.current?.focus()}
             />
-            {emailError ? (
-              <Text className="font-sans text-sm text-critical mt-1">{emailError}</Text>
-            ) : null}
+            {emailError ? <Text style={styles.fieldError}>{emailError}</Text> : null}
 
-            <Text className="font-sans-medium text-sm text-textSecondary mb-1 mt-5">Password</Text>
+            <Text style={[styles.label, { marginTop: 20 }]}>Password</Text>
             <TextInput
-              className={`bg-surface border rounded-xl px-4 py-3 font-sans text-base text-textPrimary ${
-                passwordError ? 'border-critical' : passwordFocused ? 'border-gold' : 'border-border'
-              }`}
+              ref={passwordRef}
+              style={[
+                styles.input,
+                passwordFocused && styles.inputFocused,
+                !!passwordError && styles.inputError,
+              ]}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
               placeholder="••••••••"
-              placeholderTextColor="#484F58"
+              placeholderTextColor="#3D3C52"
               editable={!isLoading}
               returnKeyType="done"
               onFocus={() => setPasswordFocused(true)}
               onBlur={() => setPasswordFocused(false)}
               onSubmitEditing={handleSignIn}
             />
-            {passwordError ? (
-              <Text className="font-sans text-sm text-critical mt-1">{passwordError}</Text>
-            ) : null}
+            {passwordError ? <Text style={styles.fieldError}>{passwordError}</Text> : null}
 
-            <Text className="font-sans text-xs text-textMuted mt-3">
+            {/* Keychain note */}
+            <View style={styles.keychainRow}>
+              <Text style={styles.keychainIcon}>🔒</Text>
+              <Text style={styles.keychainText}>
+                Your credentials are stored securely in your device's Keychain and never leave your phone.
+              </Text>
+            </View>
+
+            <Text style={styles.forgotText}>
               Forgot your password? Reset it at crossover.com
             </Text>
-
-            {/* Environment toggle */}
-            <Text className="font-sans-medium text-sm text-textSecondary mb-1 mt-7">Environment</Text>
-            <View className="flex-row rounded-xl overflow-hidden border border-border">
-              <TouchableOpacity
-                className={`flex-1 py-3 items-center ${!useQA ? 'bg-gold' : 'bg-surface'}`}
-                onPress={() => handleEnvSelect(false)}
-              >
-                <Text className={`font-sans-medium text-sm ${!useQA ? 'text-background' : 'text-textSecondary'}`}>
-                  Production
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                className={`flex-1 py-3 items-center ${useQA ? 'bg-gold' : 'bg-surface'}`}
-                onPress={() => handleEnvSelect(true)}
-              >
-                <Text className={`font-sans-medium text-sm ${useQA ? 'text-background' : 'text-textSecondary'}`}>
-                  QA (Testing)
-                </Text>
-              </TouchableOpacity>
-            </View>
           </View>
 
-          {/* Sign In CTA */}
-          <TouchableOpacity
-            className={`bg-gold rounded-xl py-4 items-center mt-8 ${isLoading ? 'opacity-60' : ''}`}
-            onPress={handleSignIn}
-            disabled={isLoading}
-            activeOpacity={0.85}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#8B949E" />
-            ) : (
-              <Text className="font-sans-semibold text-base text-background">Sign In</Text>
-            )}
-          </TouchableOpacity>
+          {/* CTA */}
+          <View style={styles.ctaWrap}>
+            <GradientButton label="Sign In" onPress={handleSignIn} loading={isLoading} />
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#0D0C14',
+  },
+  scroll: {
+    flexGrow: 1,
+    paddingBottom: 40,
+  },
+  inner: {
+    flex: 1,
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 56,
+    paddingBottom: 8,
+    justifyContent: 'space-between',
+  },
+  header: {
+    marginBottom: 32,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: 15,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  errorBanner: {
+    backgroundColor: '#1F1E29',
+    borderWidth: 1,
+    borderColor: '#F43F5E',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#F43F5E',
+  },
+  form: {
+    flex: 1,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: '#16151F',
+    borderWidth: 1,
+    borderColor: '#2F2E41',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#FFFFFF',
+  },
+  inputFocused: {
+    borderColor: '#A78BFA',
+  },
+  inputError: {
+    borderColor: '#F43F5E',
+  },
+  fieldError: {
+    fontSize: 13,
+    color: '#F43F5E',
+    marginTop: 6,
+  },
+  keychainRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 20,
+    paddingHorizontal: 2,
+  },
+  keychainIcon: {
+    fontSize: 13,
+    marginTop: 1,
+  },
+  keychainText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#484F58',
+    lineHeight: 20,
+  },
+  forgotText: {
+    fontSize: 13,
+    color: '#484F58',
+    marginTop: 12,
+    paddingHorizontal: 2,
+  },
+  ctaWrap: {
+    marginTop: 32,
+  },
+});

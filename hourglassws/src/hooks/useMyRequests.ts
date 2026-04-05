@@ -9,6 +9,7 @@ import { fetchWorkDiary } from '../api/workDiary';
 import { AuthError } from '../api/errors';
 import { getWeekStartDate } from '../lib/approvals';
 import { groupSlotsIntoEntries } from '../lib/requestsUtils';
+import { MOCK_MY_REQUESTS } from '../lib/devMock';
 import type { ManualRequestEntry, UseMyRequestsResult } from '../types/requests';
 
 // ─── Date helpers ──────────────────────────────────────────────────────────────
@@ -59,6 +60,11 @@ export function buildMyRequestsQueryFn(
 
     // Load config + credentials in parallel
     const [config, credentials] = await Promise.all([loadConfig(), loadCredentials()]);
+
+    // Dev: manager preview — return fake my-requests without API calls
+    if (config?.devManagerView) {
+      return { entries: [...MOCK_MY_REQUESTS], error: null };
+    }
 
     // Guard: no config or missing assignmentId
     if (!config || !config.assignmentId || !credentials) {

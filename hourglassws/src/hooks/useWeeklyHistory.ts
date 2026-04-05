@@ -4,7 +4,7 @@
 // Consumer (07-overview-sync) combines this with live useAIData/useHoursData for current week.
 
 import { useState, useEffect } from 'react';
-import { loadWeeklyHistory } from '../lib/weeklyHistory';
+import { loadWeeklyHistory, onHistoryUpdate } from '../lib/weeklyHistory';
 import type { WeeklySnapshot } from '../lib/weeklyHistory';
 
 export interface UseWeeklyHistoryResult {
@@ -25,10 +25,17 @@ export function useWeeklyHistory(): UseWeeklyHistoryResult {
         setIsLoading(false);
       })
       .catch(() => {
-        // Silent failure — AsyncStorage unavailable
         setSnapshots([]);
         setIsLoading(false);
       });
+
+    // Re-read whenever a backfill write lands — drives progressive chart animation
+    const unsub = onHistoryUpdate(() => {
+      loadWeeklyHistory()
+        .then(data => setSnapshots(data))
+        .catch(() => {});
+    });
+    return unsub;
   }, []);
 
   return { snapshots, isLoading };

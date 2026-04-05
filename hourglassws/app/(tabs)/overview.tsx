@@ -17,14 +17,16 @@
  *   OverviewHeroCard is the first content item; replaces the old standalone toggle row.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView } from 'react-native';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useConfig } from '@/src/hooks/useConfig';
 import { useOverviewData } from '@/src/hooks/useOverviewData';
-import { useHoursData } from '@/src/hooks/useHoursData';
 import { useFocusKey } from '@/src/hooks/useFocusKey';
 import { useEarningsHistory } from '@/src/hooks/useEarningsHistory';
 import { colors } from '@/src/lib/colors';
@@ -80,11 +82,14 @@ interface ChartSectionProps {
   maxValue?: number;
   targetValue?: number;
   showGuide?: boolean;
+  capLabel?: string;
   weekLabels?: string[];
   onScrubChange: ScrubChangeCallback;
   externalCursorIndex: number | null;
   chartKey: string;
 }
+
+const CHART_HEIGHT = 96;
 
 function ChartSection({
   label,
@@ -96,45 +101,69 @@ function ChartSection({
   maxValue,
   targetValue,
   showGuide,
+  capLabel,
   weekLabels,
   onScrubChange,
   externalCursorIndex,
   chartKey,
 }: ChartSectionProps) {
-  const [dims, setDims] = useState({ width: 0, height: 72 });
+  const [dims, setDims] = useState({ width: 0, height: CHART_HEIGHT });
+  const [cardWidth, setCardWidth] = useState(0);
+
+  // Card-level pan: captures horizontal swipes anywhere in the card, not just the chart strip.
+  // failOffsetY yields to ScrollView on vertical movement > 10px.
+  const gesture = useMemo(() => Gesture.Pan()
+    .minDistance(5)
+    .activeOffsetX([-5, 5])
+    .failOffsetY([-10, 10])
+    .onUpdate((e) => {
+      if (data.length === 0 || cardWidth === 0) return;
+      const idx = Math.max(0, Math.min(Math.round((e.x / cardWidth) * (data.length - 1)), data.length - 1));
+      runOnJS(onScrubChange)(idx);
+    })
+    .onFinalize(() => {
+      runOnJS(onScrubChange)(null);
+    }),
+  [cardWidth, data.length, onScrubChange]);
 
   return (
-    <Card borderAccentColor={borderAccentColor}>
-      <SectionLabel className="mb-2">{label}</SectionLabel>
-      <Text
-        className="font-display-bold"
-        style={{ color, fontSize: 28, fontVariant: ['tabular-nums'], letterSpacing: -0.56 }}
-      >
-        {heroValue}
-      </Text>
-      {subtitle ? (
-        <Text className="text-textSecondary text-xs font-sans mt-0.5">{subtitle}</Text>
-      ) : null}
-      <View
-        style={{ height: 72 }}
-        onLayout={e => setDims({ width: e.nativeEvent.layout.width, height: 72 })}
-        className="mt-3"
-      >
-        <TrendSparkline
-          key={chartKey}
-          data={data}
-          width={dims.width}
-          height={dims.height}
-          color={color}
-          maxValue={maxValue}
-          targetValue={targetValue}
-          showGuide={showGuide}
-          weekLabels={weekLabels}
-          onScrubChange={onScrubChange}
-          externalCursorIndex={externalCursorIndex}
-        />
+    <GestureDetector gesture={gesture}>
+      <View onLayout={e => setCardWidth(e.nativeEvent.layout.width)}>
+        <Card borderAccentColor={borderAccentColor}>
+          <SectionLabel className="mb-2">{label}</SectionLabel>
+          <Text
+            className="font-display-bold"
+            style={{ color, fontSize: 28, fontVariant: ['tabular-nums'], letterSpacing: -0.56 }}
+          >
+            {heroValue}
+          </Text>
+          {subtitle ? (
+            <Text className="text-textSecondary text-xs font-sans mt-0.5">{subtitle}</Text>
+          ) : null}
+          <View
+            style={{ height: CHART_HEIGHT }}
+            onLayout={e => setDims({ width: e.nativeEvent.layout.width, height: CHART_HEIGHT })}
+            className="mt-3"
+          >
+            <TrendSparkline
+              key={chartKey}
+              data={data}
+              width={dims.width}
+              height={dims.height}
+              color={color}
+              maxValue={maxValue}
+              targetValue={targetValue}
+              showGuide={showGuide}
+              capLabel={capLabel}
+              weekLabels={weekLabels}
+              onScrubChange={onScrubChange}
+              externalCursorIndex={externalCursorIndex}
+              gestureDisabled
+            />
+          </View>
+        </Card>
       </View>
-    </Card>
+    </GestureDetector>
   );
 }
 
@@ -162,6 +191,21 @@ export default function OverviewScreen() {
 
   // ── Synchronized scrub state ───────────────────────────────────────────────
   const [scrubWeekIndex, setScrubWeekIndex] = useState<number | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const lastHapticIndex = useRef<number | null>(null);
+
+  const handleScrubChange = useCallback((index: number | null) => {
+    setScrubWeekIndex(index);
+    // Lock scroll while scrubbing so vertical drift doesn't pan the list
+    scrollRef.current?.setNativeProps({ scrollEnabled: index === null });
+    // Haptic tick when crossing to a new index
+    if (index !== null && index !== lastHapticIndex.current) {
+      lastHapticIndex.current = index;
+      Haptics.selectionAsync();
+    } else if (index === null) {
+      lastHapticIndex.current = null;
+    }
+  }, []);
 
   // Reset scrub when window changes (avoids stale index)
   const handleWindowChange = (newWindow: 4 | 12) => {
@@ -171,7 +215,6 @@ export default function OverviewScreen() {
 
   // ── Data ───────────────────────────────────────────────────────────────────
   const { data: overviewData } = useOverviewData(window);
-  const { data: hoursData } = useHoursData();
 
   const weeklyLimit = config?.weeklyLimit ?? 40;
   const hourlyRate = config?.hourlyRate ?? 0;
@@ -181,8 +224,10 @@ export default function OverviewScreen() {
   // FR5: period totals for the selected window
   const totalEarnings = overviewData.earnings.reduce((s, v) => s + v, 0);
   const totalHours = overviewData.hours.reduce((s, v) => s + v, 0);
-  // FR2: current-week overtime only (historical not available in snapshots)
-  const overtimeHours = Math.max(0, (hoursData?.total ?? 0) - (config?.weeklyLimit ?? 0));
+  // FR2: sum of actualOvertime from payments API per week.
+  // This is the "Actual Overtime" column — hours worked above the weekly limit,
+  // sourced directly from the payments dashboard data (not derived from hours math).
+  const overtimeHours = overviewData.overtimeHours.reduce((s, v) => s + v, 0);
 
   // ── Ambient color ───────────────────────────────────────────────────────────
   // FR4: earnings pace ratio → ambient signal → color
@@ -238,7 +283,7 @@ export default function OverviewScreen() {
 
   return (
     <FadeInScreen>
-      <SafeAreaView className="flex-1 bg-background">
+      <SafeAreaView edges={['top']} className="flex-1 bg-background">
         {/* Layer 1: ambient field — absolute, full-screen, behind all content */}
         {/* 08-dark-glass-polish: direct AnimatedMeshBackground wiring with earningsPace signal */}
         {/* 02-mesh-urgency-signal: approvalMeshState overrides earningsPace when non-null */}
@@ -249,6 +294,7 @@ export default function OverviewScreen() {
         />
 
         <ScrollView
+          ref={scrollRef}
           className="flex-1"
           contentContainerStyle={{ padding: 16, paddingTop: 8, gap: 12 }}
         >
@@ -323,9 +369,11 @@ export default function OverviewScreen() {
             color={colors.gold}
             borderAccentColor={colors.gold}
             maxValue={maxEarnings > 0 ? maxEarnings : undefined}
+            targetValue={maxEarnings > 0 ? maxEarnings : undefined}
             showGuide={maxEarnings > 0}
+            capLabel={maxEarnings > 0 ? `$${Math.round(maxEarnings).toLocaleString()}` : undefined}
             weekLabels={overviewData.weekLabels}
-            onScrubChange={setScrubWeekIndex}
+            onScrubChange={handleScrubChange}
             externalCursorIndex={scrubWeekIndex}
             chartKey={`earnings-${chartKey}-${window}`}
           />
@@ -343,9 +391,11 @@ export default function OverviewScreen() {
               color={colors.success}
               borderAccentColor={computeSnapshotHoursColor(heroHours, weeklyLimit)}
               maxValue={weeklyLimit > 0 ? weeklyLimit : undefined}
+              targetValue={weeklyLimit > 0 ? weeklyLimit : undefined}
               showGuide={weeklyLimit > 0}
+              capLabel={weeklyLimit > 0 ? `${weeklyLimit}h` : undefined}
               weekLabels={overviewData.weekLabels}
-              onScrubChange={setScrubWeekIndex}
+              onScrubChange={handleScrubChange}
               externalCursorIndex={scrubWeekIndex}
               chartKey={`hours-${chartKey}-${window}`}
             />
@@ -361,8 +411,9 @@ export default function OverviewScreen() {
               maxValue={100}
               targetValue={75}
               showGuide
+              capLabel="75%"
               weekLabels={overviewData.weekLabels}
-              onScrubChange={setScrubWeekIndex}
+              onScrubChange={handleScrubChange}
               externalCursorIndex={scrubWeekIndex}
               chartKey={`ai-${chartKey}-${window}`}
             />
@@ -380,8 +431,9 @@ export default function OverviewScreen() {
             borderAccentColor={colors.violet}
             showGuide
             targetValue={5}
+            capLabel="5h"
             weekLabels={overviewData.weekLabels}
-            onScrubChange={setScrubWeekIndex}
+            onScrubChange={handleScrubChange}
             externalCursorIndex={scrubWeekIndex}
             chartKey={`brainlift-${chartKey}-${window}`}
           />

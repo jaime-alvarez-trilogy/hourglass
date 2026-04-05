@@ -94,6 +94,11 @@ export interface TrendSparklineProps {
    * Used by OverviewScreen (07-overview-sync) to sync all 4 charts.
    */
   externalCursorIndex?: number | null;
+  /**
+   * When true, the internal VNX gesture does not emit onScrubChange.
+   * Use when the parent card owns the gesture (card-level scrub).
+   */
+  gestureDisabled?: boolean;
 }
 
 const CAP_LABEL_FONT_SIZE = 10;
@@ -111,6 +116,7 @@ export default function TrendSparkline({
   onScrubChange,
   weekLabels: _weekLabels,
   externalCursorIndex = null,
+  gestureDisabled = false,
 }: TrendSparklineProps) {
   const clipProgress = useSharedValue(0);
   const h = height > 0 ? height : 52;
@@ -156,10 +162,16 @@ export default function TrendSparkline({
     }
   };
 
+  // gestureDisabledSV bridges the React prop into the Reanimated reaction.
+  const gestureDisabledSV = useSharedValue(gestureDisabled);
+  useEffect(() => { gestureDisabledSV.value = gestureDisabled; }, [gestureDisabled]);
+
   useAnimatedReaction(
     () => ({ active: state.isActive.value, xValue: state.x.value.value }),
     ({ active, xValue }) => {
-      runOnJS(emitScrubChange)(active, xValue);
+      if (!gestureDisabledSV.value) {
+        runOnJS(emitScrubChange)(active, xValue);
+      }
     },
   );
 
@@ -191,34 +203,14 @@ export default function TrendSparkline({
   const domainYMin = yMin - padBottom;
   const domainYMax = yMax + padTop;
 
-  // Cap label font
+  // Cap label font + measured width (used inside renderOutside to position alongside guide line)
   const capFont = showGuide && capLabel
     ? matchFont({ fontFamily: 'System', fontSize: CAP_LABEL_FONT_SIZE })
     : null;
-
-  // Cap label positioning — right-aligned, top of chart area
   const capLabelWidth = capFont && capLabel ? capFont.measureText(capLabel).width : 0;
-  const capLabelX = width - capLabelWidth - 4;
-  const capLabelY = CAP_LABEL_FONT_SIZE;
 
   return (
     <View style={{ width, height: h }}>
-      {/* Cap label overlay — rendered above clip so it's always visible */}
-      {showGuide && capLabel && capFont && (
-        <Canvas
-          style={{ position: 'absolute', top: 0, left: 0, width, height: h, zIndex: 1 }}
-          pointerEvents="none"
-        >
-          <SkiaText
-            x={capLabelX}
-            y={capLabelY}
-            text={capLabel}
-            font={capFont}
-            color={colors.textMuted}
-            opacity={0.35}
-          />
-        </Canvas>
-      )}
       {/* Clip container: animates width 0 → W to reveal sparkline left-to-right.  */}
       {/* CartesianChart is inside an absolute View at full `width` so its layout   */}
       {/* is stable — it always measures W and renders the line at correct coords.  */}
@@ -237,27 +229,72 @@ export default function TrendSparkline({
           // both canvas edges so neither edge clips the glow of the first/last data point.
           // (10-mesh-color-overhaul FR5: was { left: 0, right: 10 } — left glow clipped)
           domainPadding={{ left: 10, right: 10 }}
-          // activeOffsetX activates on horizontal swipe (works inside ScrollView without
-          // requiring a precise long-press on the tiny 72px chart strip).
-          chartPressConfig={{ pan: { activeOffsetX: [-5, 5] } }}
-          chartPressState={state}
+          // activeOffsetX: activate on horizontal swipe ≥5px.
+          // failOffsetY: if vertical movement exceeds 10px, yield to the ScrollView.
+          // Together these give a clear handoff: mostly-horizontal → scrub,
+          // mostly-vertical → scroll, with no ambiguous fighting in between.
+          // When gestureDisabled, omit chartPressState entirely so VNX doesn't register
+          // a gesture handler — allowing the parent GestureDetector to own the touch.
+          {...(!gestureDisabled && {
+            chartPressConfig: { pan: { activeOffsetX: [-5, 5], failOffsetY: [-10, 10] } },
+            chartPressState: state,
+          })}
           renderOutside={({ chartBounds }) => {
             // renderOutside runs inside VNX's Skia Canvas — Skia elements only, no <Canvas> wrapper.
             // Shared helper: maps a data index to pixel (x, y) using the padded domain.
             const extDomainRange = domainYMax - domainYMin;
+            // domainPadding={{ left: 10, right: 10 }} causes VNX to inset the first/last
+            // data points 10px from each edge. Our manual dot must match that inset.
+            const X_PAD = 10;
             const xAt = (idx: number) => safeData.length > 1
-              ? chartBounds.left + (idx / (safeData.length - 1)) * (chartBounds.right - chartBounds.left)
+              ? chartBounds.left + X_PAD + (idx / (safeData.length - 1)) * (chartBounds.right - chartBounds.left - 2 * X_PAD)
               : (chartBounds.left + chartBounds.right) / 2;
             const yAt = (idx: number) => {
               const pct = extDomainRange === 0 ? 0.5 : 1 - (safeData[idx] - domainYMin) / extDomainRange;
               return chartBounds.top + pct * (chartBounds.bottom - chartBounds.top);
             };
 
+            // ── Target / cap guide line ──────────────────────────────────────
+            // Rendered behind cursor and dot so it doesn't obscure them.
+            const guideEl = showGuide ? (() => {
+              const guideY = targetValue !== undefined
+                ? (() => {
+                    const pct = extDomainRange === 0 ? 0.5 : 1 - (targetValue - domainYMin) / extDomainRange;
+                    return chartBounds.top + pct * (chartBounds.bottom - chartBounds.top);
+                  })()
+                : chartBounds.top + 2;
+              // Label sits just above the line, right-aligned inside the chart area
+              const labelX = chartBounds.right - capLabelWidth - 4;
+              const labelY = guideY - 3;
+              return (
+                <>
+                  <SkiaLine
+                    p1={vec(chartBounds.left, guideY)}
+                    p2={vec(chartBounds.right, guideY)}
+                    color={colors.textMuted}
+                    strokeWidth={1.5}
+                    opacity={0.4}
+                  />
+                  {capLabel && capFont && (
+                    <SkiaText
+                      x={labelX}
+                      y={labelY}
+                      text={capLabel}
+                      font={capFont}
+                      color={colors.textMuted}
+                      opacity={0.55}
+                    />
+                  )}
+                </>
+              );
+            })() : null;
+
             if (externalCursorIndex !== null && safeData.length > 0) {
               // ── Scrubbing: vertical line + dot at cursor position ────────────
               const idx = Math.max(0, Math.min(externalCursorIndex, safeData.length - 1));
               return (
                 <>
+                  {guideEl}
                   <SkiaLine
                     p1={vec(xAt(idx), chartBounds.top)}
                     p2={vec(xAt(idx), chartBounds.bottom)}
@@ -273,7 +310,12 @@ export default function TrendSparkline({
             // ── Default: dot at latest (rightmost) data point ────────────────
             if (safeData.length === 0) return null;
             const lastIdx = safeData.length - 1;
-            return <Circle cx={xAt(lastIdx)} cy={yAt(lastIdx)} r={strokeWidth * 2} color={color} />;
+            return (
+              <>
+                {guideEl}
+                <Circle cx={xAt(lastIdx)} cy={yAt(lastIdx)} r={strokeWidth * 2} color={color} />
+              </>
+            );
           }}
         >
           {({ points, chartBounds }) => (

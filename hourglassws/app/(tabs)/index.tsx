@@ -207,7 +207,7 @@ export default function HoursDashboard() {
 
   return (
     <FadeInScreen>
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView edges={['top']} className="flex-1 bg-background">
       {/* FR1 (02-home-hero-ambient): Fixed ambient backdrop — outside ScrollView, does not scroll */}
       {/* 09-chart-visual-fixes FR3: AmbientBackground replaced with AnimatedMeshBackground     */}
       {/* directly — the old wrapper silently discarded its color prop (08-dark-glass-polish).   */}
@@ -307,6 +307,11 @@ export default function HoursDashboard() {
           </View>
         </PanelGradient>
         </Animated.View>
+
+        {/* ── Deadline urgency banner — below hero, above chart ─────────── */}
+        {urgencyLevel !== 'none' && data && (
+          <UrgencyBanner timeRemaining={data.timeRemaining} />
+        )}
 
         {/* ── Error banner (no data + error) ───────────────────────────── */}
         {error && !data && (
@@ -441,6 +446,7 @@ export default function HoursDashboard() {
                   height={sparklineDims.height}
                   color={colors.gold}
                   maxValue={(config?.hourlyRate ?? 0) * (config?.weeklyLimit ?? 40)}
+                  targetValue={(config?.hourlyRate ?? 0) * (config?.weeklyLimit ?? 40)}
                   showGuide
                   capLabel={
                     config?.hourlyRate && config?.weeklyLimit
@@ -456,11 +462,6 @@ export default function HoursDashboard() {
         </Card>
         </Animated.View>
         </Animated.View>
-
-        {/* ── Footer: UrgencyBanner ─────────────────────────────────────── */}
-        {urgencyLevel !== 'none' && data && (
-          <UrgencyBanner timeRemaining={data.timeRemaining} />
-        )}
 
         {/* ── Stale cache indicator ─────────────────────────────────────── */}
         {isStale && cachedAt && (

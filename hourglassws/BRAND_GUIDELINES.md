@@ -1,323 +1,499 @@
-# Hourglass — Brand & Design System Guidelines
+# Hourglass Brand Guidelines v2.0
+**Spatial Dark Glass UI — Strict Implementation Reference**
 
-> **Version 1.1** · Last updated 2026-03-15
-> *Changes from v1.0: hued base palette, Inter variable font consolidation, radial panel gradients, dark glass surface system, violet as interactive accent, cyan evolution*
-
----
-
-## Mission Statement
-
-Hourglass exists to answer one question in under three seconds: *where does my week stand, and where is it heading?*
-
-Everything in the design — the dark glass canvas, the prominent numbers, the colour-coded panel states — serves that goal. Data is the product. The UI is the frame. The frame should never compete with the picture.
+> **Version 2.0** · Supersedes v1.1 completely.
+> This document is the canonical source of truth for all visual decisions in the Hourglass app.
+> Every color, font weight, radius, blur amount, and animation in this document is **non-negotiable**.
+> If something on screen does not match this document, it is a bug.
 
 ---
 
-## App Identity
+## 0. Design Philosophy
 
-**Name:** Hourglass
-**Category:** Work dashboard / productivity
-**Audience:** Crossover contractors (contributors and managers)
-**Tone:** Confident, precise, premium. The app of someone who takes their output seriously.
-**Reference aesthetics:** Oura Ring app · Revolut · Linear · Arc Browser · Raycast
-**One-sentence design brief:** Dark glass dashboard where numbers are the hero, panels radiate colour to telegraph week status at a glance, and every interaction feels satisfying and immediate.
+### 0.1 Primary Mission
 
----
+The app must answer **"Where does my week stand?"** in under 3 seconds. Every visual decision is subordinate to this. Aesthetic richness serves clarity — it never competes with it.
 
-## Colour System
+### 0.2 The Liquid Glass Paradigm
 
-### Philosophy
+This is not dark mode. This is not glassmorphism. This is **Liquid Glass** — a paradigm where:
 
-The palette is built around a deep, hued-black canvas that makes coloured data pop without visual fatigue. The background is not generic near-black — it has a subtle eggplant undertone that makes accents feel warmer and the whole app feel more owned. Semantic accent colours carry meaning — do not use them decoratively. Surface colours create depth through layering, supported by blur and noise.
+- Interface surfaces are **physical materials** with mass, depth, light refraction, and environmental reactivity
+- The background is a **living technical environment** — not a static wallpaper, an active scene
+- Data visualizations **emit light** — charts glow from within, bars have neon peaks, arcs pulse with gradients
+- Interactions carry **physical mass** — elements compress, spring back, settle with friction
+- Colors are **mathematical inputs to a lighting system** — they communicate weekly standing without words
 
-### Base Palette
+Every element on screen is part of a single coherent spatial scene. There is no foreground and background — only layers of depth within the same illuminated environment.
 
-| Token | Hex | Usage |
-|---|---|---|
-| `background` | `#0D0C14` | App background, screen fill — deep eggplant, not generic black |
-| `surface` | `#16151F` | Default card background |
-| `surfaceElevated` | `#1F1E29` | Modals, bottom sheets, popovers, active card state |
-| `border` | `#2F2E41` | Card borders, dividers, input outlines |
+### 0.3 The Version 2.0 Upgrade
 
-> **Why eggplant, not black:** `#0A0A0F` is forgettable. `#0D0C14` has a barely-there violet undertone that makes it feel intentional and gives the accent colours — gold, cyan, violet — a warmer, richer surface to sit on. The difference is subtle on paper, dramatic in practice.
-
-### Accent Colours
-
-| Token | Hex | Semantic role |
-|---|---|---|
-| `gold` | `#E8C97A` | Earnings, salary, money values. Primary brand accent. |
-| `goldBright` | `#FFDF89` | Hero earnings moments — use as gradient endpoint with `gold` |
-| `cyan` | `#00C2FF` | AI usage percentage, AI-related metrics — slightly more electric than v1.0 |
-| `violet` | `#A78BFA` | BrainLift hours, deep-work metrics. Also the primary interactive accent (buttons, focused states). |
-| `success` | `#10B981` | On-track status, completed items, positive deltas |
-| `warning` | `#F59E0B` | Behind-pace status, caution states, soft alerts |
-| `critical` | `#F43F5E` | Critical behind-pace, overdue approvals, urgent alerts |
-| `destructive` | `#F85149` | Destructive actions (delete, reject), irreversible operations |
-
-### Text Colours
-
-| Token | Hex | Usage |
-|---|---|---|
-| `textPrimary` | `#FFFFFF` | Hero numbers, headings, primary labels |
-| `textSecondary` | `#8B949E` | Supporting labels, metadata, secondary values |
-| `textMuted` | `#484F58` | Placeholder text, disabled states, fine print |
-
-### Colour Usage Rules
-
-1. **Gold is for money only.** `gold` and `goldBright` mean currency. When a user sees gold, they think earnings. The settings toggle, deadline banners, navigation — none of these are gold.
-2. **Cyan is for AI only.** `cyan` = AI usage percentage. Not a general highlight colour.
-3. **Violet is for BrainLift AND interactive UI.** `violet` doubles as the primary interactive accent for buttons, pressed states, and focused elements. This makes the whole app feel cohesive — the BrainLift accent and the interaction accent are the same family.
-4. **Status colours carry meaning.** `success`, `warning`, `critical` map to week pace states. Using `success` green decoratively will confuse users.
-5. **`destructive` vs `critical`:** `critical` is informational (this situation is urgent). `destructive` is action-driven (this button will permanently do something).
-6. **Never use pure white for large text blocks.** `#FFFFFF` is reserved for hero numbers and key labels. Body text uses `textSecondary`.
-7. **Borders should whisper.** `#2F2E41` is intentionally subtle. Cards are defined by their surface colour and content, not heavy outlines.
+v1.1 used flat radial gradients as panel state indicators. v2.0 replaces these with **volumetric colored subsurface glows** — light emitted from the data itself, visually refracting through frosted glass surfaces. The upgrade is not cosmetic. It shifts the app from "dark mode dashboard" to "spatial observatory."
 
 ---
 
-## Panel Gradient States
+## 1. Color System
 
-Panels shift their background gradient to signal week status. In v1.1, gradients are **radial** — they emanate from the center of the hero metric, pulling focus to the number while filling the panel with ambient colour. This makes the gradient feel data-connected rather than decorative.
+### 1.1 Foundation Palette
 
-| State | Condition | Gradient |
-|---|---|---|
-| **On Track** | Hours pace ≥ target | Radial `success` (`#10B981`) at 35% opacity from center → transparent |
-| **Behind** | Hours pace 50–99% of target | Radial `warning` (`#F59E0B`) at 35% opacity from center → transparent |
-| **Critical** | Hours pace < 50% of target | Radial `critical` (`#F43F5E`) at 35% opacity from center → transparent |
-| **Crushed It** | Hours ≥ weekly target met | Radial `gold`→`goldBright` gradient at 35% opacity from center → transparent |
-| **Idle** | No data yet / weekend / not started | Flat `surface` (`#16151F`), no gradient |
-
-**Implementation note:** Use a radial gradient centered at the hero number position — roughly top-center of the panel. The gradient should reach 100% coverage at the card edges. Animate state transitions using `springPremium` (see Animation Philosophy). The `springPremium` stiffness should scale with the magnitude of the state change — a drop from On Track to Critical is faster and more dramatic than a slip from On Track to Behind.
-
----
-
-## Typography System
-
-### Single Variable Font
-
-Hourglass uses **Inter** for everything. One font family, differentiated entirely by weight, size, and letter-spacing. This creates maximum cohesion — the app feels like one unified system, not a collection of parts.
-
-> **Why Inter:** Linear built its entire iconic UI on Inter. It has exceptional legibility, robust `tabular-nums` support, extensive weight range (100–900), and precise number shapes. Three fonts created cognitive friction and inconsistency; Inter eliminates both.
-
-### Type Roles
-
-| Role | Weight | Letter-spacing | Purpose |
+| Token | Hex | Material Application | Conceptual Role |
 |---|---|---|---|
-| **Display** | 700–800 | `-0.02em` | Hero numbers, large metric values |
-| **Heading** | 600 | `-0.01em` | Card titles, section headers, key labels |
-| **UI** | 500 | `0` | Navigation, buttons, active tab labels, form inputs |
-| **Body** | 400 | `0` | Secondary labels, metadata, body copy |
-| **Muted** | 400 | `0` | Captions, placeholder text, fine print |
+| `background` | `#0D0C14` | Animated SKSL/Skia mesh canvas base | Infinite spatial void behind the interface. Deep eggplant — **NOT pure black**. Pure black kills accent luminosity; this lets accents radiate with warmth. |
+| `surface` | `#16151F` | BackdropFilter (16–20px blur) + 0.03 noise | Default analytical card glass. |
+| `surfaceElevated` | `#1F1E29` | Multi-layer BackdropFilter (30px blur) | Modals, bottom sheets, PressIn states. Stronger blur signals higher z-axis. |
+| `border` | `#2F2E41` | Hardware-accelerated masked LinearGradient, 1–1.5px | Chamfered glass edge catching ambient light. |
+| `textPrimary` | `#E0E0E0` | Typography only | **Never `#FFFFFF`.** Pure white on dark causes halation — visual bleeding and eye strain. |
+| `textSecondary` | `#A0A0A0` | Typography only | Metadata, subtitles, secondary values. |
+| `textMuted` | `#757575` | Typography only | Placeholders, disabled states, timestamps, axis labels. Replaces legacy `#484F58`. |
 
-### Type Scale
+### 1.2 Semantic Accent Colors
 
-| Name | Size (px) | Line height | Role | Notes |
+Each accent has **one semantic domain**. Using an accent outside its domain is a brand violation — accents must retain their neurological associations (gold = financial reward, cyan = AI intelligence, violet = deep focus).
+
+| Token | Hex | Semantic Domain | Forbidden Uses |
+|---|---|---|---|
+| `gold` | `#E8C97A` / `#FFDF89` (Crushed It peak) | Financial metrics, earnings, "Crushed It" state exclusively | Navigation, decoration, non-financial charts, BrainLift, AI data |
+| `cyan` | `#00C2FF` | AI usage %, AI trajectory, AI predictions only | Hours, earnings, BrainLift, navigation |
+| `violet` | `#A78BFA` | BrainLift hours, deep-work tracking, primary CTAs, active navigation states | Financial data, AI usage percentage |
+| `success` | `#10B981` | Weekly hours on-track state, positive delta indicators | Earnings (must use gold), AI metrics |
+| `warning` | `#F59E0B` | Behind-pace state (50–99% of target) | Errors (use critical), destructive actions |
+| `critical` | `#F43F5E` | Behind-pace state (<50% of target), urgent time-sensitive alerts | Destructive actions (use destructive) |
+| `destructive` | `#F85149` | Irreversible actions only — delete, reject, permanent operations | Warnings, status indicators |
+
+**On the two gold values:** `#E8C97A` is the warm base used for all earnings text and chart lines. `#FFDF89` is the brighter peak used exclusively for the "Crushed It" background glow at maximum luminosity. `#FFDF89` is never used for text.
+
+### 1.3 Panel State → Volumetric Subsurface Glow
+
+The animated mesh background's Node C (the status node) shifts color to communicate the user's weekly pace. This is the app's **primary emotional signal** — a luminous state machine. The glow emanates from the data itself and visually refracts through all glass surfaces in the scene.
+
+| State | Condition | Node C Color | Glow Opacity | Animation |
 |---|---|---|---|---|
-| `3xl` | 36 | 40 | Display 700–800 | Hero number (e.g., weekly hours) |
-| `2xl` | 28 | 34 | Display 700 | Section hero metric |
-| `xl` | 22 | 28 | Heading 600 | Card headline, large label |
-| `lg` | 18 | 26 | Heading 600 | Subsection heading, prominent value |
-| `md` | 16 | 24 | UI 500 | Primary UI label, body |
-| `sm` | 14 | 20 | Body 400 | Secondary label, metadata |
-| `xs` | 12 | 16 | Muted 400 | Caption, pill badge, fine print |
+| On Track | Pace ≥ target | `#10B981` Success Green | 35% | Steady |
+| Behind | Pace 50–99% of target | `#F59E0B` Warning Orange | 35% | Steady |
+| Critical | Pace < 50% of target | `#F43F5E` Critical Red | 35% → 55% → 35% | **Pulsing**: `withRepeat(withSequence(withTiming(0.55, {duration:800}), withTiming(0.35, {duration:800})), -1)` |
+| Crushed It | Target fully met | `#FFDF89` Gold Peak | 35% | Steady (use brighter `#FFDF89` not `#E8C97A`) |
+| Idle / Weekend | No active data | No Node C glow — default violet/cyan mesh | — | — |
 
-### Typography Rules
+### 1.4 Gradient Border State Awareness
 
-1. **Numeric values use Display weight (700–800) with `tabular-nums`.** Every metric, counter, and data value — hero cards, chart labels, earnings figures, percentages — uses Inter Display. No exceptions.
-2. **`tabular-nums` on everything that changes.** `fontVariant: ['tabular-nums']` prevents horizontal jitter when values update. Apply it to all metric displays, not just animated ones.
-3. **Button labels use UI weight (500–600).** Actionable, not decorative.
-4. **AI insights and explanatory copy use Body weight (400)** with slightly increased line height (`1.6`) for readability.
-5. **Letter-spacing tightens at large sizes.** Display gets `-0.02em`, Heading gets `-0.01em`, everything else is `0`.
+The card gradient border is **not always violet**. It responds to the card's semantic context:
 
----
+- **Default / neutral cards:** `#A78BFA` Violet → transparent at 45°
+- **Status-bearing cards** (metric cards showing pace): border uses the current panel state color → transparent
+- **Earnings cards:** `#E8C97A` Gold → transparent at 45°
+- **AI metric cards:** `#00C2FF` Cyan → transparent at 45°
 
-## Spacing Philosophy
+This extends the volumetric glow philosophy to the card surface: the border itself becomes a secondary light source that echoes the data's semantic color.
 
-Hourglass uses the **Tailwind default 4px base scale** with no modifications.
+### 1.5 Surface Texture
 
-**Key spacing habits:**
+Every glass card surface carries a **white noise texture overlay at 0.03 opacity** on top of the glass fill. This eliminates the "too clean CG rendering" look and makes the surface feel like a physical material rather than a rectangle with CSS.
 
-- Card internal padding: `p-5` (20px) or `p-6` (24px) — never less than `p-4`
-- Gap between cards/sections: `gap-4` (16px) to `gap-6` (24px)
-- Gap between a label and its value within a card: `gap-1` or `gap-2`
-- Screen horizontal padding: `px-4` (16px) — consistent edge-to-edge breathing room
-- Stack spacing within a list: `gap-3` (12px)
-
-**The airy principle:** If a layout looks dense, add spacing before removing content. Premium apps breathe. Numbers need white space around them to feel authoritative.
+- Opacity: **0.03** — barely perceptible individually, but collectively removes synthetic sterility
+- Blend mode: `overlay`
+- Asset: tileable white noise PNG at 256×256px, repeated to fill
+- Position: `AbsoluteFill` inside the card, above BackdropFilter canvas, below content
 
 ---
 
-## Border Radius Rules
+## 2. Typography
 
-| Context | Token | px value |
+### 2.1 Font Stack
+
+| Role | Typeface | Rationale |
 |---|---|---|
-| Cards, panels, large containers | `rounded-2xl` | 16px |
-| Buttons, inputs, small modals | `rounded-xl` | 12px |
-| Pills, status badges, small chips | `rounded-full` | 9999px |
-| Inner elements within cards | `rounded-lg` | 8px |
+| **Hero numbers, section headings** | Space Grotesk | Geometric, brutalist sans-serif. Definitive for technical, AI-driven dashboards. Immediate visual impact at 36px hero sizes. The "face" of the data. |
+| **Data tables, timestamps, numeric columns** | Space Mono | Highly structured monospaced. Vertical column alignment is mathematically guaranteed. For dense tabular data where misalignment would be jarring. |
+| **Body copy, labels, descriptions** | Inter | Undisputed gold standard for interface text. Massive x-height. Clarity at 12–16px. For anything the user reads rather than scans. |
 
-**Rule:** Do not use `rounded-md` (6px) or smaller — it reads as a browser default, not a design decision. The minimum intentional radius is `rounded-lg` (8px).
+### 2.2 Type Scale
 
----
-
-## Surface & Depth — The Dark Glass System
-
-The design brief says "dark glass dashboard." This section defines how to deliver it. Glass is not just a dark background — it is layered, blurred, textured, and glowing.
-
-### Layering
-
-Depth is created through three surface tiers, not shadows:
-
-| Layer | Token | Usage |
-|---|---|---|
-| Canvas | `background` `#0D0C14` | Screen fill. Never place content directly here without a card. |
-| Card | `surface` `#16151F` | All data cards and primary content. |
-| Elevated | `surfaceElevated` `#1F1E29` | Modals, bottom sheets, tooltips, active states. |
-
-### Backdrop Blur (Glass Effect)
-
-Modals, bottom sheets, and `surfaceElevated` panels should use **backdrop blur** to deliver the glass aesthetic:
-
-```
-background: hsla(248, 15%, 10%, 0.75)
-backdrop-filter: blur(16px)
-border: 1px solid rgba(255, 255, 255, 0.06)
-```
-
-This creates a translucent panel that reveals depth behind it. On React Native, use `BlurView` from `expo-blur` with `intensity={40}` and `tint="dark"`.
-
-### Noise Texture
-
-Apply a subtle static noise overlay over the entire app background to add tactile quality:
-
-- Use a semi-transparent noise PNG at `opacity: 0.03–0.05`
-- Alternatively use a shader-based noise at the same opacity
-- This is the difference between "dark mode" and "dark glass" — Linear, Arc, and Raycast all use this technique
-
-### Gradient Borders
-
-For focused or active panels, replace the plain `border` with a gradient border:
-
-```
-border: 1px solid transparent
-background-clip: padding-box
-background-image: linear-gradient(surface, surface),
-                  linear-gradient(135deg, violet 0%, transparent 60%)
-```
-
-The gradient border glows violet on focus, fades to invisible at rest. On React Native, achieve this with a wrapping `LinearGradient` at 1px padding.
-
-### Coloured Glows
-
-Elevated panels in status states should emit a coloured glow, not a hard shadow:
-
-- **On Track panel:** Soft `success` green glow — `shadowColor: '#10B981'`, `shadowOpacity: 0.15`, `shadowRadius: 20`
-- **Critical panel:** Deep `critical` red glow — `shadowColor: '#F43F5E'`, `shadowOpacity: 0.2`, `shadowRadius: 24`
-- **Crushed It panel:** Warm `gold` glow — `shadowColor: '#E8C97A'`, `shadowOpacity: 0.2`, `shadowRadius: 24`
-
----
-
-## Component Personality
-
-### Card-First Layout
-
-Every major data unit lives in a card. Cards are the atomic unit of the dashboard. They:
-- Have a `surface` (`#16151F`) background
-- Use `border` (`#2F2E41`) with 1px width
-- Use `rounded-2xl` (16px) radius
-- Have `p-5` or `p-6` internal padding
-- May optionally carry a radial panel gradient overlay for status-driven panels
-- May use a gradient border for focused/active states
-
-### Airy Density
-
-The layout is generous, not compact. Every card should feel like it has room to breathe.
-
-### Number Hierarchy
-
-Within any card:
-1. **Hero value** — Display 700–800, `textPrimary`, `tabular-nums`
-2. **Supporting metric** — Heading 600 or Display 700, `textSecondary`
-3. **Label / caption** — Body 400, `textMuted`
-
-The eye lands on the number first, then finds context from the label below.
-
-### Interactive Elements
-
-Buttons and tappable elements use `violet` as their primary interactive accent:
-- Default state: `surface` background, `violet` text or border
-- Pressed state: `scale(0.96)` via `timingInstant` + slight `violet` glow
-- Active/selected: `violet` background at 15–20% opacity
-
-This ties interactive states to the BrainLift accent, creating an analogous, cohesive palette across the whole app.
-
----
-
-## Animation Philosophy
-
-Animation serves communication, not entertainment. Every animated element should feel like it has physical weight and intention.
-
-### Two Animation Personalities
-
-**Springs → transitions, interactions, structure**
-Cards appearing, panels opening, modals sliding in, navigation transitions. Springs feel alive because they simulate physics — the slight overshoot tells the user something arrived, not just appeared.
-
-**Timing curves → data, charts, fills**
-Progress bars filling, chart bars growing, percentage counters. These should feel precise — like a gauge settling to its reading. Springs on data fills feel uncontrolled.
-
-### Personality Calibration
-
-- **Snappy:** Fast, decisive. Navigation, small UI responses.
-- **Bouncy:** Alive, confident, a touch of delight. Cards appearing, panel expansion.
-- **Premium:** Unhurried, smooth, authoritative. Hero panels, modal sheets. The "Revolut card flip" feeling.
-
-### Animation Rules
-
-1. Never animate colour alone — pair colour transitions with a subtle scale or opacity shift.
-2. Panel gradient state changes use `springPremium`. The spring stiffness scales with the magnitude of the state change — a drop from On Track to Critical is faster and more dramatic than a slip from On Track to Behind.
-3. List items that enter staggered use `springBouncy` with a 50ms delay multiplied by index, capped at 300ms total stagger.
-4. Button press feedback uses `timingInstant` scale (0.96) — immediate, tactile. Follow with a brief `violet` radial glow (opacity 0.15 → 0, 200ms).
-5. Loading skeletons pulse with `timingSmooth` opacity — slow enough to be calm, not anxious.
-6. Tab navigation transitions use `springSnappy` — decisive, not sluggish. Never use a plain cross-fade.
-7. All animations must have a `useReducedMotion` fallback that shows the end state instantly.
-
----
-
-## Do's and Don'ts
-
-### Do
-- Lead with the number, follow with the label
-- Use status colours only for their designated semantic meaning
-- Keep cards padded and spacious
-- Use Inter Display weight for every metric value, with `tabular-nums`
-- Animate with purpose — every animation communicates something
-- Keep the background dark and hued; let accent colours guide attention
-- Use backdrop-blur on modals and elevated panels
-- Use `violet` for interactive states (buttons, focus, pressed)
-- Use radial gradients on status panels, centered on the hero metric
-
-### Don't
-- Don't use `gold` for non-earnings elements — not toggles, not highlights, not decoration
-- Don't put more than one hero number per card
-- Don't use gradients decoratively — they have semantic meaning
-- Don't use `rounded-md` or smaller — minimum is `rounded-lg`
-- Don't spring-animate chart fills or progress bars — use timing curves
-- Don't use light text on light surfaces
-- Don't use the old three-font stack — Inter only
-- Don't animate without a `useReducedMotion` fallback
-
----
-
-## Panel State Reference Table
-
-| State | Token | Hex | Gradient type | Opacity | Trigger condition |
+| NativeWind class | Size | Typeface | Weight | Color | Specific use |
 |---|---|---|---|---|---|
-| On Track | `success` | `#10B981` | Radial from hero metric center | 35% | Current pace ≥ weekly target pace |
-| Behind | `warning` | `#F59E0B` | Radial from hero metric center | 35% | Current pace 50–99% of target |
-| Critical | `critical` | `#F43F5E` | Radial from hero metric center | 35% | Current pace < 50% of target |
-| Crushed It | `gold`→`goldBright` | `#E8C97A`→`#FFDF89` | Radial gold gradient from hero metric center | 35% | Weekly hour target fully met |
-| Idle | — | — | None (flat `surface`) | 0% | No data, weekend, week not started |
+| `font-display-bold text-4xl` | 36px | Space Grotesk | 700 | `#E0E0E0` | Weekly hours hero (`33.8h`) |
+| `font-display-bold text-2xl` | 24px | Space Grotesk | 700 | `#E8C97A` | Earnings hero (`$1,692`) |
+| `font-display-semibold text-xl` | 20px | Space Grotesk | 600 | `#E0E0E0` | Section metric values, overview numbers |
+| `font-display-semibold text-lg` | 18px | Space Grotesk | 600 | `#00C2FF` | AI percentage hero (`92%`) |
+| `font-sans-medium text-xs uppercase` | 11px | Inter | 500 | `#A0A0A0` | Card section labels (`THIS WEEK`, `EARNINGS`) |
+| `font-mono-regular text-sm` | 14px | Space Mono | 400 | `#A0A0A0` | Table row values, date columns |
+| `font-mono-regular text-xs` | 12px | Space Mono | 400 | `#757575` | Timestamps, secondary table data |
+| `font-sans-regular text-xs` | 12px | Inter | 400 | `#757575` | Axis labels, chart captions, footnotes |
+
+### 2.3 Strict Calibration Rules
+
+1. **No pure white text, ever.** `#FFFFFF` is prohibited on all dark surfaces. Minimum primary text: `#E0E0E0`. This is not a preference — it eliminates halation.
+
+2. **Tabular nums on every number.** All hours, dollars, percentages, and counts must have `fontVariant: ['tabular-nums']`. Prevents horizontal jitter when values update. No exceptions.
+
+3. **Hero letter-spacing.** At 36px+: `letterSpacing: -0.02 * fontSize` (e.g., `letterSpacing: -0.72` at 36px). At 24px: `letterSpacing: -0.48`. Tighter tracking at display sizes reads as precision and confidence.
+
+4. **Section label style.** All card section labels (`THIS WEEK`, `AI TRAJECTORY`, `EARNINGS`) are uppercase Inter Medium at 11–12px with `letterSpacing: 0.08em`. Never use Space Grotesk for labels — it's reserved for numbers.
+
+5. **Font weight ceiling: 700.** ExtraBold (800) renders optically too heavy on dark backgrounds. Bold (700) is the maximum allowed weight across all typefaces.
+
+6. **Optical weight reduction.** Light text on dark backgrounds renders ~1 weight-step heavier than it truly is. Compensate: where Bold (700) would be used in light mode, use SemiBold (600). Where Regular (400) would be used, consider Light (300) for delicate secondary text. Never compensate by reducing font size.
+
+7. **Line heights.** Body and label text: `lineHeight: fontSize * 1.5`. Tight line heights on dark surfaces cause luminance clustering. Do not go below `1.4×`.
+
+8. **Gradient hero text (high-impact, optional).** Major hero numbers may use a Skia `LinearGradient` mask — `#E0E0E0` at top fading to `#A0A0A0` at bottom. Creates volumetric depth on large numerals. Apply to `33.8h` and `$1,692` only. Never on body text or labels.
+
+9. **FOUT prevention is mandatory.** Space Grotesk and Space Mono must be fully loaded before the splash screen dismisses. Implementation: `SplashScreen.preventAutoHideAsync()` at app root → `useFonts({...spaceGrotesk, ...spaceMono, ...inter})` → `SplashScreen.hideAsync()` in `useEffect` when `fontsLoaded === true`. A flash of unstyled Inter before Space Grotesk appears is a visible product regression.
 
 ---
 
-*Hourglass Design System v1.1 — maintained alongside the codebase in `BRAND_GUIDELINES.md`*
-*Previous version: v1.0 (2026-03-14) — archived at `docs/brand-guidelines-v1.0.md`*
+## 3. Glass Card Surface
+
+### 3.1 The Liquid Glass Definition
+
+A Hourglass glass card is not a "semi-transparent dark rectangle." It is a **physical material** that:
+- Has measurable thickness (simulated by inner shadows)
+- Refracts the animated environment behind it (BackdropFilter blur)
+- Has chamfered edges that catch and scatter light (gradient border)
+- Carries surface imperfection (noise texture)
+- Responds to touch with physical compression (spring PressIn)
+
+Every property in §3.2 exists to create this illusion. Removing any layer degrades the physical quality of the material.
+
+### 3.2 Layer Stack (bottom → top)
+
+```
+AnimatedMeshBackground     AbsoluteFill, z=0, pointerEvents=none
+  ↓ all content floats above ↓
+Animated.View              Spring scale wrapper (pressable cards only)
+  MaskedView               Gradient border — 1.5px perimeter gap
+    LinearGradient         Status/semantic color → transparent at 45°
+  View (onLayout)          ← onLayout MUST be here, not on Canvas
+    Canvas (AbsoluteFill)  Skia rendering layer
+      BackdropFilter(16)   Blurs animated mesh — creates refraction
+        RoundedRect        Fills with GLASS_FILL rgba(22,21,31,0.6)
+  NoiseOverlay (AbsFill)   White noise PNG at 0.03 opacity / overlay blend
+  ShadowView (inset)       Physical glass thickness simulation
+    top edge               rgba(0,0,0,0.6), offset {0,4}, blur 8
+    bottom edge            rgba(255,255,255,0.10) reflected highlight
+  content View             Children, padding 20px (p-5)
+```
+
+### 3.3 Glass Card Values
+
+| Property | Value | Source / Notes |
+|---|---|---|
+| Blur radius — standard card | `16–20px` | Skia `BackdropFilter` with `ImageFilter.MakeBlur(16,16)`. 20px for wider cards. |
+| Blur radius — elevated surface | `30px` | Modals, bottom sheets. Stronger blur signals higher z-axis elevation. |
+| Fill color | `rgba(22, 21, 31, 0.60)` | Dark glass. This must be dark. A light or white fill means BackdropFilter is not rendering. |
+| Border radius | `16px` | `rounded-2xl`. Non-negotiable minimum for tactile aesthetic. |
+| Border width | `1.5px` | Gradient masked perimeter. |
+| Border gradient | Semantic color → `transparent` at 45° | See §1.4 for color selection. Default: `#A78BFA` violet. |
+| Inner shadow — top | `rgba(0,0,0,0.6)`, offset `{width:0, height:4}`, blur `8` | Thickness at top edge — dark interior. |
+| Inner shadow — bottom | `rgba(255,255,255,0.10)` reflected light | Brightness at bottom edge — ambient bounce light. **Note: 0.10, not 0.08.** |
+| Noise texture | White noise PNG, opacity `0.03`, blend `overlay` | See §1.5. |
+| `onLayout` | On the wrapping `View`, **never on `<Canvas>`** | `<Canvas onLayout>` is unsupported in new architecture — causes console error. |
+| Max simultaneous glass layers | **3** | Exceeding this triggers GPU thermal throttling. Standard screens should target 1–2 overlapping layers. |
+| Card opacity | **Always 1.0** | Sub-1.0 opacity on BackdropFilter views causes rendering pipeline glitches and visual artifacts. |
+| Android | `renderToHardwareTextureAndroid={true}` mandatory | Forces GPU hardware texture caching. Without this, Android repaints at CPU level during scroll — catastrophic performance. |
+
+### 3.4 Platform Routing for Blur
+
+| Platform | Glass Implementation | Rationale |
+|---|---|---|
+| iOS 26+ — cards | Skia `BackdropFilter` | `UIGlassEffect` reserved for system chrome (tab bar, system alerts). Skia gives precise control over card blur. |
+| iOS 26+ — tab bar | `NativeTabs` (system handles) | Automatic `UIGlassEffect` integration — real-time dynamic specular highlights, gyroscope-responsive optical distortion. Zero configuration. |
+| Legacy iOS < 26 | Skia `BackdropFilter` | Stable 60+ FPS. Avoids `UIVisualEffectView` framebuffer allocation — which caused SIGKILL crashes on this codebase when multiple cards mounted concurrently alongside Reanimated startup. |
+| All Android | Skia `BackdropFilter` | Android has no robust native real-time background blur. Skia provides cross-platform parity without performance degradation. |
+
+**Permanently banned:** `expo-blur`, `@react-native-community/blur`. Both caused SIGKILL crashes on this codebase. They are not to be reinstalled under any circumstances.
+
+### 3.5 Spatial Geometry
+
+| Property | Value | Tailwind | Rule |
+|---|---|---|---|
+| Card internal padding | 20px or 24px | `p-5` / `p-6` | `p-5` for standard cards; `p-6` for hero/large cards |
+| Screen horizontal margin | 16px | `px-4` | Ensures separation from device bezel |
+| Card gap (vertical) | 16px | `gap-4` | Between stacked cards on a screen |
+| Main cards | 16px radius | `rounded-2xl` | |
+| Interactive elements, buttons, inputs | 12px radius | `rounded-xl` | |
+| Nested badges, tags, chips | 8px radius | `rounded-lg` | |
+| **Absolute minimum** | **8px** | `rounded-lg` | `rounded-md` (6px) or smaller permanently prohibited — destroys tactile glass aesthetic |
+
+**Base grid unit: 4px.** Every padding, margin, gap, and radius value must be a multiple of 4. This is non-negotiable.
+
+---
+
+## 4. Animated Mesh Background
+
+### 4.1 Design Decision: Declarative over SKSL
+
+Two implementation options were evaluated:
+- **Option A (SKSL fragment shaders):** GPU-accelerated per-pixel Simplex/Perlin noise via `RuntimeEffect`. Maximum fidelity, maximum complexity. Rejected for maintainability — shader code is opaque, difficult to debug, and cannot be reasoned about in React terms.
+- **Option B (Declarative Skia gradients):** Multiple `RadialGradient` components with Reanimated-driven orbital centers. **Selected.** Achieves equivalent visual result through composable React primitives. Maintainable, debuggable, cross-platform identical.
+
+### 4.2 Architecture
+
+- **Full-screen Skia `<Canvas>`** at `AbsoluteFill`, `zIndex: 0`, `pointerEvents: 'none'`
+- **Present on every screen** — the mesh is the environment, not a home-screen decoration
+- **3 RadialGradient nodes** bound to Reanimated `useSharedValue`-driven orbital centers
+- **BlendMode: `"screen"`** on all nodes — luminous intersections where node light overlaps
+- **Base:** `<Circle>` covering full canvas in `#0D0C14` eggplant before nodes render
+- **Node opacity ceiling: 0.15** — mesh is atmosphere, never foreground
+
+### 4.3 Node Specification
+
+| Node | Color | Phase Offset | Orbital Role |
+|---|---|---|---|
+| A | `#A78BFA` Violet | 0° | Primary orbital — always present |
+| B | `#00C2FF` Cyan | 120° counter-phase | Secondary orbital — always present |
+| C | Current panel state color (§1.3) | 240° | Status signal — changes with weekly pace |
+
+### 4.4 Animation
+
+```js
+// Single shared time value drives all three nodes
+time = useSharedValue(0)
+→ withRepeat(withTiming(2 * Math.PI, { duration: 8000, easing: Easing.linear }), -1, false)
+
+// Per-node center calculation (run on UI thread via useDerivedValue)
+nodeCenter.x = screenWidth/2  + 160 * Math.sin(time.value + phaseOffset)
+nodeCenter.y = screenHeight/2 + 200 * Math.cos(time.value * 0.7 + phaseOffset)
+
+// Node radii — large enough to cover significant screen area
+nodeRadiusA = screenWidth * 0.7   // violet — dominant
+nodeRadiusB = screenWidth * 0.6   // cyan
+nodeRadiusC = screenWidth * 0.55  // status — slightly smaller
+```
+
+---
+
+## 5. Data Visualization
+
+### 5.1 Library Mandate
+
+**Victory Native XL v41+** is required for all non-specialized charts (bar chart, sparklines). It renders a single optimized Skia `Path` on the GPU canvas rather than SVG nodes — enabling 60–120 FPS gesture tracking via Reanimated worklets.
+
+**Banned chart libraries:**
+- `react-native-chart-kit` — SVG-based, UI thread blocking during animation
+- Pre-v40 `victory-native` — SVG rendering, cannot run worklets
+- `react-native-svg` as a chart renderer — same issue
+
+### 5.2 Weekly Bar Chart
+
+| Property | Spec |
+|---|---|
+| Library | VNX `<CartesianChart>` wrapping custom `<Bar>` component |
+| Bar fill | Vertical `LinearGradient` — neon status-color at full opacity at peak → `rgba(color, 0)` transparent at base. Bars must glow from the top down. |
+| Rounded corners | `topLeft: 4, topRight: 4` — rounded peak, flat base (sits on axis) |
+| Cylindrical depth | `ShadowView` inset on each bar — creates illusion of volumetric cylinder |
+| Today's bar color | Status color: `#10B981` on-track / `#F59E0B` behind / `#F43F5E` critical |
+| Past bars | `#10B981` success green gradient |
+| Future bars | `#757575` muted — future is unknown |
+| Target line | `#A0A0A0` dashed horizontal at weekly target Y position |
+| Card surface | **Dark glass only.** White backgrounds behind charts are a bug. |
+
+### 5.3 Trend Sparkline (Earnings, Hours, AI%)
+
+| Property | Spec |
+|---|---|
+| Library | VNX `<CartesianChart>` + `<Line>` + `<Area>` |
+| Line stroke width | 2.5px |
+| Line glow | `BlurMaskFilter(blur=8, style="solid")` painted over the line — creates neon luminous halo |
+| Line color | Semantic: `#E8C97A` gold=earnings, `#10B981` green=hours, `#00C2FF` cyan=AI% |
+| Area fill | `LinearGradient` — accent color at 0.35 opacity at top → `transparent` at `y0` bottom axis |
+| Cursor | Vertical hairline + filled dot at touched data point |
+| Gesture | `gestureLongPressDelay={0}` — immediate activation. 60–120 FPS via Skia + Reanimated UI-thread worklet. Cross-chart sync via `externalCursorIndex` / `onScrubChange` props. |
+| Card surface | **Dark glass only.** |
+
+### 5.4 AI Arc Hero (Circular Progress)
+
+| Property | Spec |
+|---|---|
+| Renderer | Skia `<Canvas>` + `<Path>` (270° arc) + `<SweepGradient>` |
+| Gradient stops | `#00C2FF` Cyan (0%) → `#A78BFA` Violet (50%) → `#FF00FF` Magenta (100%) |
+| Track | 270° path at full extent, stroke `rgba(255,255,255,0.08)` |
+| Sweep animation | `useSharedValue(0)` → `withSpring(targetPct / 100, springArcFill)` on mount and value change |
+| Arc sweep | 270° — opens at bottom center (flat bottom, not full circle) |
+| Card surface | **Dark glass only.** The arc should appear to float within a dark glass environment. |
+
+### 5.5 Prime Radiant / AI Cone Chart
+
+| Property | Spec |
+|---|---|
+| Renderer | Custom Skia — **permanently excluded from VNX migration** |
+| Rationale | 3D holographic cone shape + layered cyan/indigo glow layers + scrub gesture returning `AIScrubPoint` — bespoke visualization that would lose its identity in any generic chart framework |
+| Main projection line | `#00C2FF` cyan, `BlurMaskFilter(blur=6)` glow |
+| Confidence cone area | `rgba(0,194,255,0.12)` filled Skia Path (upper and lower bounds) |
+| 75% AI target guide | `#E8C97A` gold dashed horizontal |
+| Axis labels | Inter Regular 11px, `#757575` |
+
+---
+
+## 6. Motion System
+
+### 6.1 Core Principle
+
+**Elements must behave with physical mass, momentum, and friction.** Linear transitions feel mechanical and reveal their digital nature. Every animation should suggest that the element has weight — it overshoots slightly, settles, compresses on impact. The user should feel like they are interacting with matter, not pixels.
+
+### 6.2 Spring Constants
+
+```ts
+// src/lib/animation.ts — single source of truth
+
+springCardEntry = { mass: 1,   stiffness: 100, damping: 15 }
+// Cards entering a screen: deliberate, confident, settles smoothly
+
+springListItem  = { mass: 0.8, stiffness: 80,  damping: 12 }
+// List items: lighter, faster, slight bounce creates "settling in" feel
+
+springPressIn   = { stiffness: 300, damping: 20 }
+// Touch feedback: stiff and immediate — must feel instantaneous
+
+springArcFill   = { mass: 1,   stiffness: 80,  damping: 12 }
+// AI arc progress: deliberate spring from 0 to current value on mount
+```
+
+### 6.3 Screen Card Entry (useStaggeredEntry)
+
+Applied to **every screen's top-level cards** via `useFocusEffect` — replays on every tab switch, not just initial mount.
+
+```
+count:   number of cards on screen
+delay:   cardIndex × 150ms
+
+Initial state per card:
+  opacity:    0
+  translateY: 20px  (cards float up into place)
+  scale:      0.95  (slight zoom in)
+
+Final state:
+  opacity:    1
+  translateY: 0
+  scale:      1
+
+Spring: springCardEntry
+```
+
+Screens and their card counts: Home (4), Overview (5), AI (3+rows), Approvals (list).
+
+### 6.4 List Cascade (useListCascade)
+
+Applied to **every scrollable list** — AI daily rows, approval cards, any `FlatList` or `.map()` rendered list.
+
+```
+count:   number of items
+delay:   itemIndex × 100ms  (faster than card stagger — items are lighter)
+
+Initial state:
+  opacity:    0
+  translateY: 12px
+  scale:      0.97
+
+Final state:
+  opacity:    1
+  translateY: 0
+  scale:      1
+
+Spring: springListItem
+Re-triggers: when count changes (new data loads)
+```
+
+### 6.5 PressIn / PressOut (Tactile Feedback)
+
+All navigable cards use `pressable={true}` on `GlassCard`. Non-navigable informational cards use `pressable={false}`.
+
+```
+onPressIn:
+  scale:        1.0 → 0.96
+  inner shadow: opacity ↑ (card compresses deeper into itself)
+  spring:       springPressIn (immediate — must not lag)
+
+onPressOut:
+  scale:        0.96 → 1.0
+  inner shadow: opacity back to resting value
+  spring:       springPressIn
+```
+
+### 6.6 What Must Not Be Used
+
+| Banned | Replacement | Reason |
+|---|---|---|
+| Moti library | `react-native-reanimated` directly | Adds dependency for zero benefit — Reanimated 4.2.1 exposes everything Moti wraps |
+| Legacy `Animated` API (`Animated.Value`, `Animated.timing`) | Reanimated `useSharedValue` + worklets | Legacy API crosses JS bridge asynchronously — cannot guarantee 60 FPS during complex Skia renders |
+| `Animated.spring` / `Animated.sequence` | `withSpring`, `withSequence` from Reanimated | Same bridge issue |
+
+---
+
+## 7. Navigation
+
+### 7.1 Tab Bar
+
+- **Component:** `NativeTabs` from `expo-router/unstable-native-tabs`
+- **Correct API:** `<NativeTabs.Trigger name="...">` containing `<NativeTabs.Trigger.Icon sf="..." />` + `<NativeTabs.Trigger.Label>` + optional `<NativeTabs.Trigger.Badge>` — **not** `.Screen`
+- **Active tint:** `#A78BFA` Violet via `tintColor` prop on `<NativeTabs>` directly — not via `screenOptions`
+- **iOS 26+:** `UIGlassEffect` applied automatically by system — the tab bar becomes refractive glass matching the spatial environment. Do not configure, override, or interfere with it.
+- **Feature flag:** `ENABLE_NATIVE_TABS: true` in `app.json → expo.extra`
+- **Haptics:** Native tab bars on both iOS and Android handle haptic feedback natively. The `HapticTab` wrapper component is deprecated and must not be used.
+
+### 7.2 Shared Element Transitions
+
+- **Feature flag:** `ENABLE_SHARED_ELEMENT_TRANSITIONS: true` in `app.json → expo.extra`
+- Executed on the native C++ thread — JS thread mounts new screen simultaneously, no janking
+- Morphs geometry (position, size, borderRadius) from source to destination card
+
+**Tagged element pairs:**
+
+| Source | Destination | Tag |
+|---|---|---|
+| Home earnings `TrendSparkline` card | Overview earnings section | `home-earnings-card` |
+| Home AI compact card | AI tab main chart card | `home-ai-card` |
+
+**Usage:** `setTag(tag)` from `src/lib/sharedTransitions.ts` — reads feature flag, returns `{ sharedTransitionTag: tag }` or `{}`. Wrap GlassCard in `<Animated.View {...setTag('home-earnings-card')}>`.
+
+---
+
+## 8. Design Targets (Competitive Calibration)
+
+When making subjective visual decisions not covered explicitly by this document, calibrate against:
+
+| Product | What to learn from it |
+|---|---|
+| **Oura Ring app** | Spatial depth in health dashboards. How glass cards layer without cluttering. How metric typography feels confident without being aggressive. |
+| **Linear** | Data density on dark backgrounds. Purposeful use of violet as the primary action color. How to make a "serious" product feel premium rather than cold. |
+| **Arc Browser** | Organic shapes in dark UI. How animated ambient backgrounds create atmosphere without demanding attention. Premium tactile interaction quality. |
+
+If a proposed design would look out of place in any of these apps, it is wrong for Hourglass.
+
+---
+
+## 9. Implementation Gap Register
+
+Current state of the running app vs. this spec. These are bugs.
+
+| # | Gap | Status | Fix |
+|---|---|---|---|
+| 1 | **Card background** | ✅ Fixed | `ShadowView` got `backgroundColor: 'transparent'` — was covering BackdropFilter Canvas with white |
+| 2 | **All chart card backgrounds** | ✅ Fixed | Same `ShadowView` fix — all `Card`/`GlassCard` now dark glass |
+| 3 | **Bar chart fill** | ✅ Fixed | Replaced VNX `Bar` with Skia `RoundedRect`+`LinearGradient` per bar for per-bar color gradients |
+| 4 | **Line chart glow** | ✅ Fixed | `TrendSparkline` already has `BlurMask blur={8}` inside `Line` from VNX migration |
+| 5 | **Area fill under sparklines** | ✅ Fixed | `TrendSparkline` already has `Area` + `LinearGradient` from VNX migration |
+| 6 | **Hero font** | ✅ Fixed | `MetricValue` uses `font-display-extrabold` → `SpaceGrotesk_700Bold` via tailwind.config |
+| 7 | **Data table font** | ✅ Fixed | `DailyAIRow` updated to `font-mono` + `fontVariant: ['tabular-nums']` on all data cells |
+| 8 | **Text colors** | ✅ Fixed | `colors.ts` already has correct tokens; `#E0E0E0`, `#A0A0A0`, `#757575` |
+| 9 | **Animated mesh** | ✅ Fixed | Split combined `{x,y}` DerivedValues into separate `cx`/`cy` for Skia UI-thread reactivity; opacity 0.15 |
+| 10 | **Tabular nums** | ✅ Fixed | `MetricValue` and `DailyAIRow` both enforce `fontVariant: ['tabular-nums']` |
+| 11 | **Noise texture** | ✅ Fixed | Added `ImageBackground noise.png` at `0.03 opacity` inside `GlassCard` glass body |
+| 12 | **Border color** | ✅ Fixed | `Card` accepts `borderAccentColor` prop; `index.tsx` passes gold/cyan/panelState; AI tab uses cyan |
+
+---
+
+## 10. What "Done" Looks Like
+
+When fully implemented, every screen of this app should evoke the following:
+
+> You are looking at live data through **frosted volcanic glass** suspended in deep space.
+>
+> The background is not a wallpaper — it breathes. Three light sources orbit slowly, their intersecting glow communicating the week's standing before the user has read a single number: green = doing well, orange = slipping, red = critical. The colors shift with physical softness, not a binary toggle.
+>
+> Cards have genuine depth. They refract the orbiting light behind them. Their edges catch violet and cyan and scatter it at 45°. Press one and it compresses inward with physical mass, the inner shadow deepening as if the glass flexes under your finger. Release and it springs back with the momentum of something that weighs something.
+>
+> Numbers are carved from dark glass in Space Grotesk — confident, geometric, precisely off-white. They are not labels. They are instruments.
+>
+> Charts emit light. Bar peaks are neon-bright, fading to nothing at the base like a plasma display. Line charts glow with luminous halos. The AI arc sweeps through cyan to violet to magenta with spring momentum.
+>
+> The overall register is: **deep space observatory, 2026. Not dark mode.**

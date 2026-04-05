@@ -208,3 +208,31 @@ export async function fetchAndBuildConfig(
     setupDate: now,
   };
 }
+
+export type EnvProbeResult =
+  | { type: 'prod_only' }
+  | { type: 'qa_only' }
+  | { type: 'both' }
+  | { type: 'none' };
+
+/**
+ * Try authenticating against both prod and QA in parallel.
+ * Returns which environments accepted the credentials.
+ */
+export async function probeEnvironments(
+  username: string,
+  password: string,
+): Promise<EnvProbeResult> {
+  const [prodResult, qaResult] = await Promise.allSettled([
+    getAuthToken(username, password, false),
+    getAuthToken(username, password, true),
+  ]);
+
+  const hasProd = prodResult.status === 'fulfilled';
+  const hasQA = qaResult.status === 'fulfilled';
+
+  if (hasProd && hasQA) return { type: 'both' };
+  if (hasProd) return { type: 'prod_only' };
+  if (hasQA) return { type: 'qa_only' };
+  return { type: 'none' };
+}

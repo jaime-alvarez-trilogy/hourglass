@@ -9,6 +9,7 @@ export default function AuthLayout() {
         <Stack.Screen name="welcome" />
         <Stack.Screen name="credentials" />
         <Stack.Screen name="verifying" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="env-select" options={{ gestureEnabled: false }} />
         <Stack.Screen name="setup" />
         <Stack.Screen name="success" />
       </Stack>

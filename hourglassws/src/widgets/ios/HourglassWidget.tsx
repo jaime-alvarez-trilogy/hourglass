@@ -31,7 +31,7 @@ const { VStack, HStack, ZStack, Text, Spacer, Rectangle, RoundedRectangle, Circl
 // ─── Urgency color mapping ────────────────────────────────────────────────────
 
 const URGENCY_ACCENT: Record<string, string> = {
-  none:     '#00FF88',  // test-locked — used as bar chart today-bar accent
+  none:     '#10B981',  // brand success emerald — matches app on-track state
   low:      '#F5C842',
   high:     '#F59E0B',  // brand warning amber
   critical: '#F43F5E',  // brand critical rose
@@ -59,15 +59,15 @@ const PACE_LABELS: Record<string, string> = {
 // ─── Design system constants ──────────────────────────────────────────────────
 
 const COLORS = {
-  bgDark:        '#0B0D13',
-  surface:       '#1C1E26CC', // 80% opacity glass
-  borderSubtle:  '#FFFFFF1A', // 10% white — etched-glass look
+  bgDark:        '#0D0C14',   // exact app background
+  surface:       '#16151FCC', // app surface at 80% opacity
+  borderSubtle:  '#2F2E41',   // app border token
   textSecondary: '#A0A0A0',
   textMuted:     '#757575',
   gold:          '#E8C97A',   // earnings only
   cyan:          '#00C2FF',   // AI%
   violet:        '#A78BFA',   // BrainLift
-  barPast:       '#4A4A6A',
+  barPast:       '#10B981',   // success green — matches app bar chart past bars
   barFuture:     '#2F2E41',
 };
 
@@ -102,7 +102,7 @@ function formatCachedTime(cachedAt: number): string {
 function WidgetBackground({ accent }: { accent: string }) {
   return (
     <ZStack>
-      <Rectangle fill="#0B0D13" />
+      <Rectangle fill={COLORS.bgDark} />
       {/* Top-center header glow — mirrors main app header gradient */}
       <VStack>
         <Circle fill={accent} width={250} height={200} opacity={0.15} blur={60} />
@@ -117,8 +117,8 @@ function WidgetBackground({ accent }: { accent: string }) {
 function IosGlassCard({ children }: { children: React.ReactNode }) {
   return (
     <ZStack>
-      <RoundedRectangle fill="#1C1E26BF" cornerRadius={16} />
-      <RoundedRectangle cornerRadius={16} stroke="#FFFFFF26" strokeWidth={0.5} />
+      <RoundedRectangle fill={COLORS.surface} cornerRadius={16} />
+      <RoundedRectangle cornerRadius={16} stroke={COLORS.borderSubtle} strokeWidth={1.5} />
       <VStack padding={14} alignment="leading">
         {children}
       </VStack>

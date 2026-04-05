@@ -24,9 +24,10 @@ import type { WeeklySnapshot } from '../lib/weeklyHistory';
 
 export interface OverviewData {
   earnings: number[];       // length = min(history + 1, window)
-  hours: number[];          // same length
+  hours: number[];          // Payment hours (what you're paid for) — same length
   aiPct: number[];          // same length
   brainliftHours: number[]; // same length
+  overtimeHours: number[];  // Actual overtime above weekly limit per week — same length
   weekLabels: string[];     // aligned to data array length
 }
 
@@ -73,12 +74,17 @@ export function useOverviewData(
     const hours = [...pastSlice.map(s => s.hours), currentHours];
     const aiPct = [...pastSlice.map(s => s.aiPct), currentAiPct];
     const brainliftHours = [...pastSlice.map(s => s.brainliftHours), currentBrainlift];
+    // Current week overtime: useEarningsHistory fetches the CURRENT-status payment record too,
+    // so it stores actualOvertime in the current week's snapshot. Look it up directly.
+    const currentWeekSnapshot = snapshots.find(s => s.weekStart === currentMonday);
+    const currentOvertime = currentWeekSnapshot?.overtime ?? 0;
+    const overtimeHours = [...pastSlice.map(s => s.overtime ?? 0), currentOvertime];
 
     // weekLabels from getWeekLabels(window), aligned to actual data length
     const allLabels = getWeekLabels(window);
     const weekLabels = allLabels.slice(-earnings.length);
 
-    return { earnings, hours, aiPct, brainliftHours, weekLabels };
+    return { earnings, hours, aiPct, brainliftHours, overtimeHours, weekLabels };
   }, [snapshots, hoursData, aiData, window]);
 
   return { data, isLoading };

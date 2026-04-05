@@ -1,12 +1,13 @@
 // FR6: Success screen — confirm onboarding complete, persist credentials, navigate to tabs
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useOnboarding } from '@/src/contexts/OnboardingContext';
 import { saveConfig, saveCredentials } from '@/src/store/config';
+import { GradientButton } from '@/src/components/GradientButton';
 import { springBouncy } from '@/src/lib/reanimated-presets';
 
 export default function SuccessScreen() {
@@ -78,18 +79,9 @@ export default function SuccessScreen() {
         ) : null}
 
         {/* Go to Dashboard CTA */}
-        <TouchableOpacity
-          className={`bg-gold rounded-xl py-4 items-center mb-4 ${saving ? 'opacity-60' : ''}`}
-          onPress={handleGoToDashboard}
-          disabled={saving}
-          activeOpacity={0.85}
-        >
-          {saving ? (
-            <ActivityIndicator color="#8B949E" />
-          ) : (
-            <Text className="font-sans-semibold text-base text-background">Go to Dashboard</Text>
-          )}
-        </TouchableOpacity>
+        <View className="mb-4">
+          <GradientButton label="Go to Dashboard" onPress={handleGoToDashboard} loading={saving} />
+        </View>
       </View>
     </SafeAreaView>
   );

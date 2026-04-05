@@ -1,11 +1,12 @@
 // FR5: Setup screen — manual rate fallback when auto-detect fails
 import { useState, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, ActivityIndicator,
+  View, Text, TextInput, TouchableOpacity,
   KeyboardAvoidingView, ScrollView, Platform, Keyboard,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useOnboarding } from '@/src/contexts/OnboardingContext';
+import { GradientButton } from '@/src/components/GradientButton';
 
 export default function SetupScreen() {
   const router = useRouter();
@@ -87,18 +88,9 @@ export default function SetupScreen() {
           </View>
 
           {/* Continue CTA */}
-          <TouchableOpacity
-            className={`bg-gold rounded-xl py-4 items-center mt-8 ${isLoading ? 'opacity-60' : ''}`}
-            onPress={handleContinue}
-            disabled={isLoading}
-            activeOpacity={0.85}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#8B949E" />
-            ) : (
-              <Text className="font-sans-semibold text-base text-background">Continue</Text>
-            )}
-          </TouchableOpacity>
+          <View className="mt-8">
+            <GradientButton label="Continue" onPress={handleContinue} loading={isLoading} />
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

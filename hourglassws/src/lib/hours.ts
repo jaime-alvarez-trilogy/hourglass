@@ -204,10 +204,12 @@ export function calculateHours(
   const averageHours = parseFloat(String(timesheetData.averageHoursPerDay ?? 0));
   const stats = timesheetData.stats ?? [];
 
-  // Prefer payments.paidHours when available and > 0
+  // For hours display and panel state, prefer payments.workedHours (actual hours tracked,
+  // uncapped). payments.paidHours is capped at weeklyLimit so it hides overtime.
+  // Fall back to timesheetTotal if workedHours is absent.
   const total =
-    paymentsData && paymentsData.paidHours > 0
-      ? paymentsData.paidHours
+    paymentsData && paymentsData.workedHours > 0
+      ? paymentsData.workedHours
       : timesheetTotal;
 
   // Today's hours by local date string match

@@ -9,10 +9,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface WeeklySnapshot {
   weekStart: string;        // YYYY-MM-DD (Monday)
-  hours: number;            // Total paid hours that week (0 if unknown)
+  hours: number;            // Total paid hours that week (= Payment hours column)
   earnings: number;         // Total earnings that week (0 if unknown)
   aiPct: number;            // Midpoint AI% for the week (0 if unknown)
   brainliftHours: number;   // BrainLift hours for the week (0 if unknown)
+  overtime?: number;        // Actual overtime hours above weekly limit (may be absent in old snapshots)
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -80,12 +81,42 @@ export async function loadWeeklyHistory(): Promise<WeeklySnapshot[]> {
   }
 }
 
+// ─── wipeAIHistory (dev only) ─────────────────────────────────────────────────
+
+/**
+ * Zeroes out aiPct and brainliftHours on every stored snapshot.
+ * Preserves earnings and hours. Call once to demo the backfill animation.
+ */
+export async function wipeAIHistory(): Promise<void> {
+  const history = await loadWeeklyHistory();
+  const wiped = history.map(s => ({ ...s, aiPct: 0, brainliftHours: 0 }));
+  await saveWeeklyHistory(wiped);
+}
+
+// ─── History update event ─────────────────────────────────────────────────────
+
+type HistoryListener = () => void;
+const _historyListeners: HistoryListener[] = [];
+
+/**
+ * Subscribe to history saves. Returns an unsubscribe function.
+ * Called by useWeeklyHistory to re-read AsyncStorage after each backfill write.
+ */
+export function onHistoryUpdate(fn: HistoryListener): () => void {
+  _historyListeners.push(fn);
+  return () => {
+    const i = _historyListeners.indexOf(fn);
+    if (i >= 0) _historyListeners.splice(i, 1);
+  };
+}
+
 // ─── saveWeeklyHistory ────────────────────────────────────────────────────────
 
 /**
- * Writes WeeklySnapshot[] to AsyncStorage.
+ * Writes WeeklySnapshot[] to AsyncStorage, then notifies all subscribers.
  * Propagates AsyncStorage errors — callers decide how to handle.
  */
 export async function saveWeeklyHistory(snapshots: WeeklySnapshot[]): Promise<void> {
   await AsyncStorage.setItem(WEEKLY_HISTORY_KEY, JSON.stringify(snapshots));
+  _historyListeners.forEach(fn => fn());
 }

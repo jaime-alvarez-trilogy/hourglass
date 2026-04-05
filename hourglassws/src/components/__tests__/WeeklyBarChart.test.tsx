@@ -54,16 +54,21 @@ jest.mock('victory-native', () => {
   const chartBounds = { left: 0, right: 300, top: 0, bottom: 120, width: 300, height: 120 };
   return {
     CartesianChart: ({ children, data, xKey, yKeys }: any) => {
+      // Populate points.value with mock {x, y} entries matching data length
+      // so WeeklyBarChart's RoundedRect per-bar render path executes without crash.
       const points: any = {};
-      if (yKeys) yKeys.forEach((k: string) => { points[k] = []; });
+      if (yKeys && data) {
+        yKeys.forEach((k: string) => {
+          points[k] = (data as any[]).map((_d: any, i: number) => ({
+            x: (i + 0.5) * (chartBounds.right / data.length),
+            y: 60, // mid-chart y for all bars
+          }));
+        });
+      }
       return R.createElement('CartesianChart', { data, xKey, yKeys },
         typeof children === 'function' ? children({ points, chartBounds }) : children
       );
     },
-    Bar: ({ children, roundedCorners }: any) =>
-      R.createElement('Bar', { roundedCorners },
-        typeof children === 'function' ? children() : children
-      ),
   };
 });
 
@@ -141,10 +146,13 @@ describe('WeeklyBarChart — FR3 (04-victory-charts): Bar visual treatment', () 
     expect(source).toContain('@shopify/react-native-skia');
   });
 
-  it('SC2.2 — LinearGradient inside Bar (replaces old BlurMaskFilter glow)', () => {
+  it('SC2.2 — LinearGradient inside RoundedRect (per-bar gradient fill)', () => {
+    // WeeklyBarChart uses Skia RoundedRect (not VNX Bar) for per-bar gradients.
+    // VNX Bar applies one gradient to ALL bars in a series; RoundedRect gives full
+    // per-bar control with individual LinearGradient children.
     const source = fs.readFileSync(BAR_CHART_FILE, 'utf8');
     expect(source).toContain('LinearGradient');
-    expect(source).toContain('Bar');
+    expect(source).toContain('RoundedRect');
   });
 
   it('SC2.3 — LinearGradient uses transparent as end color', () => {

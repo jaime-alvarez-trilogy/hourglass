@@ -20,7 +20,7 @@ import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { Tabs } from 'expo-router';
 import Constants from 'expo-constants';
 import React, { useMemo } from 'react';
-import { View } from 'react-native';
+import { View, Platform } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import NoiseOverlay from '@/src/components/NoiseOverlay';
@@ -81,21 +81,28 @@ export default function TabLayout() {
     // API: NativeTabs.Trigger (not .Screen) with Icon/Label/Badge children.
     return (
       <View style={{ flex: 1 }}>
-        <NativeTabs tintColor={colors.violet}>
+        <NativeTabs
+          tintColor={colors.violet}
+          iconColor={{ default: colors.textMuted, selected: colors.violet }}
+          backgroundColor={Platform.OS === 'android' ? colors.surface : 'transparent'}
+          blurEffect="systemUltraThinMaterialDark"
+          disableTransparentOnScrollEdge={false}
+          shadowColor="transparent"
+        >
           <NativeTabs.Trigger name="index">
-            <NativeTabs.Trigger.Icon sf="house.fill" />
+            <NativeTabs.Trigger.Icon sf="house.fill" md="home" />
             <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
           </NativeTabs.Trigger>
           <NativeTabs.Trigger name="overview">
-            <NativeTabs.Trigger.Icon sf="chart.bar.fill" />
+            <NativeTabs.Trigger.Icon sf="chart.bar.fill" md="bar_chart" />
             <NativeTabs.Trigger.Label>Overview</NativeTabs.Trigger.Label>
           </NativeTabs.Trigger>
           <NativeTabs.Trigger name="ai">
-            <NativeTabs.Trigger.Icon sf="sparkles" />
+            <NativeTabs.Trigger.Icon sf="sparkles" md="auto_awesome" />
             <NativeTabs.Trigger.Label>AI</NativeTabs.Trigger.Label>
           </NativeTabs.Trigger>
           <NativeTabs.Trigger name="approvals">
-            <NativeTabs.Trigger.Icon sf="checkmark.circle.fill" />
+            <NativeTabs.Trigger.Icon sf="checkmark.circle.fill" md="check_circle" />
             <NativeTabs.Trigger.Label>Requests</NativeTabs.Trigger.Label>
             {approvalBadge != null && (
               <NativeTabs.Trigger.Badge>{String(approvalBadge)}</NativeTabs.Trigger.Badge>

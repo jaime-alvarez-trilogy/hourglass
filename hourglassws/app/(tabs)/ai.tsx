@@ -181,7 +181,7 @@ export default function AIScreen() {
   const ambientColor = getAmbientColor({ type: 'aiPct', pct: Math.round(heroAIPct) }) as string;
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: '#0D0C14' }}>
       {/* FR4 (04-ai-hero-arc): Ambient layer — full-screen behind all content */}
       {/* 08-dark-glass-polish: direct AnimatedMeshBackground wiring with aiPct signal */}
       <AnimatedMeshBackground aiPct={Math.round(heroAIPct)} />

@@ -25,9 +25,9 @@ import { colors } from '@/src/lib/colors';
 interface OverviewHeroCardProps {
   /** Sum of earnings[] for the selected window */
   totalEarnings: number;
-  /** Sum of hours[] for the selected window */
+  /** Sum of paidHours (Payment hours column) for the selected window */
   totalHours: number;
-  /** Current week overtime hours (Math.max(0, hoursData.total - weeklyLimit)) — 0 = no badge */
+  /** Sum of actualOvertime (Actual Overtime column) for the selected window */
   overtimeHours: number;
   /** Selected time window */
   window: 4 | 12;
@@ -104,46 +104,50 @@ export default function OverviewHeroCard({
         </View>
       </View>
 
-      {/* Metrics row: earnings (left) + hours (right) */}
+      {/* Metrics row: 3 columns — Earnings | Paid Hours | Actual OT */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        {/* Earnings column */}
-        <View style={{ flex: 1 }}>
+        {/* Earnings */}
+        <View>
           <Text style={{
             color: colors.gold,
-            fontSize: 28,
+            fontSize: 24,
             fontWeight: '700',
             fontVariant: ['tabular-nums'],
           }}>
             {`$${Math.round(totalEarnings).toLocaleString()}`}
           </Text>
           <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 3 }}>
-            Total Earnings
+            Earnings
           </Text>
         </View>
 
-        {/* Hours column */}
-        <View style={{ flex: 1, alignItems: 'flex-end' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-            <Text style={{
-              color: colors.textPrimary,
-              fontSize: 28,
-              fontWeight: '700',
-              fontVariant: ['tabular-nums'],
-            }}>
-              {`${Math.round(totalHours)}h`}
-            </Text>
-            {overtimeHours > 0 && (
-              <Text style={{
-                color: colors.overtimeWhiteGold,
-                fontSize: 13,
-                fontWeight: '500',
-              }}>
-                {`+${Math.round(overtimeHours)}h OT`}
-              </Text>
-            )}
-          </View>
+        {/* Paid Hours */}
+        <View style={{ alignItems: 'center' }}>
+          <Text style={{
+            color: colors.textPrimary,
+            fontSize: 24,
+            fontWeight: '700',
+            fontVariant: ['tabular-nums'],
+          }}>
+            {`${totalHours % 1 === 0 ? Math.round(totalHours) : totalHours.toFixed(1)}h`}
+          </Text>
           <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 3 }}>
-            Total Hours
+            Paid Hours
+          </Text>
+        </View>
+
+        {/* Actual OT */}
+        <View style={{ alignItems: 'flex-end' }}>
+          <Text style={{
+            color: overtimeHours > 0 ? colors.overtimeWhiteGold : colors.textMuted,
+            fontSize: 24,
+            fontWeight: '700',
+            fontVariant: ['tabular-nums'],
+          }}>
+            {`${overtimeHours % 1 === 0 ? Math.round(overtimeHours) : overtimeHours.toFixed(1)}h`}
+          </Text>
+          <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 3 }}>
+            Actual OT
           </Text>
         </View>
       </View>

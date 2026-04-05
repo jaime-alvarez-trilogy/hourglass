@@ -67,6 +67,12 @@ interface CardProps {
    * glass={false} renders the legacy flat opaque card.
    */
   glass?: boolean;
+  /**
+   * Gradient border accent color (default: violet #A78BFA).
+   * Pass semantic context colors: colors.gold for earnings, colors.cyan for AI,
+   * panel state color for status-bearing cards. Brand §1.4.
+   */
+  borderAccentColor?: string;
   /** Additional NativeWind classes appended to outer wrapper */
   className?: string;
   /** Pass-through style to outer wrapper (merged after glass styles) */
@@ -81,6 +87,7 @@ interface CardProps {
 export default function Card({
   elevated,
   glass = true,
+  borderAccentColor,
   className,
   style,
   testID,
@@ -104,6 +111,7 @@ export default function Card({
   return (
     <GlassCard
       elevated={elevated}
+      borderAccentColor={borderAccentColor}
       className={className}
       style={style}
       testID={testID}

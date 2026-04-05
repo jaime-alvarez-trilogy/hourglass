@@ -117,7 +117,7 @@ export default function ApprovalsScreen() {
 
   return (
     <FadeInScreen>
-      <View className="flex-1">
+      <View className="flex-1 bg-background">
         <AnimatedMeshBackground panelState={meshPanelState} />
         {/* Header */}
         <View className="flex-row items-center justify-between px-4 pt-14 pb-3 bg-surface border-b border-border">

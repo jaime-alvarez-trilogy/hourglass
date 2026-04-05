@@ -3,7 +3,7 @@
 // On success: writes HoursData to AsyncStorage 'hours_cache' with cachedAt timestamp.
 // On total failure: reads 'hours_cache' from AsyncStorage; returns isStale=true.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTimesheet } from './useTimesheet';
 import { usePayments } from './usePayments';
@@ -92,19 +92,26 @@ export function useHoursData(): UseHoursDataResult {
     paymentsQuery.refetch();
   };
 
-  // Serving from live data
-  if (hasLiveData && config) {
+  // Memoize to prevent new object reference on every render — useWidgetSync
+  // has hoursData in its deps, so an unstable reference would fire the effect
+  // on every re-render and write to AsyncStorage in a tight loop.
+  const liveData = useMemo(() => {
+    if (!hasLiveData || !config) return null;
     const hourlyRate = config.hourlyRate ?? 0;
     const weeklyLimit = config.weeklyLimit ?? 40;
-    const data = calculateHours(
-      timesheetQuery.data,
-      paymentsQuery.data,
+    return calculateHours(
+      timesheetQuery.data!,
+      paymentsQuery.data!,
       hourlyRate,
-      weeklyLimit
+      weeklyLimit,
     );
+  }, [timesheetQuery.data, paymentsQuery.data, config, hasLiveData]);
+
+  // Serving from live data
+  if (hasLiveData && config) {
     return {
-      data,
-      isLoading: eitherLoading && !hasLiveData,
+      data: liveData,
+      isLoading: false,
       isStale: false,
       cachedAt: null,
       error: null,

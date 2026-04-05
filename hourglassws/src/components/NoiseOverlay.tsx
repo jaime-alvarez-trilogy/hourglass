@@ -6,21 +6,20 @@
 //   opacity: 0.04 — subtle texture, adds depth without drawing attention.
 //   pointerEvents="none" — never intercepts touch events.
 //
-// Usage: Place inside the root screen View, after all content.
-//   <View style={{ flex: 1 }}>
-//     {/* screen content */}
-//     <NoiseOverlay />
-//   </View>
+// Architecture:
+//   Outer View has pointerEvents="none" — guarantees touches pass through.
+//   ImageBackground handles tiling correctly (Image resizeMode="repeat" renders
+//   a fixed square on iOS; ImageBackground tiles properly).
 
 import React from 'react';
-import { View, Image, StyleSheet } from 'react-native';
+import { View, ImageBackground, StyleSheet } from 'react-native';
 
 export default function NoiseOverlay(): JSX.Element {
   return (
-    <View style={styles.container} pointerEvents="none">
-      <Image
+    <View pointerEvents="none" style={styles.container}>
+      <ImageBackground
         source={require('../../assets/images/noise.png')}
-        style={styles.noise}
+        style={StyleSheet.absoluteFill}
         resizeMode="repeat"
       />
     </View>
@@ -29,14 +28,6 @@ export default function NoiseOverlay(): JSX.Element {
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    // pointerEvents set via prop above (StyleSheet doesn't support pointerEvents in RN <0.82)
-  },
-  noise: {
     position: 'absolute',
     top: 0,
     left: 0,

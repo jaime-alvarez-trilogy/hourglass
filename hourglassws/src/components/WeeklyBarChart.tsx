@@ -157,33 +157,28 @@ export default function WeeklyBarChart({
         {/* inside CartesianChart's render prop gives full per-bar control.           */}
         {(() => {
           const chartData = toBarData(rawValues, todayIndex, todayColor);
-          // cellW: width of one bar cell in pixels, used to set proportional X domainPadding.
-          // Computed from the outer `width` prop — chartBounds width equals this after layout.
-          // Guard against zero width to avoid division-by-zero on first render.
-          const cellW = chartData.length > 0 && width > 0 ? width / chartData.length : 1;
           return (
             <CartesianChart
               data={chartData}
               xKey="day"
               yKeys={['value']}
               domain={{ y: [0, resolvedMax] }}
-              // domainPadding:
-              //   top/bottom: 0  — suppresses VNX's internal vertical axis compression that
-              //                    causes low-value bars (e.g. 1.8h in a 120px canvas) to
-              //                    render at sub-pixel height after VNX's heuristic shrink.
-              //   left/right: cellW*0.35 — prevents first/last bar edges from clipping at
-              //                    the canvas boundary (matches 65% bar width + 35% gap design).
-              domainPadding={{ left: cellW * 0.35, right: cellW * 0.35, top: 0, bottom: 0 }}
+              // top/bottom: 0 — suppresses VNX's internal vertical axis compression
+              // No X domainPadding — bar positions computed directly from chartBounds
+              // to avoid VNX point.x/cellW misalignment that causes uneven bar widths.
+              domainPadding={{ top: 0, bottom: 0 }}
             >
               {({ points, chartBounds }) => {
                 const n = chartData.length;
                 const cellW = n > 0 ? (chartBounds.right - chartBounds.left) / n : 0;
-                const barW = cellW * 0.65; // 65% of cell width; rest is gap between bars
+                const barW = cellW * 0.65; // 65% of cell width; rest is gap
                 return (
                   <>
                     {points.value.map((point, i) => {
                       if (point.y === null || point.y === undefined) return null;
-                      const barX = point.x - barW / 2;
+                      // Compute barX from index directly — avoids VNX domainPadding
+                      // shifting point.x out of sync with cellW-derived barW.
+                      const barX = chartBounds.left + i * cellW + (cellW - barW) / 2;
                       const barTop = point.y;
                       const barBottom = chartBounds.bottom;
                       const barH = Math.max(0, barBottom - barTop);

@@ -1,18 +1,15 @@
 // modal.tsx
 // FR3 (05-panel-glass-surfaces): BlurView dark glass surface
-//
-// Design system rule (BRAND_GUIDELINES.md v1.1 §Surface & Depth — Backdrop Blur):
-//   Modals use BlurView intensity=30, tint="dark" wrapping content.
-//   Inner View: surfaceElevated background at 0.85 opacity for legibility.
-//   Fallback (expo-blur unavailable): solid surfaceElevated background.
 
-import { View, Text, Switch, StyleSheet, Alert, ScrollView } from 'react-native';
+import { View, Text, Switch, StyleSheet, Alert, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { AnimatedPressable } from '@/src/components/AnimatedPressable';
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, startTransition } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { clearAll, loadConfig, loadCredentials, saveConfig } from '@/src/store/config';
+import { clearAll, loadCredentials, saveConfig } from '@/src/store/config';
+import { fetchAndBuildConfig } from '@/src/api/auth';
+import { MOCK_TEAM_ITEMS } from '@/src/lib/devMock';
 import { useConfig } from '@/src/hooks/useConfig';
 import { colors } from '@/src/lib/colors';
 
@@ -21,10 +18,24 @@ export default function ModalScreen() {
   const queryClient = useQueryClient();
   const { config } = useConfig();
   const [username, setUsername] = useState<string | null>(null);
+  const [isSwitchingEnv, setIsSwitchingEnv] = useState(false);
+
+  // Local toggle state — initialized once from config, then owned locally.
+  const [managerPreview, setManagerPreview] = useState(false);
+  const [overtimePreview, setOvertimePreview] = useState(false);
+  const [togglesInitialized, setTogglesInitialized] = useState(false);
 
   useEffect(() => {
     loadCredentials().then((creds) => setUsername(creds?.username ?? null));
   }, []);
+
+  useEffect(() => {
+    if (config && !togglesInitialized) {
+      setManagerPreview(config.devManagerView ?? false);
+      setOvertimePreview(config.devOvertimePreview ?? false);
+      setTogglesInitialized(true);
+    }
+  }, [config, togglesInitialized]);
 
   const isMe = username === 'jalvarez0907@outlook.com';
 
@@ -43,29 +54,86 @@ export default function ModalScreen() {
     ]);
   }
 
+  async function handleSwitchEnvironment() {
+    if (!config || !username) return;
+
+    const targetEnv = config.useQA ? 'Production' : 'QA / Testing';
+    const targetIsQA = !config.useQA;
+
+    Alert.alert(
+      `Switch to ${targetEnv}?`,
+      targetIsQA
+        ? 'You will switch to the QA sandbox environment. Data here is for testing only.'
+        : 'You will switch back to Production with your real hours and earnings.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: `Switch to ${targetEnv}`,
+          onPress: async () => {
+            setIsSwitchingEnv(true);
+            try {
+              const creds = await loadCredentials();
+              if (!creds) return;
+              const newConfig = await fetchAndBuildConfig(creds.username, creds.password, targetIsQA);
+              await saveConfig(newConfig);
+              startTransition(() => {
+                queryClient.setQueryData(['config'], newConfig);
+                queryClient.invalidateQueries({ queryKey: ['hours'] });
+                queryClient.invalidateQueries({ queryKey: ['approvals'] });
+              });
+              router.dismiss();
+            } catch {
+              Alert.alert('Failed to Switch', `Could not connect to ${targetEnv}. Check your network and try again.`);
+            } finally {
+              setIsSwitchingEnv(false);
+            }
+          },
+        },
+      ],
+    );
+  }
+
   async function toggleDevManagerView(value: boolean) {
     if (!config) return;
-    const updated = { ...config, devManagerView: value };
-    await saveConfig(updated);
-    queryClient.setQueryData(['config'], updated);
-    queryClient.invalidateQueries({ queryKey: ['approvals'] });
-    queryClient.invalidateQueries({ queryKey: ['myRequests'] });
+    setManagerPreview(value);
+    try {
+      const updated = { ...config, devManagerView: value };
+      await saveConfig(updated);
+      startTransition(() => {
+        queryClient.setQueryData(['config'], updated);
+        queryClient.setQueryData(['approvals'], value ? [...MOCK_TEAM_ITEMS] : []);
+      });
+    } catch (e) {
+      console.error('[settings] toggleDevManagerView failed:', e);
+    }
   }
 
   async function toggleDevOvertimePreview(value: boolean) {
     if (!config) return;
-    const updated = { ...config, devOvertimePreview: value };
-    await saveConfig(updated);
-    queryClient.setQueryData(['config'], updated);
-    queryClient.invalidateQueries({ queryKey: ['hours'] });
+    setOvertimePreview(value);
+    try {
+      const updated = { ...config, devOvertimePreview: value };
+      await saveConfig(updated);
+      startTransition(() => {
+        queryClient.setQueryData(['config'], updated);
+        queryClient.invalidateQueries({ queryKey: ['hours'] });
+      });
+    } catch (e) {
+      console.error('[settings] toggleDevOvertimePreview failed:', e);
+    }
   }
 
   return (
     <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill}>
       <View style={styles.overlay}>
-        <ScrollView style={styles.container}>
+        <View style={styles.header}>
           <Text style={styles.title}>Settings</Text>
+          <TouchableOpacity onPress={() => router.dismiss()} style={styles.doneButton} hitSlop={16}>
+            <Text style={styles.doneText}>Done</Text>
+          </TouchableOpacity>
+        </View>
 
+        <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
           {config && (
             <View style={styles.debugBox}>
               <Text style={styles.debugTitle}>Config Debug</Text>
@@ -80,7 +148,36 @@ export default function ModalScreen() {
             </View>
           )}
 
-          {/* Dev options — always visible since this is a debug settings screen */}
+          {/* Environment switcher — shown when user has both envs available */}
+          {config && (
+            <TouchableOpacity
+              style={[styles.envSwitchButton, isSwitchingEnv && { opacity: 0.6 }]}
+              onPress={handleSwitchEnvironment}
+              disabled={isSwitchingEnv}
+              activeOpacity={0.8}
+            >
+              {isSwitchingEnv ? (
+                <ActivityIndicator color={config.useQA ? colors.success : colors.warning} size="small" />
+              ) : (
+                <>
+                  <View>
+                    <Text style={styles.envSwitchLabel}>
+                      {config.useQA ? '🔄  Switch to Production' : '🧪  Switch to QA / Testing'}
+                    </Text>
+                    <Text style={styles.envSwitchHint}>
+                      {config.useQA
+                        ? 'Return to your real hours and earnings'
+                        : 'Connect to the sandbox environment'}
+                    </Text>
+                  </View>
+                  <Text style={[styles.envBadge, { color: config.useQA ? colors.success : colors.warning }]}>
+                    {config.useQA ? 'QA' : 'PROD'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+
           {config && isMe && (
             <View style={styles.devBox}>
               <Text style={styles.devTitle}>Dev Options</Text>
@@ -89,28 +186,28 @@ export default function ModalScreen() {
                   <View style={styles.toggleRow}>
                     <Text style={styles.toggleLabel}>Manager Preview</Text>
                     <Switch
-                      value={config.devManagerView ?? false}
+                      value={managerPreview}
                       onValueChange={toggleDevManagerView}
                       trackColor={{ false: colors.border, true: colors.violet }}
                       thumbColor={colors.textPrimary}
                     />
                   </View>
                   <Text style={styles.toggleHint}>
-                    Shows the Team Requests queue with fake pending approvals + fake My Requests (pending, approved, rejected).
+                    Shows the Team Requests queue with fake pending approvals + fake My Requests.
                   </Text>
                 </>
               )}
-              <View style={styles.toggleRow}>
+              <View style={[styles.toggleRow, { marginTop: 12 }]}>
                 <Text style={styles.toggleLabel}>Overtime Preview</Text>
                 <Switch
-                  value={config.devOvertimePreview ?? false}
+                  value={overtimePreview}
                   onValueChange={toggleDevOvertimePreview}
                   trackColor={{ false: colors.border, true: colors.violet }}
                   thumbColor={colors.textPrimary}
                 />
               </View>
               <Text style={styles.toggleHint}>
-                Forces the home screen hero to show the Overtime panel state (for UI testing).
+                Forces the home screen hero to show the Overtime panel state.
               </Text>
             </View>
           )}
@@ -125,19 +222,39 @@ export default function ModalScreen() {
 }
 
 const styles = StyleSheet.create({
-  // surfaceElevated overlay for legibility over blur
   overlay: {
     flex: 1,
-    backgroundColor: colors.surfaceElevated + 'D9', // D9 = 0.85 opacity in hex (217/255)
+    backgroundColor: colors.surfaceElevated + 'D9',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingTop: 56,
+    paddingBottom: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  doneButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  doneText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: colors.violet,
   },
   container: {
     flex: 1,
-    padding: 24,
-    paddingTop: 40,
+    paddingHorizontal: 24,
   },
   debugBox: {
     backgroundColor: '#161B22',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 14,
     marginBottom: 16,
     gap: 4,
@@ -155,18 +272,43 @@ const styles = StyleSheet.create({
     color: '#8B949E',
     fontFamily: 'Courier',
   },
+  envSwitchButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    marginBottom: 16,
+  },
+  envSwitchLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 3,
+  },
+  envSwitchHint: {
+    fontSize: 12,
+    color: '#484F58',
+  },
+  envBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
   devBox: {
     backgroundColor: '#161B22',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 14,
     marginBottom: 24,
-    gap: 4,
   },
   devTitle: {
     fontSize: 12,
     fontWeight: '700',
     color: '#E8C97A',
-    marginBottom: 8,
+    marginBottom: 12,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -184,18 +326,12 @@ const styles = StyleSheet.create({
   toggleHint: {
     fontSize: 12,
     color: '#484F58',
-    marginTop: 4,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 32,
+    marginTop: 6,
   },
   signOutButton: {
     borderWidth: 1,
     borderColor: '#F85149',
-    borderRadius: 10,
+    borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
   },

@@ -1,17 +1,23 @@
 // GlassCard.tsx
 // FR1 (03-glass-surfaces): Skia BackdropFilter blur layer — crash-safe glass
 // FR2 (03-glass-surfaces): Masked gradient border (MaskedView + LinearGradient)
-// FR3 (03-glass-surfaces): InnerShadow physical depth simulation
+// FR3 (03-glass-surfaces): Skia inner shadow (top dark + bottom highlight in same Canvas)
 // FR4 (03-glass-surfaces): Pressable spring animation (scale 1→0.97)
 // FR5 (03-glass-surfaces): layerBudget=false flat-surface fallback
 // FR6 (03-glass-surfaces): padding and radius props
 //
 // Architecture:
-//   Animated.View  → spring scale wrapper (pressable=true only)
+//   Animated.View  → dark bg fallback (#16151F) + spring scale wrapper (pressable=true only)
 //   MaskedView     → gradient border: LinearGradient through 1.5px perimeter mask
-//   Canvas         → Skia BackdropFilter(blur=16) + RoundedRect fill
-//   InnerShadow    → physical glass thickness (top dark + bottom highlight)
-//   content View   → children with padding
+//   Canvas         → BackdropFilter(blur=16) + RoundedRect fill + Skia inner shadow gradient
+//   View (noise)   → white noise PNG at 0.03 opacity (brand §1.5)
+//   View (content) → plain View with padding — no react-native-inner-shadow
+//
+// Why not react-native-inner-shadow:
+//   ShadowView from react-native-inner-shadow renders an opaque white background for its
+//   shadow calculation algorithm regardless of style.backgroundColor. This covers the
+//   entire card with white on iOS. Replaced with a Skia LinearGradient drawn inside
+//   the existing BackdropFilter Canvas — purely GPU, no white background issues.
 //
 // Why BackdropFilter instead of BlurView:
 //   BlurView allocates a UIVisualEffectView GPU framebuffer at mount time.
@@ -32,16 +38,17 @@ import {
   ViewStyle,
   StyleSheet,
   Pressable,
+  ImageBackground,
 } from 'react-native';
 import {
   Canvas,
   BackdropFilter,
   Blur,
   RoundedRect,
+  LinearGradient as SkiaLinearGradient,
+  vec,
 } from '@shopify/react-native-skia';
-import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
-import { InnerShadow } from 'react-native-inner-shadow';
 import Animated, {
   useSharedValue,
   withSpring,
@@ -63,7 +70,7 @@ const DEFAULT_BORDER_COLOR = '#A78BFA'; // violetAccent
 // BackdropFilter tinted fill — 60% opacity (blur provides the depth)
 const GLASS_FILL = 'rgba(22,21,31,0.6)';
 
-// Inner shadow colors
+// Inner shadow colors (Skia LinearGradient gradient stops)
 const SHADOW_TOP = 'rgba(0,0,0,0.6)';
 const SHADOW_BOTTOM = 'rgba(255,255,255,0.08)';
 
@@ -143,26 +150,6 @@ export default function GlassCard({
     );
   }
 
-  // ── Mask element: outer ring minus inner rect = 1.5px perimeter ───────────────
-  const maskElement = (
-    <View
-      style={{
-        flex: 1,
-        borderRadius: borderRadiusPx,
-        overflow: 'hidden',
-        backgroundColor: 'transparent',
-        borderWidth: BORDER_GAP,
-        borderColor: 'white', // mask uses white = visible
-      }}
-    />
-  );
-
-  // ── Outer content container with children ─────────────────────────────────────
-  const contentStyle: ViewStyle = {
-    padding: paddingPx,
-    flex: 1,
-  };
-
   // ── Glass card body ───────────────────────────────────────────────────────────
   const glassBody = (
     <Animated.View
@@ -170,6 +157,10 @@ export default function GlassCard({
         {
           borderRadius: borderRadiusPx,
           overflow: 'hidden',
+          // Dark surface fallback — guarantees no white square when BackdropFilter
+          // fails or hasn't rendered yet. BackdropFilter + RoundedRect(GLASS_FILL)
+          // layers on top of this when Skia is working correctly.
+          backgroundColor: '#16151F',
         },
         // Only apply animated scale style when pressable — avoids a no-op GPU
         // layer on Android for the common non-interactive case
@@ -179,21 +170,30 @@ export default function GlassCard({
       renderToHardwareTextureAndroid={Platform.OS === 'android'}
       testID={testID}
     >
-      <MaskedView
-        maskElement={maskElement}
-        style={StyleSheet.absoluteFill}
-      >
-        {/* Gradient border — visible through the 1.5px mask perimeter */}
-        <LinearGradient
-          colors={[borderAccentColor, 'transparent']}
-          start={{ x: 0, y: 1 }}
-          end={{ x: 1, y: 0 }}
-          style={StyleSheet.absoluteFill}
-        />
-      </MaskedView>
+      {/* Gradient border — expo-linear-gradient at low opacity around the perimeter.  */}
+      {/* MaskedView (RNCMaskedView) requires a custom dev build and isn't available   */}
+      {/* in Expo Go. This approximation uses a gradient overlay at the card edges.    */}
+      <LinearGradient
+        colors={[borderAccentColor + '80', 'transparent']}
+        start={{ x: 0, y: 1 }}
+        end={{ x: 1, y: 0 }}
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            borderRadius: borderRadiusPx,
+            borderWidth: BORDER_GAP,
+            borderColor: 'transparent',
+          },
+        ]}
+        pointerEvents="none"
+      />
 
-      {/* Skia BackdropFilter — refracts the animated mesh behind */}
-      <Canvas
+      {/* Skia BackdropFilter + glass fill + inner shadow — all in one Canvas.     */}
+      {/* Inner shadow is drawn as a LinearGradient-filled RoundedRect AFTER the   */}
+      {/* BackdropFilter, using the painter's algorithm. No react-native-inner-    */}
+      {/* shadow needed — ShadowView always renders white regardless of style.     */}
+      {/* onLayout must be on the wrapping View, not Canvas (new arch limitation)  */}
+      <View
         style={StyleSheet.absoluteFill}
         onLayout={(e) => {
           const { width, height } = e.nativeEvent.layout;
@@ -201,31 +201,53 @@ export default function GlassCard({
         }}
       >
         {dims.w > 0 && (
-          <BackdropFilter filter={<Blur blur={blurRadius} />}>
-            <RoundedRect
-              x={0}
-              y={0}
-              width={dims.w}
-              height={dims.h}
-              r={borderRadiusPx}
-              color={GLASS_FILL}
-            />
-          </BackdropFilter>
+          <Canvas style={StyleSheet.absoluteFill}>
+            {/* BackdropFilter: blurs animated mesh behind card + dark glass fill */}
+            <BackdropFilter filter={<Blur blur={blurRadius} />}>
+              <RoundedRect
+                x={0}
+                y={0}
+                width={dims.w}
+                height={dims.h}
+                r={borderRadiusPx}
+                color={GLASS_FILL}
+              />
+            </BackdropFilter>
+            {/* Inner shadow overlay — top dark inset + bottom highlight.         */}
+            {/* Single RoundedRect with a 4-stop gradient:                        */}
+            {/*   SHADOW_TOP at y=0 → transparent by 12% → transparent at 85% →  */}
+            {/*   SHADOW_BOTTOM at y=100%. Purely Skia, no white background.      */}
+            <RoundedRect x={0} y={0} width={dims.w} height={dims.h} r={borderRadiusPx}>
+              <SkiaLinearGradient
+                start={vec(0, 0)}
+                end={vec(0, dims.h)}
+                colors={[SHADOW_TOP, 'transparent', 'transparent', SHADOW_BOTTOM]}
+                positions={[0, 0.12, 0.85, 1]}
+              />
+            </RoundedRect>
+          </Canvas>
         )}
-      </Canvas>
+      </View>
 
-      {/* InnerShadow: top dark inset + bottom highlight for physical thickness */}
-      <InnerShadow
-        inset
-        shadowColor={SHADOW_TOP}
-        shadowOffset={{ width: 0, height: 4 }}
-        shadowBlur={8}
-        isReflectedLightEnabled
-        reflectedLightColor={SHADOW_BOTTOM}
-        style={contentStyle}
+      {/* Noise texture — white noise PNG at 0.03 opacity, tiled to fill card surface */}
+      {/* Position: above BackdropFilter canvas, below content (brand §1.5). */}
+      <View
+        style={[StyleSheet.absoluteFill, { opacity: 0.03 }]}
+        pointerEvents="none"
       >
+        <ImageBackground
+          source={require('../../assets/images/noise.png')}
+          style={StyleSheet.absoluteFill}
+          resizeMode="repeat"
+        />
+      </View>
+
+      {/* Content — plain View with padding. react-native-inner-shadow removed    */}
+      {/* because ShadowView ignores backgroundColor: 'transparent' on iOS and   */}
+      {/* renders a white surface, covering the BackdropFilter Canvas beneath it. */}
+      <View style={{ padding: paddingPx, flex: 1 }}>
         {children}
-      </InnerShadow>
+      </View>
     </Animated.View>
   );
 

@@ -8,8 +8,8 @@ export interface Payment {
   amount: number;           // Total payment amount for the period
   periodStartDate: string;  // YYYY-MM-DD Monday (week start)
   periodEndDate: string;    // YYYY-MM-DD Sunday (week end)
-  paidHours: number;
-  workedHours: number;
+  paidHours: number;        // "Payment hours" — hours paid for (capped at weekly limit unless approved OT)
+  workedHours: number;      // Uncapped total hours worked (logged + manual); "Actual Overtime" = workedHours - paidHours
   status: string;           // "CURRENT" | "PENDING" | "PAID" etc.
 }
 

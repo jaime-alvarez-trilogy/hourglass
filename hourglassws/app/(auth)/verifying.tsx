@@ -15,6 +15,8 @@ export default function VerifyingScreen() {
       router.replace('/(auth)/success');
     } else if (step === 'setup') {
       router.replace('/(auth)/setup');
+    } else if (step === 'env-select') {
+      router.replace('/(auth)/env-select');
     } else if (step === 'credentials') {
       router.replace('/(auth)/credentials');
     }

@@ -20,6 +20,8 @@ export interface CrossoverConfig {
   lastRoleCheck: string;  // ISO timestamp, refreshed weekly Monday
   debugMode: boolean;
   showApprovals?: boolean; // dev toggle — show Approvals tab regardless of isManager
+  devManagerView?: boolean; // dev toggle — preview manager UI with fake data (non-manager accounts)
+  devOvertimePreview?: boolean; // dev toggle — force overtime panel state for UI testing
   setupComplete: boolean;
   setupDate: string;      // ISO timestamp
 }

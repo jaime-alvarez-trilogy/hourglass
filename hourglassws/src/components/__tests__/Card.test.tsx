@@ -293,12 +293,28 @@ describe('Card — source file structure checks', () => {
 // Skia Canvas with BackdropFilter. glass=false keeps the flat legacy surface.
 
 describe('Card — FR7 (03-glass-surfaces): GlassCard delegation', () => {
-  it('FR7.1 — Card with default props renders Canvas element (GlassCard delegation)', () => {
+  it('FR7.1 — Card with default props renders Canvas element after layout (GlassCard delegation)', () => {
     let tree: any;
     act(() => {
       tree = create(React.createElement(Card, null, 'child'));
     });
-    expect(JSON.stringify(tree.toJSON())).toContain('"Canvas"');
+    // Canvas is guarded by dims.w > 0 — fire onLayout to trigger render
+    act(() => {
+      const withLayout = tree.root.findAll(
+        (node: any) => node.props && typeof node.props.onLayout === 'function',
+        { deep: true },
+      );
+      withLayout.forEach((node: any) => {
+        node.props.onLayout({ nativeEvent: { layout: { width: 320, height: 120 } } });
+      });
+    });
+    // Use root.findAll (not JSON.stringify) — BackdropFilter has a React element prop
+    // that causes circular JSON errors once Canvas is rendered.
+    const canvasNodes = tree.root.findAll(
+      (node: any) => node.type === 'Canvas',
+      { deep: true },
+    );
+    expect(canvasNodes.length).toBeGreaterThan(0);
   });
 
   it('FR7.2 — Card glass={false} renders no Canvas element (flat surface)', () => {

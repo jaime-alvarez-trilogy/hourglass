@@ -54,10 +54,10 @@ export function useWidgetSync(
       console.error('[useWidgetSync] Widget update failed:', err);
     });
   // approvalItems in deps: managers need re-sync when approvals change
-  // aiData intentionally omitted: AI data changes don't need to re-trigger
+  // aiData in deps: widget must update when AI% loads (loads async after hoursData)
   // myRequests intentionally omitted: contributor request changes don't need independent re-trigger
   // prevWeekSnapshot intentionally omitted: history changes don't need independent re-trigger;
   //   hoursData change is sufficient to pick up the latest snapshot value.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hoursData, pendingCount, config, approvalItems]);
+  }, [hoursData, pendingCount, config, approvalItems, aiData]);
 }

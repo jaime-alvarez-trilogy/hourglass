@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "hourglassws",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
@@ -82,9 +82,9 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#0D1117",
+          "backgroundColor": "#0D0C14",
           "dark": {
-            "backgroundColor": "#0D1117"
+            "backgroundColor": "#0D0C14"
           }
         }
       ],
@@ -108,7 +108,7 @@
     },
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": false
     },
     "extra": {
       "ENABLE_NATIVE_TABS": true,

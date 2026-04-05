@@ -364,14 +364,17 @@ export function AIConeChart({
         }
       });
     } else {
-      // No data to animate (N <= 1) — enable scrub immediately
+      // No data to animate (N <= 1) — reveal chart immediately and enable scrub
+      clipProgress.value = 1;
       setAnimDone(true);
     }
   }, [N]);
 
-  const clipStyle = useAnimatedStyle(() => ({
-    width: clipProgress.value * width,
-  }));
+  const clipStyle = useAnimatedStyle(() => {
+    const p = clipProgress.value;
+    if (p >= 0.99) return { width }; // exact prop width — no overflow:hidden after animation
+    return { overflow: 'hidden' as const, width: p * width };
+  });
 
   // ── Current frame paths — always final frame; clip reveals left-to-right ─
   const finalIdx          = N > 0 ? N - 1 : 0;
@@ -392,7 +395,7 @@ export function AIConeChart({
   <View>
     <GestureDetector gesture={gesture} enabled={animDone && size === 'full'}>
     <View style={{ width, height }}>
-      <Animated.View style={[{ overflow: 'hidden', height }, clipStyle]}>
+      <Animated.View style={[{ height }, clipStyle]}>
       <Canvas style={{ width, height }}>
 
         {/* ── CONE SPACE: the probability region ──────────────────────────── */}
