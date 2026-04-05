@@ -19,6 +19,7 @@ import { useAIData } from '@/src/hooks/useAIData';
 import { useConfig } from '@/src/hooks/useConfig';
 import { useFocusKey } from '@/src/hooks/useFocusKey';
 import { useStaggeredEntry } from '@/src/hooks/useStaggeredEntry';
+import { useListCascade } from '@/src/hooks/useListCascade';
 import { useWeeklyHistory } from '@/src/hooks/useWeeklyHistory';
 import { getWeekStartDate } from '@/src/lib/hours';
 import AIConeChart from '@/src/components/AIConeChart';
@@ -65,6 +66,7 @@ export default function AIScreen() {
   const { config } = useConfig();
   const chartKey = useFocusKey();
   const { getEntryStyle } = useStaggeredEntry({ count: 7 });
+  const { getItemStyle } = useListCascade({ count: data?.dailyBreakdown.length ?? 0 }, [chartKey]);
 
   // App breakdown — reads ai_app_history cache from AsyncStorage (no API calls).
   const { aggregated12w, currentWeek } = useAppBreakdown();
@@ -243,26 +245,18 @@ export default function AIScreen() {
                 <Text className="w-[70px] text-right text-xs text-textMuted uppercase tracking-wider">AI%</Text>
                 <Text className="w-[70px] text-right text-xs text-textMuted uppercase tracking-wider">BrainLift</Text>
               </View>
-              {safeData.dailyBreakdown.map((day) => (
-                <DailyAIRow key={day.date} item={day} />
+              {safeData.dailyBreakdown.map((day, index) => (
+                <Animated.View key={day.date} style={getItemStyle(index)}>
+                  <DailyAIRow item={day} />
+                </Animated.View>
               ))}
             </Card>
             </Animated.View>
           )}
 
-          {/* App Breakdown Card — FR4 (12-app-breakdown-ui) */}
-          {aggregated12w.length > 0 && (
-            <Animated.View style={getEntryStyle(3)}>
-              <AppBreakdownCard
-                entries={aggregated12w.slice(0, 8)}
-                guidance={generateGuidance(aggregated12w, currentWeek)}
-              />
-            </Animated.View>
-          )}
-
-          {/* 12-Week AI Trajectory Card */}
+          {/* 12-Week AI Trajectory Card — above app breakdown per user preference */}
           {hasTrajectory && (
-            <Animated.View style={getEntryStyle(4)}>
+            <Animated.View style={getEntryStyle(3)}>
             <Card borderAccentColor={colors.cyan}>
               <SectionLabel className="mb-2">12-WEEK TRAJECTORY</SectionLabel>
 
@@ -322,6 +316,16 @@ export default function AIScreen() {
                 })}
               </View>
             </Card>
+            </Animated.View>
+          )}
+
+          {/* App Breakdown Card — FR4 (12-app-breakdown-ui) */}
+          {aggregated12w.length > 0 && (
+            <Animated.View style={getEntryStyle(4)}>
+              <AppBreakdownCard
+                entries={aggregated12w.slice(0, 8)}
+                guidance={generateGuidance(aggregated12w, currentWeek)}
+              />
             </Animated.View>
           )}
 

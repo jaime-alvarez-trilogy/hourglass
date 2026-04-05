@@ -30,6 +30,7 @@ import SectionLabel from '@/src/components/SectionLabel'
 import SkeletonLoader from '@/src/components/SkeletonLoader'
 import FadeInScreen from '@/src/components/FadeInScreen'
 import { useStaggeredEntry } from '@/src/hooks/useStaggeredEntry'
+import { useListCascade } from '@/src/hooks/useListCascade'
 import { AnimatedPressable } from '@/src/components/AnimatedPressable'
 import AnimatedMeshBackground from '@/src/components/AnimatedMeshBackground'
 import { colors } from '@/src/lib/colors'
@@ -58,6 +59,7 @@ export default function ApprovalsScreen() {
   const [isApprovingAll, setIsApprovingAll] = useState(false)
 
   const { getEntryStyle } = useStaggeredEntry({ count: 2 })
+  const { getItemStyle } = useListCascade({ count: items.length }, [items.length])
 
   // ─── Pull-to-refresh ────────────────────────────────────────────────────────
 
@@ -92,13 +94,15 @@ export default function ApprovalsScreen() {
     }
   }
 
-  function renderApprovalItem({ item }: { item: ApprovalItem }) {
+  function renderApprovalItem({ item, index }: { item: ApprovalItem; index: number }) {
     return (
-      <ApprovalCard
-        item={item}
-        onApprove={() => approveItem(item)}
-        onReject={() => setRejectTarget(item)}
-      />
+      <Animated.View style={getItemStyle(index)}>
+        <ApprovalCard
+          item={item}
+          onApprove={() => approveItem(item)}
+          onReject={() => setRejectTarget(item)}
+        />
+      </Animated.View>
     )
   }
 
