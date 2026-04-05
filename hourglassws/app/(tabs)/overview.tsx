@@ -39,6 +39,7 @@ import SectionLabel from '@/src/components/SectionLabel';
 import TrendSparkline from '@/src/components/TrendSparkline';
 import FadeInScreen from '@/src/components/FadeInScreen';
 import OverviewHeroCard from '@/src/components/OverviewHeroCard';
+import EarningsPaceCard from '@/src/components/EarningsPaceCard';
 import { computeEarningsPace, computeStreak, computeTargetHitRate } from '@/src/lib/overviewUtils';
 import { computeHoursVariance } from '@/src/lib/hours';
 import { setTag } from '@/src/lib/sharedTransitions';
@@ -352,6 +353,13 @@ export default function OverviewScreen() {
             window={window}
             onWindowChange={handleWindowChange}
             hoursHitRate={hoursHitRate}
+          />
+
+          {/* 02-earnings-pace-projection: EWMA annual projection card */}
+          <EarningsPaceCard
+            earnings={overviewData.earnings}
+            targetWeeklyEarnings={hourlyRate * weeklyLimit}
+            window={window}
           />
 
           {/* Week snapshot panel — always rendered, animated opacity/translateY */}

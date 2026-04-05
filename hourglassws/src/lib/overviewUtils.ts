@@ -29,3 +29,58 @@ export function computeEarningsPace(earnings: number[]): number {
   if (priorAvg === 0) return 1.0;
   return earnings[earnings.length - 1] / priorAvg;
 }
+
+/**
+ * Returns the count of consecutive completed weeks (all but last, which is
+ * the partial current week) where each value meets or exceeds `target`.
+ * Counts from the most-recent completed week backwards.
+ *
+ * Returns 0 if fewer than 2 entries (no completed weeks).
+ */
+export function computeStreak(data: number[], target: number): number {
+  if (data.length < 2) return 0;
+  const completed = data.slice(0, -1); // exclude current partial week
+  let streak = 0;
+  for (let i = completed.length - 1; i >= 0; i--) {
+    if (completed[i] >= target) streak++;
+    else break;
+  }
+  return streak;
+}
+
+/**
+ * Computes an EWMA-smoothed annual earnings projection.
+ *
+ * - Excludes the last entry (partial current week)
+ * - Excludes zero values (weeks with no data — gap weeks, onboarding, etc.)
+ * - Returns 0 if fewer than 2 completed non-zero weeks (not enough signal)
+ * - EWMA with alpha=0.3: more weight to recent weeks, smooths short-term noise
+ * - Returns ewma * 52 as the annualized projection
+ *
+ * @param earnings - Weekly earnings array ordered oldest→newest.
+ *   Last entry = current (partial) week, excluded from calculation.
+ * @returns Annualized projection in dollars, or 0 if insufficient data.
+ */
+export function computeAnnualProjection(earnings: number[]): number {
+  const completed = earnings.slice(0, -1).filter(v => v > 0);
+  if (completed.length < 2) return 0;
+  const alpha = 0.3;
+  let ewma = completed[0];
+  for (let i = 1; i < completed.length; i++) {
+    ewma = alpha * completed[i] + (1 - alpha) * ewma;
+  }
+  return ewma * 52;
+}
+
+/**
+ * Returns 0–100 percentage of completed weeks (all but last) where value
+ * meets or exceeds `target`.
+ *
+ * Returns 0 if fewer than 2 entries.
+ */
+export function computeTargetHitRate(data: number[], target: number): number {
+  if (data.length < 2) return 0;
+  const completed = data.slice(0, -1);
+  const hits = completed.filter(v => v >= target).length;
+  return Math.round((hits / completed.length) * 100);
+}
