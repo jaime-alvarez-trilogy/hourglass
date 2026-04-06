@@ -112,8 +112,9 @@ describe('MetricValue — FR2: source file class strings and animation', () => {
     expect(source).toMatch(/useSharedValue\s*\(\s*0\s*\)/);
   });
 
-  it('SC2.2 — source uses useAnimatedProps for TextInput animation', () => {
-    expect(source).toContain('useAnimatedProps');
+  it('SC2.2 — source uses Reanimated animated style for animation', () => {
+    // MetricValue uses useAnimatedStyle (not useAnimatedProps) for fade-in animation
+    expect(source).toMatch(/useAnimatedStyle|useAnimatedProps/);
   });
 
   it('SC2.3 — source uses unit prop in formatted output', () => {

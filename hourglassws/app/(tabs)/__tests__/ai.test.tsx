@@ -194,9 +194,9 @@ describe('AI Tab — FR5 (04-ai-hero-arc): AIArcHero hero replacement', () => {
     expect(source).not.toMatch(/const\s+BRAINLIFT_TARGET\s*=/);
   });
 
-  it('SC5.7 — useStaggeredEntry uses count: 5 (was 6, minus BrainLift card)', () => {
+  it('SC5.7 — useStaggeredEntry uses count: 7 (includes AppBreakdownCard)', () => {
     const source = fs.readFileSync(AI_TAB_FILE, 'utf8');
-    expect(source).toMatch(/useStaggeredEntry\s*\(\s*\{\s*count\s*:\s*5\s*\}/);
+    expect(source).toMatch(/useStaggeredEntry\s*\(\s*\{\s*count\s*:\s*7\s*\}/);
   });
 
   it('SC5.8 — heroAIPct scrub override is passed as aiPct prop to AIArcHero', () => {

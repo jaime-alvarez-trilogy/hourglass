@@ -53,8 +53,8 @@ describe('useAIData — FR4: source file contract (static analysis)', () => {
     expect(source).toMatch(/setItem\s*\(\s*(PREV_WEEK_KEY|['"]previousWeekAIPercent['"])/);
   });
 
-  it('SC4.5 — source uses isMonday check (getDay() === 1) before writing', () => {
-    expect(source).toMatch(/getDay\s*\(\s*\)\s*===\s*1/);
+  it('SC4.5 — source uses isMonday check (getUTCDay() === 1) before writing', () => {
+    expect(source).toMatch(/getUTCDay\s*\(\s*\)\s*===\s*1/);
   });
 
   it('SC4.6 — source has a useEffect for reading AsyncStorage on mount', () => {

@@ -20,7 +20,7 @@ import { loadWeeklyHistory, mergeWeeklySnapshot, saveWeeklyHistory } from '../li
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CACHE_KEY = 'earnings_history_v1';
-export const EARNINGS_HISTORY_WEEKS = 12;
+export const EARNINGS_HISTORY_WEEKS = 24;
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 

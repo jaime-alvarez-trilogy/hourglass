@@ -12,7 +12,14 @@ function makePayment(from: string, amount: number): Payment {
   const toDate = new Date(fromDate);
   toDate.setUTCDate(toDate.getUTCDate() + 6);
   const to = toDate.toISOString().slice(0, 10);
-  return { from, to, amount };
+  return {
+    periodStartDate: from,
+    periodEndDate: to,
+    amount,
+    paidHours: 0,
+    workedHours: 0,
+    status: 'PAID',
+  };
 }
 
 // Four consecutive Monday dates for test data

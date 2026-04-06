@@ -47,8 +47,8 @@ describe('exported constants', () => {
     expect(WEEKLY_HISTORY_KEY).toBe('weekly_history_v2');
   });
 
-  it('SC1.2 — WEEKLY_HISTORY_MAX equals 12', () => {
-    expect(WEEKLY_HISTORY_MAX).toBe(12);
+  it('SC1.2 — WEEKLY_HISTORY_MAX equals 24', () => {
+    expect(WEEKLY_HISTORY_MAX).toBe(24);
   });
 });
 
@@ -134,28 +134,28 @@ describe('mergeWeeklySnapshot', () => {
   });
 
   describe('SC1.7 — trim to WEEKLY_HISTORY_MAX', () => {
-    it('13 entries trimmed to 12, oldest removed', () => {
-      const snapshots = makeSnapshots(13, '2025-01-06'); // 13 consecutive weeks
+    it('25 entries trimmed to 24, oldest removed', () => {
+      const snapshots = makeSnapshots(25, '2025-01-06'); // 25 consecutive weeks
       const oldest = snapshots[0].weekStart;
       const result = mergeWeeklySnapshot(
-        snapshots.slice(0, 12),
-        { weekStart: snapshots[12].weekStart, hours: 1 },
+        snapshots.slice(0, 24),
+        { weekStart: snapshots[24].weekStart, hours: 1 },
       );
-      expect(result).toHaveLength(12);
+      expect(result).toHaveLength(24);
       // Oldest week should be gone
       expect(result.find(s => s.weekStart === oldest)).toBeUndefined();
       // Newest week should be present
-      expect(result[11].weekStart).toBe(snapshots[12].weekStart);
+      expect(result[23].weekStart).toBe(snapshots[24].weekStart);
     });
 
-    it('12 entries stays at 12 (not trimmed further)', () => {
-      const snapshots = makeSnapshots(12, '2025-01-06');
+    it('24 entries stays at 24 (not trimmed further)', () => {
+      const snapshots = makeSnapshots(24, '2025-01-06');
       // Re-merge the last entry (no new week)
       const result = mergeWeeklySnapshot(
-        snapshots.slice(0, 12),
-        { weekStart: snapshots[11].weekStart, aiPct: 99 },
+        snapshots.slice(0, 24),
+        { weekStart: snapshots[23].weekStart, aiPct: 99 },
       );
-      expect(result).toHaveLength(12);
+      expect(result).toHaveLength(24);
     });
   });
 

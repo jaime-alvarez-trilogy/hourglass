@@ -133,9 +133,9 @@ describe('TrendSparkline — FR3: source constraints', () => {
     expect(source).toContain('gold');
   });
 
-  it('FR3: default strokeWidth is 3 (updated in 04-chart-polish)', () => {
+  it('FR3: default strokeWidth is 2.5 (updated in 04-chart-polish)', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    expect(source).toMatch(/strokeWidth\s*=\s*3[^.0-9]/);
+    expect(source).toMatch(/strokeWidth\s*=\s*2\.5/);
   });
 
   it('FR3: Y domain handled via VNX domain prop (not internal padding constant)', () => {

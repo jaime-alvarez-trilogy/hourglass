@@ -29,6 +29,8 @@ const useChartPressState = (_initial: any) => ({
   state: {
     x: { value: { value: 0, position: 0 }, position: 0 },
     y: {},
+    // TrendSparkline.tsx accesses state.isActive.value in a useAnimatedReaction worklet
+    isActive: { value: false },
   },
   isActive: { value: false },
 });

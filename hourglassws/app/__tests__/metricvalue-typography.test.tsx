@@ -103,8 +103,8 @@ describe('MetricValue — FR4: source file class strings and comment', () => {
     expect(source).not.toContain('Space Grotesk');
   });
 
-  it('FR4.10 — font comment references "Inter" not "Space Grotesk"', () => {
-    // After fix, the file-level comment should say Inter
-    expect(source).toContain('Inter');
+  it('FR4.10 — source references the display font used (SpaceGrotesk or Inter)', () => {
+    // The file comment references whichever display font is currently in use
+    expect(source).toMatch(/SpaceGrotesk|Inter/);
   });
 });

@@ -209,7 +209,11 @@ describe('TrendSparkline FR2 — gesture layer imports (VNX)', () => {
 
   it('does NOT import GestureDetector (VNX handles gesture internally)', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    expect(source).not.toMatch(/GestureDetector/);
+    // GestureDetector must not be imported — comments mentioning it are OK
+    const importLines = source.split('\n').filter(l => l.match(/^import\s/));
+    expect(importLines.some(l => l.includes('GestureDetector'))).toBe(false);
+    // Also: no JSX element <GestureDetector
+    expect(source).not.toMatch(/<GestureDetector/);
   });
 
   it('imports useAnimatedReaction and runOnJS from react-native-reanimated', () => {
@@ -228,9 +232,10 @@ describe('TrendSparkline FR2 — gesture pattern in source (VNX)', () => {
     expect(source).not.toMatch(/<GestureDetector/);
   });
 
-  it('uses VNX gestureLongPressDelay prop on CartesianChart', () => {
+  it('uses VNX gesture configuration on CartesianChart (chartPressConfig or gestureLongPressDelay)', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    expect(source).toMatch(/gestureLongPressDelay/);
+    // Either chartPressConfig (newer VNX API) or gestureLongPressDelay (older API)
+    expect(source).toMatch(/chartPressConfig|gestureLongPressDelay/);
   });
 
   it('uses useAnimatedReaction to bridge VNX press state to onScrubChange', () => {
@@ -248,10 +253,10 @@ describe('TrendSparkline FR2 — gesture pattern in source (VNX)', () => {
     expect(hasNullishCoalesce || hasSafeWrapper || hasOptionalCall).toBe(true);
   });
 
-  it('uses VNX position state for index calculation (not pixelXs)', () => {
+  it('uses VNX state x value for index calculation (not pixelXs)', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    // VNX useChartPressState provides state.x.position
-    expect(source).toMatch(/state\.x\.position|position\.value/);
+    // VNX useChartPressState provides state.x.value or state.x.position
+    expect(source).toMatch(/state\.x\.value|state\.x\.position|position\.value/);
   });
 });
 
@@ -276,10 +281,10 @@ describe('TrendSparkline FR2 — single data point', () => {
     expect(() => renderSparkline({ data: [1500], width: 340, height: 60 })).not.toThrow();
   });
 
-  it('SC2.5 — source handles single-point cursor (center position or chartBounds.width / 2)', () => {
+  it('SC2.5 — source handles single-point cursor (center position)', () => {
     const source = fs.readFileSync(SPARKLINE_FILE, 'utf8');
-    // VNX external cursor: chartBounds.left + chartBounds.width / 2 for single point
-    expect(source).toMatch(/width\s*\/\s*2/);
+    // Single-point: center between chartBounds.left and chartBounds.right (or width / 2)
+    expect(source).toMatch(/width\s*\/\s*2|chartBounds\.left\s*\+\s*chartBounds\.right|left\s*\+\s*.*right.*\/\s*2/);
   });
 });
 

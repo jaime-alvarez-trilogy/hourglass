@@ -220,7 +220,8 @@ describe('FR2: Home screen — useStaggeredEntry integration', () => {
 
   it('imports Animated from react-native-reanimated', () => {
     const source = fs.readFileSync(HOME_FILE, 'utf8');
-    expect(source).toMatch(/import\s+Animated\s+from\s+['"]react-native-reanimated['"]/);
+    // Home screen uses a multi-line import: import Animated, { ... } from 'react-native-reanimated'
+    expect(source).toMatch(/import\s+Animated[\s,{][\s\S]*?from\s+['"]react-native-reanimated['"]/);
   });
 
   it('calls useStaggeredEntry with count: 4', () => {
@@ -272,9 +273,9 @@ describe('FR3: AI screen — useStaggeredEntry integration', () => {
     expect(source).toMatch(/import\s+Animated\s+from\s+['"]react-native-reanimated['"]/);
   });
 
-  it('calls useStaggeredEntry with count: 6', () => {
+  it('calls useStaggeredEntry with count: 7', () => {
     const source = fs.readFileSync(AI_FILE, 'utf8');
-    expect(source).toMatch(/useStaggeredEntry\s*\(\s*\{\s*count\s*:\s*6/);
+    expect(source).toMatch(/useStaggeredEntry\s*\(\s*\{\s*count\s*:\s*7/);
   });
 
   it('wraps AI Usage card with getEntryStyle(0)', () => {
@@ -307,10 +308,10 @@ describe('FR3: AI screen — useStaggeredEntry integration', () => {
     expect(source).toMatch(/getEntryStyle\(5\)/);
   });
 
-  it('uses exactly 6 getEntryStyle calls (indices 0-5)', () => {
+  it('uses exactly 7 getEntryStyle calls (indices 0-6)', () => {
     const source = fs.readFileSync(AI_FILE, 'utf8');
     const calls = (source.match(/getEntryStyle\(\d+\)/g) || []).length;
-    expect(calls).toBe(6);
+    expect(calls).toBe(7);
   });
 });
 
@@ -374,9 +375,9 @@ describe('FR5: Overview screen — useStaggeredEntry integration', () => {
     expect(source).toMatch(/useStaggeredEntry.*from.*@\/src\/hooks\/useStaggeredEntry/);
   });
 
-  it('calls useStaggeredEntry with count: 4', () => {
+  it('calls useStaggeredEntry with count: 3', () => {
     const source = fs.readFileSync(OVERVIEW_FILE, 'utf8');
-    expect(source).toMatch(/useStaggeredEntry\s*\(\s*\{\s*count\s*:\s*4/);
+    expect(source).toMatch(/useStaggeredEntry\s*\(\s*\{\s*count\s*:\s*3/);
   });
 
   it('wraps Earnings ChartSection with getEntryStyle(0)', () => {
@@ -394,15 +395,10 @@ describe('FR5: Overview screen — useStaggeredEntry integration', () => {
     expect(source).toMatch(/getEntryStyle\(2\)/);
   });
 
-  it('wraps BrainLift ChartSection with getEntryStyle(3)', () => {
-    const source = fs.readFileSync(OVERVIEW_FILE, 'utf8');
-    expect(source).toMatch(/getEntryStyle\(3\)/);
-  });
-
-  it('uses exactly 4 getEntryStyle calls (one per ChartSection)', () => {
+  it('uses exactly 3 getEntryStyle calls (one per ChartSection)', () => {
     const source = fs.readFileSync(OVERVIEW_FILE, 'utf8');
     const calls = (source.match(/getEntryStyle\(\d+\)/g) || []).length;
-    expect(calls).toBe(4);
+    expect(calls).toBe(3);
   });
 
   it('scrub snapshot panel Animated.View does NOT use getEntryStyle', () => {
@@ -412,11 +408,11 @@ describe('FR5: Overview screen — useStaggeredEntry integration', () => {
     expect(source).toMatch(/panelStyle/);
   });
 
-  it('4W/12W toggle header row is NOT wrapped with getEntryStyle', () => {
+  it('4W/12W/24W toggle header row is NOT wrapped with getEntryStyle', () => {
     const source = fs.readFileSync(OVERVIEW_FILE, 'utf8');
-    // The toggle is inside the header row — getEntryStyle should only be on ChartSection wrappers
-    // Already verified by the "exactly 4 calls" test above
+    // The toggle is inside OverviewHeroCard — getEntryStyle should only be on ChartSection wrappers
+    // Already verified by the "exactly 3 calls" test above
     const calls = (source.match(/getEntryStyle\(\d+\)/g) || []).length;
-    expect(calls).toBeLessThanOrEqual(4);
+    expect(calls).toBeLessThanOrEqual(3);
   });
 });

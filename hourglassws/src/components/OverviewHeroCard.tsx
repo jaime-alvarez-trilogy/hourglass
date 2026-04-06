@@ -30,9 +30,11 @@ interface OverviewHeroCardProps {
   /** Sum of actualOvertime (Actual Overtime column) for the selected window */
   overtimeHours: number;
   /** Selected time window */
-  window: 4 | 12;
+  window: 4 | 12 | 24;
   /** Called when user taps a window toggle button */
-  onWindowChange: (w: 4 | 12) => void;
+  onWindowChange: (w: 4 | 12 | 24) => void;
+  /** 0–100 — % of completed weeks in window where hours target was met */
+  hoursHitRate?: number;
 }
 
 // ─── Toggle pill style constants (stable references — no recreation per render) ─
@@ -57,8 +59,9 @@ export default function OverviewHeroCard({
   overtimeHours,
   window,
   onWindowChange,
+  hoursHitRate,
 }: OverviewHeroCardProps): JSX.Element {
-  const periodLabel = window === 4 ? 'LAST 4 WEEKS' : 'LAST 12 WEEKS';
+  const periodLabel = window === 4 ? 'LAST 4 WEEKS' : window === 12 ? 'LAST 12 WEEKS' : 'LAST 24 WEEKS';
 
   return (
     <Card elevated>
@@ -74,33 +77,22 @@ export default function OverviewHeroCard({
           borderRadius: 10,
           padding: 2,
         }}>
-          <TouchableOpacity
-            onPress={() => onWindowChange(4)}
-            style={window === 4 ? ACTIVE_PILL : INACTIVE_PILL}
-            activeOpacity={0.7}
-          >
-            <Text style={{
-              color: window === 4 ? colors.violet : colors.textMuted,
-              fontWeight: window === 4 ? '600' : '400',
-              fontSize: 13,
-            }}>
-              4W
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => onWindowChange(12)}
-            style={window === 12 ? ACTIVE_PILL : INACTIVE_PILL}
-            activeOpacity={0.7}
-          >
-            <Text style={{
-              color: window === 12 ? colors.violet : colors.textMuted,
-              fontWeight: window === 12 ? '600' : '400',
-              fontSize: 13,
-            }}>
-              12W
-            </Text>
-          </TouchableOpacity>
+          {([4, 12, 24] as const).map(w => (
+            <TouchableOpacity
+              key={w}
+              onPress={() => onWindowChange(w)}
+              style={window === w ? ACTIVE_PILL : INACTIVE_PILL}
+              activeOpacity={0.7}
+            >
+              <Text style={{
+                color: window === w ? colors.violet : colors.textMuted,
+                fontWeight: window === w ? '600' : '400',
+                fontSize: 13,
+              }}>
+                {w}W
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
 
@@ -151,6 +143,29 @@ export default function OverviewHeroCard({
           </Text>
         </View>
       </View>
+
+      {/* Hit rate row — % of completed weeks where hours target was met */}
+      {hoursHitRate !== undefined && hoursHitRate > 0 && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 6 }}>
+          <View style={{
+            height: 4,
+            flex: 1,
+            backgroundColor: colors.border,
+            borderRadius: 2,
+            overflow: 'hidden',
+          }}>
+            <View style={{
+              height: 4,
+              width: `${hoursHitRate}%`,
+              backgroundColor: hoursHitRate >= 75 ? colors.success : hoursHitRate >= 50 ? colors.warning : colors.critical,
+              borderRadius: 2,
+            }} />
+          </View>
+          <Text style={{ color: colors.textMuted, fontSize: 11 }}>
+            {hoursHitRate}% target weeks
+          </Text>
+        </View>
+      )}
     </Card>
   );
 }

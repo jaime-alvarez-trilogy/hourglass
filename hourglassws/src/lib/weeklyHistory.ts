@@ -19,7 +19,7 @@ export interface WeeklySnapshot {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 export const WEEKLY_HISTORY_KEY = 'weekly_history_v2';
-export const WEEKLY_HISTORY_MAX = 12;
+export const WEEKLY_HISTORY_MAX = 24;
 
 // ─── mergeWeeklySnapshot ──────────────────────────────────────────────────────
 

@@ -239,8 +239,8 @@ describe('useAIData — FR4 (06-overview-history): weekly_history_v2 flush (stat
   });
 
   it('SC4.3 — flush is guarded by isMonday && taggedSlots > 0 condition', () => {
-    expect(source).toMatch(/getDay\s*\(\s*\)\s*===\s*1/); // Monday check
-    expect(source).toMatch(/taggedSlots\s*>\s*0/);         // non-empty guard
+    expect(source).toMatch(/getUTCDay\s*\(\s*\)\s*===\s*1/); // Monday check (UTC)
+    expect(source).toMatch(/taggedSlots\s*>\s*0/);           // non-empty guard
   });
 
   it('SC4.4 — prevWeekStart derived as currentMonday minus 7 days', () => {

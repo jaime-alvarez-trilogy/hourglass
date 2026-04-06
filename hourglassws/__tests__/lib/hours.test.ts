@@ -50,23 +50,23 @@ describe('calculateHours', () => {
     jest.useRealTimers();
   });
 
-  it('returns payments.paidHours when > 0 (prefers payments over timesheet)', () => {
+  it('returns payments.workedHours when > 0 (prefers payments over timesheet)', () => {
     const ts = makeTimesheet({ totalHours: 10 });
-    const pay = makePayments({ paidHours: 35 });
+    const pay = makePayments({ workedHours: 35 });
     const result = calculateHours(ts, pay, HOURLY_RATE, WEEKLY_LIMIT);
     expect(result.total).toBe(35);
   });
 
-  it('falls back to timesheet.totalHours when paidHours === 0', () => {
+  it('falls back to timesheet.totalHours when workedHours === 0', () => {
     const ts = makeTimesheet({ totalHours: 28 });
-    const pay = makePayments({ paidHours: 0 });
+    const pay = makePayments({ paidHours: 0, workedHours: 0 });
     const result = calculateHours(ts, pay, HOURLY_RATE, WEEKLY_LIMIT);
     expect(result.total).toBe(28);
   });
 
   it('falls back to timesheet.hourWorked when totalHours absent', () => {
     const ts = { hourWorked: 22, averageHoursPerDay: 4.4, stats: [] };
-    const pay = makePayments({ paidHours: 0 });
+    const pay = makePayments({ paidHours: 0, workedHours: 0 });
     const result = calculateHours(ts as any, pay, HOURLY_RATE, WEEKLY_LIMIT);
     expect(result.total).toBe(22);
   });
@@ -103,28 +103,28 @@ describe('calculateHours', () => {
 
   it('computes hoursRemaining = Math.max(0, weeklyLimit - total)', () => {
     const ts = makeTimesheet({ totalHours: 30 });
-    const pay = makePayments({ paidHours: 0 });
+    const pay = makePayments({ paidHours: 0, workedHours: 0 });
     const result = calculateHours(ts, pay, HOURLY_RATE, WEEKLY_LIMIT);
     expect(result.hoursRemaining).toBe(10);
   });
 
   it('clamps hoursRemaining to 0 when total exceeds weeklyLimit', () => {
     const ts = makeTimesheet({ totalHours: 45 });
-    const pay = makePayments({ paidHours: 0 });
+    const pay = makePayments({ paidHours: 0, workedHours: 0 });
     const result = calculateHours(ts, pay, HOURLY_RATE, WEEKLY_LIMIT);
     expect(result.hoursRemaining).toBe(0);
   });
 
   it('computes overtimeHours = Math.max(0, total - weeklyLimit)', () => {
     const ts = makeTimesheet({ totalHours: 45 });
-    const pay = makePayments({ paidHours: 0 });
+    const pay = makePayments({ paidHours: 0, workedHours: 0 });
     const result = calculateHours(ts, pay, HOURLY_RATE, WEEKLY_LIMIT);
     expect(result.overtimeHours).toBe(5);
   });
 
   it('clamps overtimeHours to 0 when total is below weeklyLimit', () => {
     const ts = makeTimesheet({ totalHours: 30 });
-    const pay = makePayments({ paidHours: 0 });
+    const pay = makePayments({ paidHours: 0, workedHours: 0 });
     const result = calculateHours(ts, pay, HOURLY_RATE, WEEKLY_LIMIT);
     expect(result.overtimeHours).toBe(0);
   });

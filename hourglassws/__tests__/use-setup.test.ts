@@ -7,14 +7,17 @@ import type { CrossoverConfig } from '../src/types/config';
 import * as SecureStoreMock from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Mock fetchAndBuildConfig from auth.ts
+// Mock fetchAndBuildConfig and probeEnvironments from auth.ts
+// submitCredentials calls probeEnvironments first, then fetchAndBuildConfig
 jest.mock('../src/api/auth', () => ({
   fetchAndBuildConfig: jest.fn(),
+  probeEnvironments: jest.fn(),
   getProfileDetail: jest.fn(),
 }));
 
-const { fetchAndBuildConfig } = require('../src/api/auth');
+const { fetchAndBuildConfig, probeEnvironments } = require('../src/api/auth');
 const mockFetch = fetchAndBuildConfig as jest.MockedFunction<typeof fetchAndBuildConfig>;
+const mockProbe = probeEnvironments as jest.MockedFunction<typeof probeEnvironments>;
 
 const makeConfig = (overrides: Partial<CrossoverConfig> = {}): CrossoverConfig => ({
   userId: '2362707',
@@ -47,6 +50,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   (SecureStoreMock as unknown as { _reset: () => void })._reset();
   (AsyncStorage as unknown as { _reset: () => void })._reset();
+  // Default: probeEnvironments returns prod_only so fetchAndBuildConfig is called with useQA=false
+  mockProbe.mockResolvedValue({ type: 'prod_only' });
 });
 
 // --- Initial State ---
@@ -75,12 +80,15 @@ describe('FR8: useSetup — setEnvironment', () => {
     expect(get().step).toBe('welcome');
   });
 
-  it('stores the QA environment flag for use in credential submission', async () => {
+  it('setEnvironment does not change step; submitCredentials uses probeEnvironments to determine env', async () => {
+    // In the current implementation, submitCredentials calls probeEnvironments() to auto-detect env.
+    // setEnvironment() sets useQARef for selectEnvironment() (manual env selection after probe).
     mockFetch.mockResolvedValueOnce(makeConfig());
+    mockProbe.mockResolvedValueOnce({ type: 'qa_only' }); // probe returns QA-only
     const { get } = mountHook();
-    act(() => { get().setEnvironment(true); }); // set QA = true
+    act(() => { get().setEnvironment(true); }); // sets ref but doesn't affect submitCredentials
     await act(async () => { await get().submitCredentials('u', 'p'); });
-    // fetchAndBuildConfig should have been called with useQA = true
+    // fetchAndBuildConfig called with useQA derived from probeEnvironments result (qa_only → true)
     expect(mockFetch).toHaveBeenCalledWith('u', 'p', true);
   });
 });
@@ -89,10 +97,12 @@ describe('FR8: useSetup — setEnvironment', () => {
 
 describe('FR8: useSetup — submitCredentials transitions', () => {
   it('transitions step to verifying synchronously before async work completes', async () => {
-    let resolveConfig!: (v: CrossoverConfig) => void;
-    mockFetch.mockImplementationOnce(
-      () => new Promise<CrossoverConfig>((res) => { resolveConfig = res; }),
+    // submitCredentials: sets step='verifying' synchronously, then awaits probeEnvironments
+    let resolveProbe!: (v: { type: string }) => void;
+    mockProbe.mockImplementationOnce(
+      () => new Promise<{ type: string }>((res) => { resolveProbe = res; }),
     );
+    mockFetch.mockResolvedValueOnce(makeConfig({ hourlyRate: 50 }));
     const { get } = mountHook();
 
     // Start the submission — step should be 'verifying' after the sync part
@@ -100,18 +110,20 @@ describe('FR8: useSetup — submitCredentials transitions', () => {
     expect(get().step).toBe('verifying');
 
     // Resolve so test cleans up
-    await act(async () => { resolveConfig(makeConfig({ hourlyRate: 50 })); });
+    await act(async () => { resolveProbe({ type: 'prod_only' }); });
   });
 
   it('sets isLoading = true while fetchAndBuildConfig is in flight', async () => {
-    let resolveConfig!: (v: CrossoverConfig) => void;
-    mockFetch.mockImplementationOnce(
-      () => new Promise<CrossoverConfig>((res) => { resolveConfig = res; }),
+    // isLoading is set synchronously when submitCredentials starts
+    let resolveProbe!: (v: { type: string }) => void;
+    mockProbe.mockImplementationOnce(
+      () => new Promise<{ type: string }>((res) => { resolveProbe = res; }),
     );
+    mockFetch.mockResolvedValueOnce(makeConfig());
     const { get } = mountHook();
     act(() => { void get().submitCredentials('u', 'p'); });
     expect(get().isLoading).toBe(true);
-    await act(async () => { resolveConfig(makeConfig()); });
+    await act(async () => { resolveProbe({ type: 'prod_only' }); });
   });
 
   it('transitions to success and populates pendingConfig + pendingCredentials when hourlyRate > 0', async () => {
@@ -180,36 +192,39 @@ describe('FR8: useSetup — submitCredentials transitions', () => {
 
 describe('FR8: useSetup — in-flight guard and error reset', () => {
   it('is a no-op if submitCredentials called while isLoading = true', async () => {
-    let resolveFirst!: (v: CrossoverConfig) => void;
-    mockFetch
+    let resolveProbe!: (v: { type: string }) => void;
+    mockProbe
       .mockImplementationOnce(
-        () => new Promise<CrossoverConfig>((res) => { resolveFirst = res; }),
+        () => new Promise<{ type: string }>((res) => { resolveProbe = res; }),
       )
-      .mockResolvedValue(makeConfig()); // should NOT be called
+      .mockResolvedValue({ type: 'prod_only' }); // should NOT be called again
+    mockFetch.mockResolvedValue(makeConfig()); // first call resolves; second should not happen
 
     const { get } = mountHook();
     act(() => { void get().submitCredentials('u', 'p'); });
     expect(get().isLoading).toBe(true);
-    // Second call while loading — ignored
+    // Second call while loading — ignored (probeEnvironments also not called again)
     act(() => { void get().submitCredentials('u2', 'p2'); });
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    await act(async () => { resolveFirst(makeConfig()); });
+    expect(mockProbe).toHaveBeenCalledTimes(1); // only called once
+    await act(async () => { resolveProbe({ type: 'prod_only' }); });
   });
 
   it('resets error to null at the start of a new submission', async () => {
-    mockFetch.mockRejectedValueOnce(new AuthError(401));
+    // First submission fails with AuthError (probeEnvironments returns 'none')
+    mockProbe.mockResolvedValueOnce({ type: 'none' }); // triggers credentials error path
     const { get } = mountHook();
     await act(async () => { await get().submitCredentials('u', 'bad'); });
     expect(get().error).toBe('Invalid email or password.');
 
     // Second attempt — start another pending submission and verify error clears
-    let resolveSecond!: (v: CrossoverConfig) => void;
-    mockFetch.mockImplementationOnce(
-      () => new Promise<CrossoverConfig>((res) => { resolveSecond = res; }),
+    let resolveProbe!: (v: { type: string }) => void;
+    mockProbe.mockImplementationOnce(
+      () => new Promise<{ type: string }>((res) => { resolveProbe = res; }),
     );
+    mockFetch.mockResolvedValueOnce(makeConfig());
     act(() => { void get().submitCredentials('u', 'corrected'); });
     expect(get().error).toBeNull(); // error cleared at submission start
-    await act(async () => { resolveSecond(makeConfig()); });
+    await act(async () => { resolveProbe({ type: 'prod_only' }); });
   });
 });
 

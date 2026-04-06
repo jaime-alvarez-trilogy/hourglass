@@ -40,10 +40,10 @@ const OVERVIEW_FILE = path.join(HOURGLASSWS_ROOT, 'app', '(tabs)', 'overview.tsx
 // ─── FR4: Source analysis — state declarations ────────────────────────────────
 
 describe('OverviewScreen FR4 (07-overview-sync) — source analysis: state', () => {
-  it('SC4.1 — declares window state with type 4 | 12, default 4', () => {
+  it('SC4.1 — declares window state with type 4 | 12 | 24, default 4', () => {
     const source = fs.readFileSync(OVERVIEW_FILE, 'utf8');
-    // useState<4 | 12>(4) — window state
-    expect(source).toMatch(/useState\s*<\s*4\s*\|\s*12\s*>\s*\(\s*4\s*\)/);
+    // useState<4 | 12 | 24>(4) — window state
+    expect(source).toMatch(/useState\s*<\s*4\s*\|\s*12\s*\|\s*24\s*>\s*\(\s*4\s*\)/);
   });
 
   it('SC4.2 — declares scrubWeekIndex state: useState<number | null>(null)', () => {
@@ -87,9 +87,10 @@ describe('OverviewScreen FR4 (07-overview-sync) — source analysis: chart wirin
     expect(source).toMatch(/onScrubChange/);
   });
 
-  it('SC4.5 — onScrubChange is wired to setScrubWeekIndex', () => {
+  it('SC4.5 — onScrubChange is wired to handleScrubChange which calls setScrubWeekIndex', () => {
     const source = fs.readFileSync(OVERVIEW_FILE, 'utf8');
-    expect(source).toMatch(/onScrubChange.*setScrubWeekIndex|setScrubWeekIndex.*onScrubChange/);
+    // onScrubChange is wired to handleScrubChange, which internally calls setScrubWeekIndex
+    expect(source).toMatch(/onScrubChange.*handleScrubChange|handleScrubChange.*setScrubWeekIndex/);
   });
 
   it('SC4.6 — 4W label present in source (toggle control)', () => {
@@ -347,7 +348,11 @@ describe('OverviewScreen FR4 (03-overview-hero) — source: ambient wiring', () 
     // 08-dark-glass-polish: AnimatedMeshBackground is the direct mesh renderer
     const source = fs.readFileSync(OVERVIEW_FILE, 'utf8');
     const ambientIdx = source.indexOf('<AnimatedMeshBackground');
-    const scrollIdx = source.indexOf('<ScrollView');
+    // Use '<ScrollView ' or '<ScrollView\n' to avoid matching useRef<ScrollView> type usage
+    const scrollIdx = Math.min(
+      source.indexOf('<ScrollView ') !== -1 ? source.indexOf('<ScrollView ') : Infinity,
+      source.indexOf('<ScrollView\n') !== -1 ? source.indexOf('<ScrollView\n') : Infinity,
+    );
     expect(ambientIdx).toBeGreaterThan(-1);
     expect(scrollIdx).toBeGreaterThan(-1);
     expect(ambientIdx).toBeLessThan(scrollIdx);
@@ -444,8 +449,8 @@ describe('OverviewScreen FR5 (03-overview-hero) — source: hero card integratio
     expect(source).toMatch(/Math\.max\s*\(\s*0/);
   });
 
-  it('SC5.7 — overtimeHours references hoursData.total', () => {
+  it('SC5.7 — overtimeHours references overviewData.overtimeHours', () => {
     const source = fs.readFileSync(OVERVIEW_FILE, 'utf8');
-    expect(source).toMatch(/hoursData.*total|hoursData\?\.total/);
+    expect(source).toMatch(/overviewData\.overtimeHours/);
   });
 });

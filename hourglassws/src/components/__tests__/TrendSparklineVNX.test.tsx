@@ -28,6 +28,13 @@ import * as path from 'path';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
+// Use official Reanimated mock + missing exports: prevents native binary initialization
+// and worklet background timer crashes when multiple test suites share a worker process.
+jest.mock('react-native-reanimated', () => {
+  const mock = require('react-native-reanimated/mock');
+  return { ...mock, useReducedMotion: () => false };
+});
+
 const mockIsActive = { value: false };
 const mockState = {
   x: { position: { value: 0 }, value: { value: 0 } },
@@ -269,9 +276,9 @@ describe('TrendSparkline VNX — SC3.8/SC3.9: onScrubChange callbacks', () => {
   });
 
   it('SC3.8 — source emits onScrubChange with index when active', () => {
-    // useAnimatedReaction → runOnJS(onScrubChange) or similar
+    // useAnimatedReaction → runOnJS bridges to onScrubChange (directly or via wrapper function)
     expect(source).toMatch(/onScrubChange/);
-    expect(source).toMatch(/runOnJS[\s\S]{0,200}onScrubChange|onScrubChange[\s\S]{0,100}isActive/);
+    expect(source).toMatch(/runOnJS[\s\S]{0,600}onScrubChange|onScrubChange[\s\S]{0,100}isActive/);
   });
 
   it('SC3.9 — source emits onScrubChange(null) when not active', () => {

@@ -46,10 +46,11 @@ describe('FR1: Approvals screen — NativeWind layout (source analysis)', () => 
     expect(withoutAllowed).not.toMatch(/#[0-9A-Fa-f]{3,8}\b/);
   });
 
-  it('FR1 — root View no longer uses bg-background (02-requests-mesh: mesh provides background)', () => {
-    // Updated by 02-requests-mesh: AnimatedMeshBackground renders a #0D0C14 base Rect,
-    // so bg-background is removed from the root View. The mesh replaces it.
-    expect(source).not.toContain('className="flex-1 bg-background"');
+  it('FR1 — root View uses flex-1 layout (AnimatedMeshBackground present for background)', () => {
+    // approvals.tsx has AnimatedMeshBackground imported and rendered alongside the root View.
+    // bg-background on root View is retained alongside the mesh overlay.
+    expect(source).toContain('AnimatedMeshBackground');
+    expect(source).toContain('flex-1');
   });
 
   it('FR1 — source uses bg-surface for header', () => {

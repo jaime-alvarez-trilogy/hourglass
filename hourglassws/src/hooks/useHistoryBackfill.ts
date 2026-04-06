@@ -32,7 +32,7 @@ import type { WeeklySnapshot } from '../lib/weeklyHistory';
 import type { TagData } from '../lib/ai';
 import type { WorkDiarySlot } from '../types/api';
 
-const BACKFILL_MAX = 11; // cover all 12 weeks of history (past completed weeks only)
+const BACKFILL_MAX = 23; // cover all 24 weeks of history (past completed weeks only)
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

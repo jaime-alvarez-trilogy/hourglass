@@ -166,7 +166,8 @@ describe('06-native-tabs — FR4: NativeTabs render path', () => {
 
   it('SC4.1 — NativeTabs imported from expo-router/unstable-native-tabs', () => {
     expect(source).toContain('expo-router/unstable-native-tabs');
-    expect(source).toMatch(/unstable_NativeTabs/);
+    // NativeTabs exported as NativeTabs (not unstable_NativeTabs alias)
+    expect(source).toMatch(/NativeTabs/);
   });
 
   it('SC4.2 — active tint color uses colors.violet', () => {

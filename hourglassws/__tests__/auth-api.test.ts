@@ -28,7 +28,7 @@ const makeDetail = (overrides: Record<string, unknown> = {}) => ({
       },
     },
   },
-  userAvatars: [{ avatarType: 'CANDIDATE', id: 2362707 }],
+  userAvatars: [{ type: 'CANDIDATE', id: 2362707 }],
   ...overrides,
 });
 

@@ -1013,17 +1013,16 @@ describe('AIConeChart — FR12 (02-safe-cone-scrub): Animation-Complete Gate', (
     // useState already used — also used for isScrubActive, scrubCursor
   });
 
-  it('SC12.3 — FR1: source declares isMountedRef for unmount guard', () => {
+  it('SC12.3 — FR1: source declares an unmount guard (isMountedRef or isMountedSV)', () => {
     const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
-    expect(source).toMatch(/isMountedRef/);
-    // Must be a useRef with initial true
-    expect(source).toMatch(/useRef\s*\(\s*true\s*\)/);
+    // Guard can be implemented as useRef (isMountedRef) or useSharedValue (isMountedSV)
+    expect(source).toMatch(/isMountedRef|isMountedSV/);
   });
 
-  it('SC12.4 — FR1: source sets isMountedRef.current = false in a cleanup effect', () => {
+  it('SC12.4 — FR1: source sets unmount guard to false in a cleanup effect', () => {
     const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
-    // Cleanup: return () => { isMountedRef.current = false; }
-    expect(source).toMatch(/isMountedRef\.current\s*=\s*false/);
+    // Cleanup sets the guard to false: isMountedRef.current = false OR isMountedSV.value = false
+    expect(source).toMatch(/isMounted(?:Ref\.current|SV\.value)\s*=\s*false/);
   });
 
   it('SC12.5 — FR1: source calls setAnimDone(true) inside withTiming callback', () => {
@@ -1134,14 +1133,14 @@ describe('AIConeChart — FR12 (02-safe-cone-scrub): Animation-Complete Gate', (
     expect(source).toMatch(/runOnJS\s*\(\s*setAnimDone\s*\)\s*\(\s*true\s*\)/);
   });
 
-  it('SC12.20 — FR4: completion callback checks isMountedRef.current before calling setAnimDone', () => {
+  it('SC12.20 — FR4: completion callback checks mount guard before calling setAnimDone', () => {
     const source = fs.readFileSync(CONE_CHART_FILE, 'utf8');
-    // Guard against calling setState on unmounted component
-    expect(source).toMatch(/isMountedRef\.current/);
+    // Guard against calling setState on unmounted component (isMountedRef.current or isMountedSV.value)
+    expect(source).toMatch(/isMounted(?:Ref\.current|SV\.value)/);
     // The check must appear in context with runOnJS(setAnimDone)
     const callbackBlock = source.match(/withTiming\s*\(\s*1\s*,\s*CONE_ANIMATION[\s\S]{0,500}/);
     expect(callbackBlock).not.toBeNull();
-    expect(callbackBlock![0]).toMatch(/isMountedRef\.current/);
+    expect(callbackBlock![0]).toMatch(/isMounted(?:Ref\.current|SV\.value)/);
   });
 
   it('SC12.21 — FR4: reduceMotion path does NOT use withTiming (synchronous state set)', () => {

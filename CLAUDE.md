@@ -37,6 +37,14 @@ WS/
 
 ## Rules
 
+### Debugging Escalation Rule
+
+**If the same area of code breaks twice in a row** (a fix introduces a regression, or a second fix is needed right after the first), **stop immediately and say:**
+
+> "This has broken twice — let me do a proper research run to understand the system before touching it again. This will use a more powerful model to diagnose the root cause."
+
+Then run `/research` on the affected area using `model: "opus"` for the Explore agent. Do NOT attempt a third targeted fix without first completing a full analysis. This rule exists because repeated fixes without full understanding cause fix/break loops that waste time and risk destabilizing working code.
+
 ### API Documentation Rule
 **Every time you discover, test, or use a Crossover API endpoint, you MUST immediately document it in `memory/MEMORY.md` under "Key API Endpoints".** This includes:
 - The full URL pattern with parameter names

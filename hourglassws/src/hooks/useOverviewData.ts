@@ -44,7 +44,7 @@ export interface UseOverviewDataResult {
  * @param window - Number of weeks to display: 4 or 12
  */
 export function useOverviewData(
-  window: 4 | 12,
+  window: 4 | 12 | 24,
 ): UseOverviewDataResult {
   const { snapshots, isLoading: historyLoading } = useWeeklyHistory();
   const { data: hoursData, isLoading: hoursLoading } = useHoursData();

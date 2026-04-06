@@ -13,6 +13,13 @@ import { create, act } from 'react-test-renderer';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// Use official Reanimated mock + missing exports: prevents native binary initialization
+// and worklet background timer crashes when multiple test suites share a worker process.
+jest.mock('react-native-reanimated', () => {
+  const mock = require('react-native-reanimated/mock');
+  return { ...mock, useReducedMotion: () => false };
+});
+
 // ─── File path ────────────────────────────────────────────────────────────────
 
 // __dirname = hourglassws/app/(tabs)/__tests__
@@ -25,8 +32,12 @@ const INDEX_FILE = path.join(HOURGLASSWS_ROOT, 'app', '(tabs)', 'index.tsx');
 jest.mock('@/src/hooks/useHoursData');
 jest.mock('@/src/hooks/useEarningsHistory');
 jest.mock('@/src/hooks/useConfig');
+jest.mock('@/src/hooks/useApprovalItems', () => ({
+  useApprovalItems: () => ({ items: [], isLoading: false, error: null, refetch: jest.fn() }),
+}));
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn() }),
+  useFocusEffect: (cb: () => void) => { cb(); },
 }));
 
 // useFocusKey uses useIsFocused which requires NavigationContainer.
@@ -63,6 +74,26 @@ jest.mock('react-native-web/dist/exports/TextInput/index.js', () => {
       R.createElement(mockRN.View, props,
         R.createElement(mockRN.Text, null, defaultValue ?? value ?? '')
       ),
+  };
+});
+
+// FadeInScreen — stub (uses useIsFocused from react-navigation)
+jest.mock('@/src/components/FadeInScreen', () => {
+  const R = require('react');
+  return {
+    __esModule: true,
+    default: ({ children, ...props }: any) =>
+      R.createElement('View', props, children),
+  };
+});
+
+// AnimatedMeshBackground — stub
+jest.mock('@/src/components/AnimatedMeshBackground', () => {
+  const R = require('react');
+  return {
+    __esModule: true,
+    default: ({ panelState, ...props }: any) =>
+      R.createElement('View', { testID: 'animated-mesh-bg', ...props }),
   };
 });
 
