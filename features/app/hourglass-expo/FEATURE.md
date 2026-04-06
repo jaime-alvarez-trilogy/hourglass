@@ -95,6 +95,7 @@ Widget reads local store
 | 2026-03-08 | [04-ai-brainlift](specs/04-ai-brainlift/spec.md) | Work diary fetch, tag parsing, AI% formula, BrainLift hours, per-day AsyncStorage cache, AI tab screen |
 | 2026-03-08 | [06-widgets](specs/06-widgets/spec.md) | iOS (expo-widgets) + Android (react-native-android-widget) home screen widgets, WidgetData bridge, timeline entry generation, graceful degradation — **Complete** |
 | 2026-03-18 | [08-widget-enhancements](specs/08-widget-enhancements/spec.md) | Daily bar chart (large, Mon–Sun), manager approval mode-switch, contributor request status mode-switch, WidgetData type extension — **Complete** |
+| 2026-04-05 | [09-notifications-wiring](specs/09-notifications-wiring/spec.md) | Wire setNotificationHandler, registerPushToken, registerBackgroundPushHandler into _layout.tsx; unregisterPushToken on logout in modal.tsx |
 
 ## Files Created/Modified
 
