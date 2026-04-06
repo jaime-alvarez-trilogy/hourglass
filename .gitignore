@@ -1,7 +1,7 @@
 # Dependencies
 node_modules/
-package.json
-package-lock.json
+/package.json
+/package-lock.json
 
 # Tools & test scripts (may contain credentials)
 tools/
