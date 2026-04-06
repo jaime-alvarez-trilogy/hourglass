@@ -70,6 +70,8 @@ Widget reads local store
 | 06-widgets | iOS (expo-widgets) + Android (react-native-android-widget) home screen widgets, data bridge, timeline scheduling | — | 01,02,03,04,05 | L |
 | 07-ping-server | Vercel cron function, device token registration endpoint, silent push dispatch, push token storage | — | 01,02 | S |
 | 08-widget-enhancements | Daily bar chart (large, Mon–Sun), manager approval mode-switch, contributor request status mode-switch, WidgetData type extension | — | 06 | M |
+| 09-notifications-wiring | Wire registerPushToken, registerBackgroundPushHandler, setNotificationHandler into _layout.tsx; unregisterPushToken on logout | 10 | 07 | S |
+| 10-scheduled-notifications | useScheduledNotifications hook: Thursday 6pm deadline reminder + Monday 9am weekly summary as local scheduled notifications | — | 09 | S |
 
 ## Out of Scope (v1)
 
