@@ -95,7 +95,7 @@ Widget reads local store
 | 2026-03-08 | [04-ai-brainlift](specs/04-ai-brainlift/spec.md) | Work diary fetch, tag parsing, AI% formula, BrainLift hours, per-day AsyncStorage cache, AI tab screen |
 | 2026-03-08 | [06-widgets](specs/06-widgets/spec.md) | iOS (expo-widgets) + Android (react-native-android-widget) home screen widgets, WidgetData bridge, timeline entry generation, graceful degradation — **Complete** |
 | 2026-03-18 | [08-widget-enhancements](specs/08-widget-enhancements/spec.md) | Daily bar chart (large, Mon–Sun), manager approval mode-switch, contributor request status mode-switch, WidgetData type extension — **Complete** |
-| 2026-04-05 | [09-notifications-wiring](specs/09-notifications-wiring/spec.md) | Wire setNotificationHandler, registerPushToken, registerBackgroundPushHandler into _layout.tsx; unregisterPushToken on logout in modal.tsx |
+| 2026-04-05 | [09-notifications-wiring](specs/09-notifications-wiring/spec.md) | Wire setNotificationHandler, registerPushToken, registerBackgroundPushHandler into _layout.tsx; unregisterPushToken on logout in modal.tsx — **Complete** |
 
 ## Files Created/Modified
 
@@ -127,6 +127,12 @@ WS/
         useWidgetSync.ts        ← Foreground widget sync hook             [06-widgets, 08-widget-enhancements]
       notifications/
         handler.ts              ← FR5: background push handler            [07-ping-server]
+    app/
+      _layout.tsx               ← FR1-FR3: setNotificationHandler + push token + handler wiring  [09-notifications-wiring]
+      modal.tsx                 ← FR4: unregisterPushToken on logout                             [09-notifications-wiring]
+      __tests__/
+        layout-notifications.test.tsx  ← FR1-FR3 tests                                          [09-notifications-wiring]
+        modal-signout.test.tsx         ← FR4 tests                                              [09-notifications-wiring]
       components/               ← Shared UI
         AIProgressBar.tsx       ← progress bar with target marker  [04-ai-brainlift]
         DailyAIRow.tsx          ← per-day breakdown row            [04-ai-brainlift]
