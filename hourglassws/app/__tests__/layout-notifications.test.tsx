@@ -148,6 +148,11 @@ jest.mock('@expo-google-fonts/space-mono', () => ({
 
 const LAYOUT_FILE = path.resolve(__dirname, '../_layout.tsx');
 
+// Force _layout module to load NOW so setNotificationHandler fires during module init
+// before any test runs. We do this here (not in beforeAll) because jest.mock hoisting
+// guarantees mocks are in place before this module-level code executes.
+require('../_layout');
+
 // ─── FR1: setNotificationHandler at module scope ──────────────────────────────
 
 describe('FR1: setNotificationHandler — module scope', () => {
@@ -166,13 +171,11 @@ describe('FR1: setNotificationHandler — module scope', () => {
   });
 
   it('FR1.3 — setNotificationHandler is at module scope (not inside a function)', () => {
-    // Module-scope means it appears before any `function ` or `const ... = () =>` declaration
-    // It must not be indented inside a component body
+    // Module-scope means it appears before any component function declaration
     const handlerCallIndex = source.indexOf('setNotificationHandler(');
     const rootLayoutIndex = source.indexOf('function RootLayout');
     const appIndex = source.indexOf('function App');
     expect(handlerCallIndex).toBeGreaterThan(-1);
-    // Must appear before either component function definition
     const firstComponentIndex = Math.min(
       rootLayoutIndex === -1 ? Infinity : rootLayoutIndex,
       appIndex === -1 ? Infinity : appIndex
@@ -181,7 +184,6 @@ describe('FR1: setNotificationHandler — module scope', () => {
   });
 
   it('FR1.4 — setNotificationHandler is called once when module loads', () => {
-    // The mock spy was called by the module import
     expect(mockSetNotificationHandler).toHaveBeenCalledTimes(1);
   });
 

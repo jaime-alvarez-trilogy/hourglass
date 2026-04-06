@@ -122,14 +122,57 @@ describe('FR4: source file structure', () => {
     expect(source).toContain('@/src/lib/pushToken');
   });
 
-  it('FR4.0b — unregisterPushToken appears before clearAll in handleSignOut', () => {
-    const unregIndex = source.indexOf('unregisterPushToken');
-    const clearIndex = source.indexOf('clearAll');
+  it('FR4.0b — unregisterPushToken appears before clearAll in handleSignOut body', () => {
+    // Find the handleSignOut function body
+    const signOutFnIndex = source.indexOf('async function handleSignOut');
+    expect(signOutFnIndex).toBeGreaterThan(-1);
+    const fnBody = source.slice(signOutFnIndex);
+    const unregIndex = fnBody.indexOf('unregisterPushToken');
+    const clearIndex = fnBody.indexOf('clearAll');
     expect(unregIndex).toBeGreaterThan(-1);
     expect(clearIndex).toBeGreaterThan(-1);
     expect(unregIndex).toBeLessThan(clearIndex);
   });
 });
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Render the modal and return a function that simulates pressing the Sign Out
+ * button, which triggers Alert.alert. The Alert mock immediately invokes the
+ * destructive button's onPress so the async sign-out flow runs synchronously.
+ *
+ * Strategy: use renderer.root.findAll() to get instance-level access to nodes
+ * with onPress handlers. The Sign Out button is the last TouchableOpacity in
+ * the component tree that has an onPress prop. JSON-based tree search doesn't
+ * work because react-test-renderer strips function values in toJSON().
+ */
+function renderAndGetSignOut(alertSpy: jest.SpyInstance): () => Promise<void> {
+  let renderer: any;
+  act(() => {
+    renderer = create(React.createElement(require('../modal').default));
+  });
+
+  return async () => {
+    // Intercept Alert to immediately fire the destructive action
+    alertSpy.mockImplementationOnce((_title: string, _msg: string, buttons: any[]) => {
+      const destructive = buttons.find((b: any) => b.style === 'destructive');
+      destructive?.onPress?.();
+    });
+
+    // Find all instance nodes with onPress (instance tree retains function refs)
+    const nodesWithPress = renderer.root.findAll(
+      (node: any) => node.props?.onPress !== undefined
+    );
+    // Sign Out is the last pressable in the modal tree
+    const signOutNode = nodesWithPress[nodesWithPress.length - 1];
+    if (signOutNode?.props?.onPress) {
+      await act(async () => {
+        await signOutNode.props.onPress();
+      });
+    }
+  };
+}
 
 // ── Behaviour tests ───────────────────────────────────────────────────────────
 
@@ -139,6 +182,13 @@ describe('FR4: unregisterPushToken before clearAll in handleSignOut', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     callOrder.length = 0;
+    // Re-register tracking implementations after clearAllMocks
+    mockUnregisterPushToken.mockImplementation(async () => {
+      callOrder.push('unregisterPushToken');
+    });
+    mockClearAll.mockImplementation(async () => {
+      callOrder.push('clearAll');
+    });
     alertSpy = jest.spyOn(Alert, 'alert');
   });
 
@@ -146,78 +196,9 @@ describe('FR4: unregisterPushToken before clearAll in handleSignOut', () => {
     alertSpy.mockRestore();
   });
 
-  function renderModal() {
-    let renderer: any;
-    act(() => {
-      renderer = create(React.createElement(require('../modal').default));
-    });
-    return renderer;
-  }
-
   it('FR4.1 — unregisterPushToken is called before clearAll', async () => {
-    renderModal();
-
-    // Find and press sign-out button
-    const { findByType } = renderModal();
-    let pressHandlers: Array<() => void> = [];
-
-    act(() => {
-      const root = renderModal();
-      // Simulate pressing Sign Out
-    });
-
-    // Directly invoke handleSignOut via Alert mock interception
-    await act(async () => {
-      // Trigger alert by simulating button press
-      const renderer = renderModal();
-      // Get the Alert call from the last render's sign-out press
-      const json = renderer.toJSON();
-      // Find Sign Out button and press it
-      function findPressable(node: any): any {
-        if (!node) return null;
-        if (Array.isArray(node)) return node.map(findPressable).find(Boolean);
-        if (node.props?.onPress && JSON.stringify(node).includes('Sign Out')) return node;
-        return findPressable(node.children);
-      }
-      // We trigger via Alert spy interception instead
-    });
-
-    // Direct test: call the alert and trigger the destructive action
-    alertSpy.mockImplementationOnce((_title: string, _msg: string, buttons: any[]) => {
-      const destructive = buttons.find((b) => b.style === 'destructive');
-      destructive?.onPress?.();
-    });
-
-    // Re-render and tap sign out button
-    let renderer: any;
-    act(() => {
-      renderer = create(React.createElement(require('../modal').default));
-    });
-
-    // Find the sign out touchable and fire its onPress
-    function findByText(node: any, text: string): any {
-      if (!node) return null;
-      if (typeof node === 'string' && node === text) return true;
-      if (node.props) {
-        if (findByText(node.props.children, text)) return node;
-      }
-      if (Array.isArray(node)) {
-        for (const child of node) {
-          const found = findByText(child, text);
-          if (found && found !== true) return found;
-        }
-      }
-      return null;
-    }
-
-    const tree = renderer.toJSON();
-    const signOutNode = findByText(tree, 'Sign Out');
-
-    await act(async () => {
-      if (signOutNode?.props?.onPress) {
-        await signOutNode.props.onPress();
-      }
-    });
+    const triggerSignOut = renderAndGetSignOut(alertSpy);
+    await triggerSignOut();
 
     expect(callOrder).toEqual(expect.arrayContaining(['unregisterPushToken', 'clearAll']));
     const unregIdx = callOrder.indexOf('unregisterPushToken');
@@ -228,77 +209,15 @@ describe('FR4: unregisterPushToken before clearAll in handleSignOut', () => {
   it('FR4.2 — clearAll is still called even if unregisterPushToken throws', async () => {
     mockUnregisterPushToken.mockRejectedValueOnce(new Error('network error'));
 
-    alertSpy.mockImplementationOnce((_title: string, _msg: string, buttons: any[]) => {
-      const destructive = buttons.find((b) => b.style === 'destructive');
-      destructive?.onPress?.();
-    });
-
-    let renderer: any;
-    act(() => {
-      renderer = create(React.createElement(require('../modal').default));
-    });
-
-    function findByText(node: any, text: string): any {
-      if (!node) return null;
-      if (typeof node === 'string' && node === text) return true;
-      if (node.props) {
-        if (findByText(node.props.children, text)) return node;
-      }
-      if (Array.isArray(node)) {
-        for (const child of node) {
-          const found = findByText(child, text);
-          if (found && found !== true) return found;
-        }
-      }
-      return null;
-    }
-
-    const tree = renderer.toJSON();
-    const signOutNode = findByText(tree, 'Sign Out');
-
-    await act(async () => {
-      if (signOutNode?.props?.onPress) {
-        await signOutNode.props.onPress();
-      }
-    });
+    const triggerSignOut = renderAndGetSignOut(alertSpy);
+    await triggerSignOut();
 
     expect(mockClearAll).toHaveBeenCalledTimes(1);
   });
 
-  it('FR4.3 — router.replace called after clearAll', async () => {
-    alertSpy.mockImplementationOnce((_title: string, _msg: string, buttons: any[]) => {
-      const destructive = buttons.find((b) => b.style === 'destructive');
-      destructive?.onPress?.();
-    });
-
-    let renderer: any;
-    act(() => {
-      renderer = create(React.createElement(require('../modal').default));
-    });
-
-    function findByText(node: any, text: string): any {
-      if (!node) return null;
-      if (typeof node === 'string' && node === text) return true;
-      if (node.props) {
-        if (findByText(node.props.children, text)) return node;
-      }
-      if (Array.isArray(node)) {
-        for (const child of node) {
-          const found = findByText(child, text);
-          if (found && found !== true) return found;
-        }
-      }
-      return null;
-    }
-
-    const tree = renderer.toJSON();
-    const signOutNode = findByText(tree, 'Sign Out');
-
-    await act(async () => {
-      if (signOutNode?.props?.onPress) {
-        await signOutNode.props.onPress();
-      }
-    });
+  it('FR4.3 — router.replace called with /(auth)/welcome', async () => {
+    const triggerSignOut = renderAndGetSignOut(alertSpy);
+    await triggerSignOut();
 
     expect(mockReplace).toHaveBeenCalledWith('/(auth)/welcome');
   });

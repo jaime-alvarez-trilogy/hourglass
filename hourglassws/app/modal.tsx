@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState, startTransition } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { clearAll, loadCredentials, saveConfig } from '@/src/store/config';
+import { unregisterPushToken } from '@/src/lib/pushToken';
 import { fetchAndBuildConfig } from '@/src/api/auth';
 import { MOCK_TEAM_ITEMS } from '@/src/lib/devMock';
 import { useConfig } from '@/src/hooks/useConfig';
@@ -46,6 +47,7 @@ export default function ModalScreen() {
         text: 'Sign Out',
         style: 'destructive',
         onPress: async () => {
+          await unregisterPushToken().catch(() => {});
           await clearAll();
           queryClient.setQueryData(['config'], null);
           router.replace('/(auth)/welcome');

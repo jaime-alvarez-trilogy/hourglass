@@ -1,7 +1,8 @@
 import '../global.css';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack, useRouter, useSegments } from 'expo-router';
@@ -36,6 +37,17 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useConfig } from '@/src/hooks/useConfig';
 import { useRoleRefresh } from '@/src/hooks/useRoleRefresh';
 import { colors } from '@/src/lib/colors';
+import { registerPushToken } from '@/src/lib/pushToken';
+import { registerBackgroundPushHandler } from '@/src/notifications/handler';
+
+// FR1: Configure foreground notification display before any component renders
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 // Prevent auto-hide so we can control it after config loads
 SplashScreen.preventAutoHideAsync();
@@ -55,6 +67,23 @@ function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
   useRoleRefresh();
+
+  // FR2: Register push token once when setup completes
+  const hasRegisteredToken = useRef(false);
+  useEffect(() => {
+    if (!config?.setupComplete || hasRegisteredToken.current) return;
+    hasRegisteredToken.current = true;
+    registerPushToken().catch(() => {});
+  }, [config?.setupComplete]);
+
+  // FR3: Register background push handler on mount, clean up on unmount
+  const pushSubscription = useRef<Notifications.Subscription | null>(null);
+  useEffect(() => {
+    pushSubscription.current = registerBackgroundPushHandler();
+    return () => {
+      pushSubscription.current?.remove();
+    };
+  }, []);
 
   const [fontsLoaded] = useFonts({
     Inter_300Light,
