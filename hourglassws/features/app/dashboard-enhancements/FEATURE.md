@@ -18,3 +18,4 @@ All four specs are independent and can run in parallel.
 ## Changelog
 
 - 2026-04-05: Feature created from session priorities 4–6 + brand guidelines §6.4 gap
+- 2026-04-06: [03-hours-variance](specs/03-hours-variance/spec.md) — hours consistency variance label for Weekly Hours ChartSection
