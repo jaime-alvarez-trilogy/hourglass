@@ -77,6 +77,10 @@ interface ChartSectionProps {
   label: string;
   heroValue: string;
   subtitle?: string;
+  /** Inline label appended after subtitle with · separator (03-hours-variance) */
+  subtitleRight?: string;
+  /** Color for subtitleRight text — defaults to textSecondary when absent */
+  subtitleRightColor?: string;
   data: number[];
   color: string;
   /** Semantic border accent color per brand §1.4. Defaults to card default (violet). */
@@ -99,6 +103,8 @@ function ChartSection({
   label,
   heroValue,
   subtitle,
+  subtitleRight,
+  subtitleRightColor,
   data,
   color,
   borderAccentColor,
@@ -156,8 +162,20 @@ function ChartSection({
               </View>
             )}
           </View>
-          {subtitle ? (
-            <Text className="text-textSecondary text-xs font-sans mt-0.5">{subtitle}</Text>
+          {(subtitle || subtitleRight) ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 2 }}>
+              {subtitle ? (
+                <Text className="text-textSecondary text-xs font-sans">{subtitle}</Text>
+              ) : null}
+              {subtitleRight ? (
+                <Text
+                  className="text-xs font-sans"
+                  style={{ color: subtitleRightColor ?? colors.textSecondary }}
+                >
+                  {subtitle ? ' · ' : ''}{subtitleRight}
+                </Text>
+              ) : null}
+            </View>
           ) : null}
           <View
             style={{ height: CHART_HEIGHT }}
@@ -250,6 +268,13 @@ export default function OverviewScreen() {
 
   // ── Hours variance (03-hours-variance) ────────────────────────────────────
   const hoursVariance = computeHoursVariance(overviewData.hours);
+  const varianceColor = hoursVariance
+    ? hoursVariance.isConsistent
+      ? colors.success                 // stdDev ≤ 2 → on-track green
+      : hoursVariance.stdDev <= 3
+        ? colors.warning               // 2 < stdDev ≤ 3 → amber caution
+        : colors.textSecondary         // stdDev > 3 → informational grey
+    : undefined;
 
   // ── Streaks & hit rate ─────────────────────────────────────────────────────
   const aiStreak = computeStreak(overviewData.aiPct, 75);
@@ -432,9 +457,9 @@ export default function OverviewScreen() {
             <ChartSection
               label="WEEKLY HOURS"
               heroValue={`${heroHours.toFixed(1)}h`}
-              subtitle={hoursVariance
-                ? `Goal: ${weeklyLimit}h · ${hoursVariance.label}`
-                : `Goal: ${weeklyLimit}h / week`}
+              subtitle={`Goal: ${weeklyLimit}h / week`}
+              subtitleRight={hoursVariance?.label}
+              subtitleRightColor={varianceColor}
               data={overviewData.hours}
               color={colors.success}
               borderAccentColor={computeSnapshotHoursColor(heroHours, weeklyLimit)}
