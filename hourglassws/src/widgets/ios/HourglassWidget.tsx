@@ -216,13 +216,13 @@ export function IosBarChart({ daily, accent }: { daily: WidgetDailyEntry[]; acce
 // Does NOT render earnings or hoursRemaining (content triage for small size).
 // 01-ios-hud-layout FR2: hero font weight: 'bold', design: 'rounded'
 
-function SmallWidget({ props }: { props: WidgetData }) {
+function SmallWidget({ props, renderingMode = 'fullColor' }: { props: WidgetData; renderingMode?: string }) {
   const accent = URGENCY_ACCENT[props.urgency] ?? URGENCY_ACCENT.none;
 
   return (
     <ZStack>
-      {/* Atmospheric background: base + accent glow + blue glow */}
-      <WidgetBackground accent={accent} />
+      {/* Atmospheric background: skip in accented/vibrant — system controls bg */}
+      {renderingMode === 'fullColor' && <WidgetBackground accent={accent} />}
 
       <VStack padding={14} alignment="leading" spacing={6}>
         <SectionLabel text="THIS WEEK" />
@@ -253,14 +253,14 @@ function SmallWidget({ props }: { props: WidgetData }) {
 // ─── Medium Widget ────────────────────────────────────────────────────────────
 // 01-ios-hud-layout FR3: priority-branched layouts (P1/P2/P3)
 
-function MediumWidget({ props }: { props: WidgetData }) {
+function MediumWidget({ props, renderingMode = 'fullColor' }: { props: WidgetData; renderingMode?: string }) {
   const accent   = URGENCY_ACCENT[props.urgency] ?? URGENCY_ACCENT.none;
   const priority = getPriority(props);
 
   return (
     <ZStack>
-      {/* Atmospheric background: base + accent glow + blue glow */}
-      <WidgetBackground accent={accent} />
+      {/* Atmospheric background: skip in accented/vibrant — system controls bg */}
+      {renderingMode === 'fullColor' && <WidgetBackground accent={accent} />}
 
       <VStack padding={14} spacing={10}>
 
@@ -378,14 +378,14 @@ function MediumWidget({ props }: { props: WidgetData }) {
 //   P3: default   — multi-card dashboard with bar chart
 // Bottom padding = 28 for visual balance.
 
-function LargeWidget({ props }: { props: WidgetData }) {
+function LargeWidget({ props, renderingMode = 'fullColor' }: { props: WidgetData; renderingMode?: string }) {
   const accent   = URGENCY_ACCENT[props.urgency] ?? URGENCY_ACCENT.none;
   const priority = getPriority(props);
 
   return (
     <ZStack>
-      {/* Atmospheric background: base + accent glow + blue glow */}
-      <WidgetBackground accent={accent} />
+      {/* Atmospheric background: skip in accented/vibrant — system controls bg */}
+      {renderingMode === 'fullColor' && <WidgetBackground accent={accent} />}
 
       {/* Uniform 16pt padding on all sides */}
       <VStack padding={16} spacing={12} alignment="leading">
@@ -538,24 +538,25 @@ function LargeWidget({ props }: { props: WidgetData }) {
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createWidget } = require('expo-widgets');
 
-const HourglassWidget = createWidget('HourglassWidget', (props: WidgetData & { widgetFamily?: string }) => {
+const HourglassWidget = createWidget('HourglassWidget', (props: WidgetData & { widgetFamily?: string; widgetRenderingMode?: string }) => {
   'widget';
 
   const family = props.widgetFamily ?? 'systemMedium';
+  const renderingMode = props.widgetRenderingMode ?? 'fullColor';
 
   if (family === 'systemSmall') {
-    return <SmallWidget props={props} />;
+    return <SmallWidget props={props} renderingMode={renderingMode} />;
   }
 
   if (family === 'systemLarge') {
-    return <LargeWidget props={props} />;
+    return <LargeWidget props={props} renderingMode={renderingMode} />;
   }
 
-  return <MediumWidget props={props} />;
+  return <MediumWidget props={props} renderingMode={renderingMode} />;
 });
 
 export default HourglassWidget;
 
 // Named exports for unit testing — allows tests to render sub-components directly
 // without going through the expo-widgets createWidget/default export path.
-export { SmallWidget, MediumWidget, LargeWidget };
+export { SmallWidget, MediumWidget, LargeWidget, WidgetBackground };
