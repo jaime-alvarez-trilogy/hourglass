@@ -71,7 +71,9 @@
           "widgets": [
             {
               "name": "HourglassWidget",
-              "label": "Hourglass"
+              "label": "Hourglass",
+              "minWidth": "250dp",
+              "minHeight": "110dp"
             }
           ],
           "widgetTaskHandler": "./src/widgets/android/widgetTaskHandler"
