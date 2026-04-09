@@ -44,3 +44,4 @@ gauntlet-output/
 # generated native folders
 /ios
 /android
+.appstore/
