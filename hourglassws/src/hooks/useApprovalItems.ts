@@ -74,7 +74,7 @@ export function useApprovalItems(): {
   const { data, isLoading, error, refetch: queryRefetch } = useQuery({
     queryKey: APPROVALS_KEY,
     queryFn: fetchAllApprovalItems,
-    retry: false,
+    retry: 2,
     staleTime: 0,
     refetchOnWindowFocus: false, // prevent focus events from triggering refetch loop
   })

@@ -4,7 +4,10 @@ import { useEffect, useRef } from 'react';
 import { ActivityIndicator, AppState, View } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { focusManager, QueryClient } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -67,8 +70,16 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 1000 * 60 * 15, // 15 minutes — matches widget refresh cycle
       retry: 2,
+      gcTime: 1000 * 60 * 60 * 24, // keep cache for 24h so persistence has data to save
     },
   },
+});
+
+// Persist query cache to AsyncStorage so data survives app restarts.
+// Max age 24h — stale data is better than a blank screen on cold start.
+const asyncStoragePersister = createAsyncStoragePersister({
+  storage: AsyncStorage,
+  key: 'HOURGLASS_QUERY_CACHE',
 });
 
 function RootLayout() {
@@ -156,9 +167,12 @@ function RootLayout() {
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <QueryClientProvider client={queryClient}>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{ persister: asyncStoragePersister, maxAge: 1000 * 60 * 60 * 24 }}
+      >
         <RootLayout />
-      </QueryClientProvider>
+      </PersistQueryClientProvider>
     </GestureHandlerRootView>
   );
 }

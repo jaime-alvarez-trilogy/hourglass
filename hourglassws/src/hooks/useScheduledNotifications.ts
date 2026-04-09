@@ -149,9 +149,12 @@ export function useScheduledNotifications(
         const { granted } = await Notifications.getPermissionsAsync();
         if (!granted) return;
 
-        // Read hoursRemaining from the last widget bridge write
+        // Read hoursRemaining from the last widget bridge write.
+        // If no widget data exists yet (new install, first open), skip the
+        // Thursday reminder entirely — it will be scheduled once real data loads.
         const raw = await AsyncStorage.getItem(WIDGET_DATA_KEY);
-        const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
+        if (!raw) return;
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
         const hoursRemaining = (parsed?.hoursRemaining as number) ?? 0;
 
         await scheduleThursdayReminder(hoursRemaining, config.weeklyLimit);
