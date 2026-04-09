@@ -258,7 +258,7 @@ export default function HoursDashboard() {
       />
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ padding: 16, paddingTop: 8, gap: 12 }}
+        contentContainerStyle={{ padding: 16, paddingTop: 8, paddingBottom: 100, gap: 12 }}
         refreshControl={
           <RefreshControl
             refreshing={isLoading && !!data}

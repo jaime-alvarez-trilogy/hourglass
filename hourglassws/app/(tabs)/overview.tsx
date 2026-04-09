@@ -360,7 +360,7 @@ export default function OverviewScreen() {
         <ScrollView
           ref={scrollRef}
           className="flex-1"
-          contentContainerStyle={{ padding: 16, paddingTop: 8, gap: 12 }}
+          contentContainerStyle={{ padding: 16, paddingTop: 8, paddingBottom: 100, gap: 12 }}
         >
           {/* ── Approval urgency card (01-approval-urgency-card) ──────────── */}
           {isManager && approvalItems.length > 0 && (

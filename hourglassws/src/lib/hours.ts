@@ -263,9 +263,8 @@ export function calculateHours(
 // ─── computeDeadlineCountdown ─────────────────────────────────────────────────
 
 /**
- * Returns time remaining until the Crossover week cutoff (Thursday 23:59:59 UTC).
+ * Returns time remaining until end of the Crossover work week (Sunday 23:59:59 UTC).
  *
- * - If today is Friday/Sat/Sun, targets NEXT Thursday (next week's deadline).
  * - urgency: 'none' (>48h), 'warning' (24–48h), 'critical' (<24h)
  * - label: "2d 14h left" | "23h 45m left" | "45m left"
  */
@@ -274,25 +273,13 @@ export function computeDeadlineCountdown(now = new Date()): {
   label: string;
   urgency: 'none' | 'warning' | 'critical';
 } {
-  // Day of week in UTC: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
-  const utcDay = now.getUTCDay();
-
-  // Days until Thursday from current UTC day:
-  // Mon(1)=3, Tue(2)=2, Wed(3)=1, Thu(4)=0, Fri(5)=6, Sat(6)=5, Sun(0)=4
-  let daysUntilThursday: number;
-  if (utcDay <= 4) {
-    // Mon–Thu: target this week's Thursday
-    daysUntilThursday = 4 - utcDay;
-  } else {
-    // Fri(5) or Sat(6): target next week's Thursday
-    daysUntilThursday = 7 - utcDay + 4;
-  }
-
-  // Build deadline: Thursday 23:59:59 UTC
+  // Use Sunday 23:59:59 UTC as the week cutoff (Mon–Sun work week)
+  const utcDay = now.getUTCDay(); // 0 = Sunday
+  const daysUntilSunday = utcDay === 0 ? 0 : 7 - utcDay;
   const deadline = new Date(Date.UTC(
     now.getUTCFullYear(),
     now.getUTCMonth(),
-    now.getUTCDate() + daysUntilThursday,
+    now.getUTCDate() + daysUntilSunday,
     23, 59, 59, 0
   ));
 

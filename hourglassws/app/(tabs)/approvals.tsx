@@ -162,7 +162,7 @@ export default function ApprovalsScreen() {
         )}
 
         <ScrollView
-          contentContainerStyle={{ paddingBottom: 40 }}
+          contentContainerStyle={{ paddingBottom: 100 }}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}

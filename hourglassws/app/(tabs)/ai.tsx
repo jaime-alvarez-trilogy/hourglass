@@ -44,7 +44,7 @@ import Animated from 'react-native-reanimated';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
-const CONTENT_STYLE = { padding: 16, paddingTop: 56, gap: 12 } as const;
+const CONTENT_STYLE = { padding: 16, paddingTop: 56, paddingBottom: 100, gap: 12 } as const;
 
 /** Compare first half vs second half of the series to detect trend direction. */
 function trendDirection(aiPct: number[]): 'up' | 'down' | 'flat' {
